@@ -393,16 +393,14 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
         self.registered_exchanges.insert(exchange_id);
     }
 
-    fn register_trader<SubscriptionConfigs>(&mut self,
-                                            trader_id: TraderID,
-                                            subscription_configs: SubscriptionConfigs)
-        where SubscriptionConfigs: IntoIterator<
-            Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)
-        >
+    fn register_trader(
+        &mut self,
+        trader_id: TraderID,
+        sub_cfgs: impl IntoIterator<Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)>)
     {
         self.trader_configs.insert(
             trader_id,
-            subscription_configs.into_iter()
+            sub_cfgs.into_iter()
                 .inspect(
                     |(exchange, traded_pair, subscription_config)| {
                         if !self.registered_exchanges.contains(&exchange) {

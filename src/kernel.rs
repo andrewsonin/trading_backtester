@@ -98,21 +98,17 @@ impl<
 >
 Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R>
 {
-    pub fn new<EIter, BIter, TIter, ConnectedExchanges, ConnectedBrokers, SubscriptionConfigs>(
-        exchanges: EIter,
-        brokers: BIter,
-        traders: TIter,
-        mut replay: R,
-        date_range: (DateTime, DateTime),
-    ) -> Self
-        where EIter: IntoIterator<Item=E>,
-              BIter: IntoIterator<Item=(B, ConnectedExchanges)>,
-              TIter: IntoIterator<Item=(T, ConnectedBrokers)>,
-              ConnectedExchanges: IntoIterator<Item=ExchangeID>,
-              ConnectedBrokers: IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
-              SubscriptionConfigs: IntoIterator<
-                  Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)
-              >
+    pub fn new<CE, CB, SC>(exchanges: impl IntoIterator<Item=E>,
+                           brokers: impl IntoIterator<Item=(B, CE)>,
+                           traders: impl IntoIterator<Item=(T, CB)>,
+                           mut replay: R,
+                           date_range: (DateTime, DateTime)) -> Self
+        where
+            CE: IntoIterator<Item=ExchangeID>,      // Connected Exchanges
+            CB: IntoIterator<Item=(BrokerID, SC)>,  // Connected Brokers
+            SC: IntoIterator<                       // Subscription Configs
+                Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)
+            >
     {
         let (start_dt, end_dt) = date_range;
         if end_dt < start_dt {

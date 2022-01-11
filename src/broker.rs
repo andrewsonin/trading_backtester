@@ -64,12 +64,9 @@ pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol>: TimeSync + Named<Broke
 
     fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID);
 
-    fn register_trader<SubscriptionConfigs>(
+    fn register_trader(
         &mut self,
         trader_id: TraderID,
-        subscription_configs: SubscriptionConfigs,
-    )
-        where SubscriptionConfigs: IntoIterator<
-            Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)
-        >;
+        sub_cfgs: impl IntoIterator<Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)>,
+    );
 }

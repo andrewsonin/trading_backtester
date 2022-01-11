@@ -45,10 +45,10 @@ mod yaml_utils
         yaml_rust::{Yaml, yaml::{Array, Hash}},
     };
 
-    pub fn expect_yaml_hashmap<'a, F: Fn() -> String>(
+    pub fn expect_yaml_hashmap<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: F) -> &'a Hash
+        get_current_section: impl Fn() -> String) -> &'a Hash
     {
         match yml {
             Yaml::Hash(map) => map,
@@ -62,10 +62,10 @@ mod yaml_utils
         }
     }
 
-    pub fn try_expect_yaml_hashmap<'a, F: Fn() -> String>(
+    pub fn try_expect_yaml_hashmap<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: F) -> Option<&'a Hash>
+        get_current_section: impl Fn() -> String) -> Option<&'a Hash>
     {
         match yml {
             Yaml::Hash(map) => Some(map),
@@ -77,10 +77,10 @@ mod yaml_utils
         }
     }
 
-    pub fn expect_yaml_array<'a, F: Fn() -> String>(
+    pub fn expect_yaml_array<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: F) -> &'a Array
+        get_current_section: impl Fn() -> String) -> &'a Array
     {
         match yml {
             Yaml::Array(arr) => arr,
@@ -94,10 +94,10 @@ mod yaml_utils
         }
     }
 
-    pub fn expect_yaml_string<'a, F: Fn() -> String>(
+    pub fn expect_yaml_string<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: F) -> &'a String
+        get_current_section: impl Fn() -> String) -> &'a String
     {
         match yml {
             Yaml::String(string) => string,
@@ -111,10 +111,10 @@ mod yaml_utils
         }
     }
 
-    pub fn expect_yaml_real<'a, F: Fn() -> String>(
+    pub fn expect_yaml_real<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: F) -> &'a String
+        get_current_section: impl Fn() -> String) -> &'a String
     {
         match yml {
             Yaml::Real(real) => real,
@@ -128,11 +128,11 @@ mod yaml_utils
         }
     }
 
-    pub fn read_yaml_hashmap_field<'a, F: Fn() -> String>(
+    pub fn read_yaml_hashmap_field<'a>(
         map: &'a Hash,
         field: &str,
         path: &Path,
-        get_current_section: F) -> &'a Yaml
+        get_current_section: impl Fn() -> String) -> &'a Yaml
     {
         try_read_yaml_hashmap_field(map, field).expect_with(
             || panic!(
@@ -162,7 +162,7 @@ mod yaml_utils
         fn from(s: &String) -> Self { YamlValue::String(s.to_string()) }
     }
 
-    pub fn expect_yaml_value<F: Fn() -> String>(yml: &Yaml, get_current_section: F) -> YamlValue
+    pub fn expect_yaml_value(yml: &Yaml, get_current_section: impl Fn() -> String) -> YamlValue
     {
         match yml {
             Yaml::Real(real) => f64::from_str(real)
@@ -331,11 +331,11 @@ fn init_defaults() -> Env {
         .collect()
 }
 
-fn update_env<F: Fn() -> String, const KEYS_NUM: usize>(
+fn update_env<const KEYS_NUM: usize>(
     map: &Hash,
     env: &mut Env,
     path: &Path,
-    get_current_section: F,
+    get_current_section: impl Fn() -> String,
     possible_keys: [&str; KEYS_NUM])
 {
     map.into_iter().for_each(
@@ -511,12 +511,12 @@ fn parse_exchanges_section<
     )
 }
 
-fn parse_exchange_sessions<ExchangeID: Identifier, F: Fn() -> String>(
+fn parse_exchange_sessions<ExchangeID: Identifier>(
     yaml: &Hash,
     name: ExchangeID,
     path: &Path,
     mut env: HashMap<String, YamlValue>,
-    full_section_path: &F) -> Vec<ExchangeSession<ExchangeID>>
+    full_section_path: impl Copy + Fn() -> String) -> Vec<ExchangeSession<ExchangeID>>
 {
     const POSSIBLE_KEYS: [&str; 5] = [
         PATH,
@@ -831,7 +831,6 @@ fn parse_traded_pairs_section<
 fn parse_trade_start_stops<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    GetCurrentYamlSection: Fn() -> String
 >(
     map: &Hash,
     traded_pair: TradedPair<Symbol>,
@@ -839,7 +838,7 @@ fn parse_trade_start_stops<
     exchange_id: ExchangeID,
     mut env: HashMap<String, YamlValue>,
     path: &Path,
-    get_current_section: GetCurrentYamlSection) -> Vec<TradedPairLifetime<ExchangeID, Symbol>>
+    get_current_section: impl Fn() -> String) -> Vec<TradedPairLifetime<ExchangeID, Symbol>>
 {
     const POSSIBLE_KEYS: [&str; 5] = [
         PATH,
@@ -1066,8 +1065,7 @@ fn parse_trade_start_stops<
 
 fn gen_traded_pair_reader<
     ExchangeID: Identifier,
-    Symbol: Identifier,
-    F: Fn() -> String
+    Symbol: Identifier
 >(
     map: &Hash,
     traded_pair: TradedPair<Symbol>,
@@ -1075,7 +1073,7 @@ fn gen_traded_pair_reader<
     exchange_id: ExchangeID,
     env: HashMap<String, YamlValue>,
     path: &Path,
-    get_current_section: F,
+    get_current_section: impl Fn() -> String,
     err_log_file: Option<&str>) -> OneTickTradedPairReader<ExchangeID, Symbol>
 {
     let field = TRD;

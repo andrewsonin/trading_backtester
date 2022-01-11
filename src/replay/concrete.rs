@@ -109,17 +109,14 @@ impl<
 >
 OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, ObSnapshotInspector>
 {
-    pub(crate) fn new<TPR, EOC, TRC>(
+    pub(crate) fn new(
         ob_snapshot_delay_scheduler: ObSnapshotDelay,
         start_dt: DateTime,
-        traded_pair_readers: TPR,
-        exchange_open_close_events: EOC,
-        traded_pair_creation_events: TRC,
+        traded_pair_readers: impl IntoIterator<Item=OneTickTradedPairReader<ExchangeID, Symbol>>,
+        exchange_open_close_events: impl IntoIterator<Item=ExchangeSession<ExchangeID>>,
+        traded_pair_creation_events: impl IntoIterator<Item=TradedPairLifetime<ExchangeID, Symbol>>,
         inspect_ob_snapshot: ObSnapshotInspector,
     ) -> Self
-        where TPR: IntoIterator<Item=OneTickTradedPairReader<ExchangeID, Symbol>>,
-              EOC: IntoIterator<Item=ExchangeSession<ExchangeID>>,
-              TRC: IntoIterator<Item=TradedPairLifetime<ExchangeID, Symbol>>
     {
         let mut prev_dt: HashMap<ExchangeID, DateTime> = Default::default();
         let open_close_iterator = exchange_open_close_events.into_iter().map(

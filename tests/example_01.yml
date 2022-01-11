@@ -1,0 +1,56 @@
+Defaults:
+
+  datetime_format:     "%Y-%m-%d %H:%M:%S%.f"
+  csv_sep:             ','
+  open_colname:               OPEN
+  close_colname:              CLOSE
+  datetime_colname:           Timestamp
+  reference_order_id_colname: ORDER_ID
+  order_id_colname:           ORDER_ID
+  price_colname:              PRICE
+  size_colname:               SIZE
+  buy_sell_flag_colname:      BUY_SELL_FLAG
+  start_colname:              BEGIN
+  stop_colname:               STOP
+
+
+Simulation Time:
+
+  start: 2021-03-01 00:00:00
+  end:   2021-12-31 23:59:59
+
+
+Exchanges:
+
+  - name: MOEX
+    sessions:
+      path: example_01/open_close_times/MOEX_open_close.csv
+      open_colname:  OPEN
+      close_colname: CLOSE
+      datetime_format: "%Y-%m-%d %H:%M:%S%.f"
+
+  - name: NYSE
+    sessions:
+      path: example_01/open_close_times/NYSE_open_close.tsv
+      csv_sep: "\t"
+
+
+Traded Pairs:
+
+  - exchange: MOEX
+    kind:     Spot
+    quoted:   USD
+    base:     RUB
+    price_step: 0.0025
+    err_log_file: example_01/err_log.txt
+    start_stop_datetimes:
+      path: example_01/trades_start_stop_times/start_stop_01.csv
+      start_colname:    BEGIN
+      stop_colname:     STOP
+      datetime_format:  "%Y-%m-%d %H:%M:%S%.f"
+    trd:
+      path_list: example_01/trd_list.txt
+      datetime_colname: Timestamp
+      reference_order_id_colname: ORDER_ID
+    prl:
+      path_list: example_01/prl_list.txt

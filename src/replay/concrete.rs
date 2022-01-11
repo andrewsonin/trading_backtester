@@ -51,7 +51,7 @@ pub struct OneTickReplay<
     ExchangeID: Identifier,
     Symbol: Identifier,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>,
-    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>) -> ()
+    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>)
 > {
     current_dt: DateTime,
     traded_pair_readers: Vec<OneTickTradedPairReader<ExchangeID, Symbol>>,
@@ -105,7 +105,7 @@ impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>,
-    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>) -> ()
+    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>)
 >
 OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, ObSnapshotInspector>
 {
@@ -222,7 +222,7 @@ impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>,
-    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>) -> ()
+    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>)
 >
 TimeSync for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, ObSnapshotInspector>
 {
@@ -235,7 +235,7 @@ impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>,
-    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>) -> ()
+    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>)
 > Iterator for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, ObSnapshotInspector>
 {
     type Item = ReplayAction<ExchangeID, Symbol>;
@@ -263,7 +263,7 @@ impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>,
-    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>) -> ()
+    ObSnapshotInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>)
 >
 Replay<ExchangeID, Symbol>
 for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, ObSnapshotInspector>

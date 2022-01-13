@@ -5,7 +5,7 @@ pub struct LessElementBinaryHeap<T: Ord>(pub BinaryHeap<Reverse<T>>);
 
 impl<T: Ord> LessElementBinaryHeap<T>
 {
-    pub(crate) fn pop(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<T> {
         if let Some(Reverse(message)) = self.0.pop() {
             Some(message)
         } else {
@@ -13,7 +13,7 @@ impl<T: Ord> LessElementBinaryHeap<T>
         }
     }
 
-    pub(crate) fn push(&mut self, item: T) {
+    pub fn push(&mut self, item: T) {
         self.0.push(Reverse(item))
     }
 }

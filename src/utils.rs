@@ -1,36 +1,32 @@
 pub use enum_dispatch::enum_dispatch;
 
-use {crate::types::DateTime, std::panic::panic_any};
+use crate::types::DateTime;
 
 pub mod queue;
 pub mod input;
 
-pub trait ExpectWith<T, F>
-    where F: Fn() -> String
-{
-    fn expect_with(self, f: F) -> T;
+pub trait ExpectWith<T> {
+    fn expect_with(self, get_err_msg: impl Fn() -> String) -> T;
 }
 
-impl<T, F> ExpectWith<T, F> for Option<T>
-    where F: Fn() -> String
+impl<T> ExpectWith<T> for Option<T>
 {
-    fn expect_with(self, f: F) -> T {
+    fn expect_with(self, get_err_msg: impl Fn() -> String) -> T {
         if let Some(v) = self {
             v
         } else {
-            panic_any(f())
+            panic!("{}", get_err_msg())
         }
     }
 }
 
-impl<T, F, E> ExpectWith<T, F> for Result<T, E>
-    where F: Fn() -> String
+impl<T, E> ExpectWith<T> for Result<T, E>
 {
-    fn expect_with(self, f: F) -> T {
+    fn expect_with(self, get_err_msg: impl Fn() -> String) -> T {
         if let Ok(v) = self {
             v
         } else {
-            panic_any(f())
+            panic!("{}", get_err_msg())
         }
     }
 }

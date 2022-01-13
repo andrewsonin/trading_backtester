@@ -16,9 +16,9 @@ use {
 };
 
 #[enum_dispatch]
-pub trait Identifier: Hash + Ord + Copy + Display + Debug {}
+pub trait Identifier: Hash + Ord + Copy + Send + Sync + Display + Debug {}
 
-impl<T: Hash + Ord + Copy + Display + Debug> Identifier for T {}
+impl<T: Hash + Ord + Copy + Send + Sync + Display + Debug> Identifier for T {}
 
 #[enum_dispatch]
 pub trait Named<Name: Identifier> {

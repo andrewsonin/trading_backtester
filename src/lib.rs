@@ -8,3 +8,4 @@ pub mod order;
 pub mod order_book;
 pub mod replay;
 pub mod traded_pair;
+pub mod parallel;

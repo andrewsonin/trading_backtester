@@ -19,9 +19,10 @@ impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol> for DefaultTradedPai
         let base_symbol = FromStr::from_str(base_symbol).expect_with(
             || panic!("Cannot parse {} to Symbol", base_symbol)
         );
-        let kind = match kind {
-            "Spot" | "spot" => PairKind::Spot(Spot { settlement: SettleKind::Immediately }),
-            _ => panic!("Cannot parse to PairKind: {}", kind)
+        let kind = if let "Spot" | "spot" = kind {
+            PairKind::Spot(Spot { settlement: SettleKind::Immediately })
+        } else {
+            panic!("Cannot parse to PairKind: {}", kind)
         };
         TradedPair {
             kind,

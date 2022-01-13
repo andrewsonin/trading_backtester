@@ -20,11 +20,11 @@ pub enum ReplayRequest<Symbol: Identifier>
 
     StartTrades(TradedPair<Symbol>, PriceStep),
 
+    CancelLimitOrder(LimitOrderCancelRequest<Symbol>),
+
     PlaceMarketOrder(MarketOrderPlacingRequest<Symbol>),
 
     PlaceLimitOrder(LimitOrderPlacingRequest<Symbol>),
-
-    CancelLimitOrder(LimitOrderCancelRequest<Symbol>),
 
     BroadcastObStateToBrokers(TradedPair<Symbol>),
 

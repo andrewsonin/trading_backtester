@@ -13,6 +13,7 @@ rand = "^0.8.4"
 bitmask = "^0.5"
 csv = "^1.1.6"
 yaml-rust = "^0.4.5"
+rayon = "^1.5.1"
 
 [profile.test]
 opt-level = 3

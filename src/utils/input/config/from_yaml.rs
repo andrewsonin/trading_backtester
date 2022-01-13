@@ -5,9 +5,7 @@ use {
             ExchangeSession,
             GetNextObSnapshotDelay,
             OneTickReplay,
-            OneTickTradedPairReader,
             TradedPairLifetime,
-            TrdPrlInfo,
         },
         traded_pair::{TradedPair, TradedPairParser},
         types::{
@@ -18,7 +16,10 @@ use {
         },
         utils::{
             ExpectWith,
-            input::{from_yaml::{config_fields::*, yaml_utils::*}},
+            input::{
+                config::from_yaml::{config_fields::*, yaml_utils::*},
+                one_tick::{OneTickTradedPairReader, TrdPrlInfo},
+            },
         },
     },
     csv::StringRecord,
@@ -31,8 +32,6 @@ use {
     },
     yaml_rust::{Yaml, yaml::Hash, YamlLoader},
 };
-
-use crate::exchange::reply::ObSnapshot;
 
 #[cfg(test)]
 mod tests;
@@ -235,14 +234,13 @@ mod defaults {
     pub const CSV_SEP: &str = ",";
 }
 
-pub fn parse<ExchangeID, BrokerID, Symbol, TPP, ObSnapshotDelay, ObInspector>(
-    ob_snapshot_delay_scheduler: ObSnapshotDelay,
-    _traded_pair_parser: TPP,
+pub fn parse_yaml<ExchangeID, BrokerID, Symbol, TPP, ObSnapshotDelay>(
     path: impl AsRef<Path>,
-    inspect_ob_snapshot: ObInspector,
+    _traded_pair_parser: TPP,
+    ob_snapshot_delay_scheduler: ObSnapshotDelay,
 ) -> (
     Vec<BasicExchange<ExchangeID, BrokerID, Symbol>>,
-    OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, ObInspector>,
+    OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>,
     DateTime,
     DateTime
 )
@@ -250,8 +248,7 @@ pub fn parse<ExchangeID, BrokerID, Symbol, TPP, ObSnapshotDelay, ObInspector>(
           BrokerID: Identifier,
           Symbol: Identifier + FromStr,
           TPP: TradedPairParser<Symbol>,
-          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>,
-          ObInspector: FnMut(DateTime, ExchangeID, &ObSnapshot<Symbol>) -> ()
+          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
 {
     const POSSIBLE_SECTIONS: [&str; 4] = [
         DEFAULTS,
@@ -309,12 +306,11 @@ pub fn parse<ExchangeID, BrokerID, Symbol, TPP, ObSnapshotDelay, ObInspector>(
     (
         exchanges,
         OneTickReplay::new(
-            ob_snapshot_delay_scheduler,
             start,
             traded_pair_readers,
             sessions.into_iter().flatten(),
             start_stop_events.into_iter().flatten(),
-            inspect_ob_snapshot,
+            ob_snapshot_delay_scheduler,
         ),
         start,
         end

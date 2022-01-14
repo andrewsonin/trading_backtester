@@ -2,12 +2,12 @@ use {
     crate::{
         broker::Broker,
         exchange::Exchange,
-        kernel::Kernel,
+        kernel::KernelBuilder,
         replay::Replay,
         traded_pair::TradedPair,
         trader::{subscriptions::SubscriptionList, Trader},
         types::{DateTime, Identifier},
-        utils::{ExpectWith, input::config::FromConfig},
+        utils::ExpectWith,
     },
     rayon::{iter::{IntoParallelIterator, ParallelIterator}, ThreadPoolBuilder},
 };
@@ -32,10 +32,10 @@ pub fn parallel_backtest<
         BrokerID: Identifier,
         ExchangeID: Identifier,
         Symbol: Identifier,
-        E: Exchange<ExchangeID, BrokerID, Symbol> + FromConfig<ExchangeConfig>,
-        R: Replay<ExchangeID, Symbol> + FromConfig<ReplayConfig>,
-        B: Broker<BrokerID, TraderID, ExchangeID, Symbol> + FromConfig<BrokerConfig>,
-        T: Trader<TraderID, BrokerID, ExchangeID, Symbol> + FromConfig<TraderConfig>,
+        E: Exchange<ExchangeID, BrokerID, Symbol> + for<'a> From<&'a ExchangeConfig>,
+        R: Replay<ExchangeID, Symbol> + for<'a> From<&'a ReplayConfig>,
+        B: Broker<BrokerID, TraderID, ExchangeID, Symbol> + for<'a> From<&'a BrokerConfig>,
+        T: Trader<TraderID, BrokerID, ExchangeID, Symbol> + for<'a> From<&'a TraderConfig>,
         ExchangeConfig: Sync,
         BrokerConfig: Sync,
         ReplayConfig: Send,
@@ -60,17 +60,19 @@ pub fn parallel_backtest<
 
     let job = || per_thread_configs.into_par_iter().for_each(
         |(rng_seed, replay_config, trader_configs)| {
-            let exchanges = exchange_configs.iter().map(E::from_config);
+            let exchanges = exchange_configs.iter().map(E::from);
             let brokers = broker_configs.iter().map(
                 |(broker_cfg, connected_exchanges)|
-                    (B::from_config(broker_cfg), connected_exchanges.iter().cloned())
+                    (B::from(broker_cfg), connected_exchanges.iter().cloned())
             );
             let traders = trader_configs.into_iter().map(
                 |(trader_config, connected_brokers)|
-                    (T::from_config(&trader_config), connected_brokers)
+                    (T::from(&trader_config), connected_brokers)
             );
-            let replay = R::from_config(&replay_config);
-            Kernel::new(exchanges, brokers, traders, replay, date_range, rng_seed)
+            let replay = R::from(&replay_config);
+            KernelBuilder::new(exchanges, brokers, traders, replay, date_range)
+                .with_seed(rng_seed)
+                .build()
                 .run_simulation()
         }
     );

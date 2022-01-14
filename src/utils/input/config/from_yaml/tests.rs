@@ -1,12 +1,13 @@
 use {
     crate::{
         broker::concrete::BasicBroker,
-        kernel::Kernel,
-        replay::concrete::GetNextObSnapshotDelay,
+        exchange::concrete::BasicExchange,
+        kernel::KernelBuilder,
+        replay::concrete::{GetNextObSnapshotDelay, OneTickReplay},
         traded_pair::{concrete::DefaultTradedPairParser, PairKind, SettleKind, Spot, TradedPair},
         trader::{concrete::SpreadWriter, subscriptions::SubscriptionList},
-        types::{DateTime, Identifier, StdRng},
-        utils::input::config::from_yaml::parse_yaml,
+        types::{DateTime, Identifier},
+        utils::{input::config::from_yaml::parse_yaml, rand::{Rng, rngs::StdRng}},
     },
     std::{num::NonZeroU64, path::Path, str::FromStr},
 };
@@ -52,6 +53,7 @@ impl FromStr for SymbolName {
     }
 }
 
+#[derive(Copy, Clone)]
 struct DelayScheduler;
 
 impl<ExchangeID: Identifier, Symbol: Identifier>
@@ -61,7 +63,7 @@ GetNextObSnapshotDelay<ExchangeID, Symbol> for DelayScheduler
         &mut self,
         _: ExchangeID,
         _: TradedPair<Symbol>,
-        _: &mut StdRng,
+        _: &mut impl Rng,
         _: DateTime) -> Option<NonZeroU64>
     {
         Some(NonZeroU64::new(1_000_000_000).unwrap())
@@ -79,7 +81,7 @@ fn test_parse_yaml()
 {
     let test_files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
 
-    let (exchanges, replay, start_dt, end_dt) = parse_yaml(
+    let (exchange_configs, replay_config, start_dt, end_dt) = parse_yaml(
         test_files.join("example_01.yml"),
         DefaultTradedPairParser,
         DelayScheduler,
@@ -105,10 +107,15 @@ fn test_parse_yaml()
             ]
         )
     ];
-    let mut kernel = Kernel::new(
-        exchanges, brokers, traders, replay,
+    let mut kernel = KernelBuilder::new(
+        exchange_configs.iter().map(BasicExchange::from),
+        brokers,
+        traders,
+        OneTickReplay::from(&replay_config),
         (start_dt, end_dt),
-        3344,
-    );
+    )
+        .with_seed(3344)
+        .with_rng::<StdRng>()
+        .build();
     kernel.run_simulation()
 }

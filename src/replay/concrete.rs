@@ -3,7 +3,7 @@ use {
         exchange::reply::{
             ExchangeEventNotification,
             ExchangeToReplay,
-            ExchangeToReplayReply
+            ExchangeToReplayReply,
         },
         replay::{Replay, ReplayAction, request::{ReplayRequest, ReplayToExchange}},
         traded_pair::TradedPair,
@@ -13,13 +13,13 @@ use {
             Identifier,
             OrderID,
             PriceStep,
-            StdRng,
             TimeSync,
         },
         utils::{
             ExpectWith,
             input::one_tick::OneTickTradedPairReader,
             queue::LessElementBinaryHeap,
+            rand::Rng,
         },
     },
     std::{
@@ -36,7 +36,7 @@ pub trait GetNextObSnapshotDelay<ExchangeID: Identifier, Symbol: Identifier>
         &mut self,
         exchange_id: ExchangeID,
         traded_pair: TradedPair<Symbol>,
-        rng: &mut StdRng,
+        rng: &mut impl Rng,
         current_dt: DateTime) -> Option<NonZeroU64>;
 }
 
@@ -237,7 +237,7 @@ Replay<ExchangeID, Symbol> for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay
         &mut self,
         reply: ExchangeToReplay<Symbol>,
         exchange_id: ExchangeID,
-        rng: &mut StdRng) -> Vec<ReplayAction<ExchangeID, Symbol>>
+        rng: &mut impl Rng) -> Vec<ReplayAction<ExchangeID, Symbol>>
     {
         let mut get_ob_snapshot_delay = |traded_pair| {
             if let Some(delay) = self.ob_snapshot_delay_scheduler.get_ob_snapshot_delay(

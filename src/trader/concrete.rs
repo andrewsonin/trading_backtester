@@ -3,8 +3,8 @@ use {
         broker::reply::BrokerReply,
         exchange::reply::ExchangeEventNotification,
         trader::{Trader, TraderAction},
-        types::{Date, DateTime, Identifier, Named, ObState, PriceStep, Size, StdRng, TimeSync},
-        utils::ExpectWith,
+        types::{Date, DateTime, Identifier, Named, ObState, PriceStep, Size, TimeSync},
+        utils::{ExpectWith, rand::Rng},
     },
     std::{fs::File, io::Write, path::Path},
 };
@@ -50,8 +50,8 @@ for VoidTrader<TraderID>
     fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol>> {
         vec![]
     }
-    fn broker_to_trader_latency(&self, _: BrokerID, _: &mut StdRng, _: DateTime) -> u64 { 0 }
-    fn trader_to_broker_latency(&self, _: BrokerID, _: &mut StdRng, _: DateTime) -> u64 { 0 }
+    fn broker_to_trader_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
+    fn trader_to_broker_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }
 
@@ -127,7 +127,7 @@ for SpreadWriter<TraderID>
     fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol>> {
         unreachable!("Trader {} did not schedule any wakeups", self.get_name())
     }
-    fn broker_to_trader_latency(&self, _: BrokerID, _: &mut StdRng, _: DateTime) -> u64 { 0 }
-    fn trader_to_broker_latency(&self, _: BrokerID, _: &mut StdRng, _: DateTime) -> u64 { 0 }
+    fn broker_to_trader_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
+    fn trader_to_broker_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }

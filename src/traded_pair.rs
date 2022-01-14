@@ -13,7 +13,10 @@ pub struct TradedPair<Name: Identifier> {
 }
 
 pub trait TradedPairParser<Symbol: Identifier + FromStr> {
-    fn parse(kind: &str, quoted_symbol: &str, base_symbol: &str) -> TradedPair<Symbol>;
+    fn parse(
+        kind: impl AsRef<str>,
+        quoted_symbol: impl AsRef<str>,
+        base_symbol: impl AsRef<str>) -> TradedPair<Symbol>;
 }
 
 #[enum_dispatch]

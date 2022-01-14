@@ -1,8 +1,8 @@
 use crate::{
     broker::reply::BrokerReply,
     trader::request::TraderToBroker,
-    types::{DateTime, Identifier, Named, StdRng, TimeSync},
-    utils::enum_dispatch,
+    types::{DateTime, Identifier, Named, TimeSync},
+    utils::{enum_dispatch, rand::Rng},
 };
 
 pub mod request;
@@ -46,13 +46,13 @@ pub trait Trader<TraderID, BrokerID, ExchangeID, Symbol>: TimeSync + Named<Trade
     fn broker_to_trader_latency(
         &self,
         broker_id: BrokerID,
-        rng: &mut StdRng,
+        rng: &mut impl Rng,
         event_dt: DateTime) -> u64;
 
     fn trader_to_broker_latency(
         &self,
         broker_id: BrokerID,
-        rng: &mut StdRng,
+        rng: &mut impl Rng,
         event_dt: DateTime) -> u64;
 
     fn upon_register_at_broker(&mut self, broker_id: BrokerID);

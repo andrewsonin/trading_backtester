@@ -3,8 +3,8 @@ use crate::{
     exchange::reply::ExchangeToBrokerReply,
     traded_pair::TradedPair,
     trader::{request::TraderRequest, subscriptions::SubscriptionList},
-    types::{DateTime, Identifier, Named, StdRng, TimeSync},
-    utils::enum_dispatch,
+    types::{DateTime, Identifier, Named, TimeSync},
+    utils::{enum_dispatch, rand::Rng},
 };
 
 pub mod reply;
@@ -53,13 +53,13 @@ pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol>: TimeSync + Named<Broke
     fn broker_to_exchange_latency(
         &self,
         exchange_id: ExchangeID,
-        rng: &mut StdRng,
+        rng: &mut impl Rng,
         event_dt: DateTime) -> u64;
 
     fn exchange_to_broker_latency(
         &self,
         exchange_id: ExchangeID,
-        rng: &mut StdRng,
+        rng: &mut impl Rng,
         event_dt: DateTime) -> u64;
 
     fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID);

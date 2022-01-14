@@ -1,8 +1,8 @@
 use crate::{
     exchange::reply::ExchangeToReplay,
     replay::request::ReplayToExchange,
-    types::{DateTime, Identifier, StdRng, TimeSync},
-    utils::enum_dispatch,
+    types::{DateTime, Identifier, TimeSync},
+    utils::{enum_dispatch, rand::Rng},
 };
 
 pub mod request;
@@ -26,5 +26,5 @@ pub trait Replay<ExchangeID, Symbol>: TimeSync + Iterator<Item=ReplayAction<Exch
         &mut self,
         reply: ExchangeToReplay<Symbol>,
         exchange_id: ExchangeID,
-        rng: &mut StdRng) -> Vec<ReplayAction<ExchangeID, Symbol>>;
+        rng: &mut impl Rng) -> Vec<ReplayAction<ExchangeID, Symbol>>;
 }

@@ -12,6 +12,7 @@ use {
         collections::{hash_map::Entry::{Occupied, Vacant}, HashMap, VecDeque},
         fs::File,
         io::{BufRead, BufReader, Write},
+        path::Path,
         str::FromStr,
     },
 };
@@ -37,9 +38,9 @@ pub struct OneTickTradedPairReader<
 
 pub(crate) struct HistoryReader
 {
-    files_to_parse: VecDeque<String>,
+    files_to_parse: VecDeque<Box<Path>>,
     buffered_entries: VecDeque<HistoryEntry>,
-    args: TrdPrlInfo,
+    args: TrdPrlConfig,
 }
 
 #[derive(Copy, Clone)]
@@ -52,7 +53,7 @@ pub(crate) struct HistoryEntry {
 }
 
 #[derive(Clone)]
-pub struct TrdPrlInfo {
+pub struct TrdPrlConfig {
     pub datetime_colname: String,
     pub order_id_colname: String,
     pub price_colname: String,
@@ -77,11 +78,11 @@ OneTickTradedPairReader<ExchangeID, Symbol>
     pub fn new(
         exchange_id: ExchangeID,
         traded_pair: TradedPair<Symbol>,
-        prl_files: &str,
-        prl_args: TrdPrlInfo,
-        trd_files: &str,
-        trd_args: TrdPrlInfo,
-        err_log_file: Option<&str>) -> Self
+        prl_files: Box<Path>,
+        prl_args: TrdPrlConfig,
+        trd_files: Box<Path>,
+        trd_args: TrdPrlConfig,
+        err_log_file: Option<Box<Path>>) -> Self
     {
         let mut prl_reader = HistoryReader::new(prl_files, prl_args);
         let mut trd_reader = HistoryReader::new(trd_files, trd_args);
@@ -94,8 +95,8 @@ OneTickTradedPairReader<ExchangeID, Symbol>
             active_limit_orders: Default::default(),
             traded_pair,
             err_log_file: if let Some(err_log_file) = err_log_file {
-                let file = File::create(err_log_file).expect_with(
-                    || panic!("Cannot create file {}", err_log_file)
+                let file = File::create(&err_log_file).expect_with(
+                    || panic!("Cannot create file {:?}", err_log_file)
                 );
                 Some(file)
             } else {
@@ -286,22 +287,41 @@ impl Iterator for HistoryReader {
 
 impl HistoryReader
 {
-    fn new(files_to_parse: &str, args: TrdPrlInfo) -> Self
+    fn new(files_to_parse: impl AsRef<Path>, args: TrdPrlConfig) -> Self
     {
+        let files_to_parse = files_to_parse.as_ref();
         let files = {
+            let files_to_parse = Path::new(files_to_parse);
             let file = File::open(files_to_parse).expect_with(
-                || panic!("Cannot read the following file: {}", files_to_parse)
+                || panic!("Cannot read the following file: {:?}", files_to_parse)
             );
-            BufReader::new(&file).lines().filter_map(Result::ok).collect()
+            let files_to_parse_dir = files_to_parse.parent().expect_with(
+                || panic!("Cannot get parent directory of the {:?}", files_to_parse)
+            );
+            BufReader::new(&file)
+                .lines()
+                .filter_map(
+                    |path| {
+                        let path = path.ok()?;
+                        let path = Path::new(&path);
+                        let result = if path.is_relative() {
+                            Box::from(files_to_parse_dir.join(path))
+                        } else {
+                            Box::from(path)
+                        };
+                        Some(result)
+                    }
+                )
+                .collect()
         };
         let mut res = Self::new_for_vecdeque(files, args);
         if !res.buffer_next_file() {
-            panic!("No history files provided in {}", files_to_parse)
+            panic!("No history files provided in {:?}", files_to_parse)
         }
         res
     }
 
-    fn new_for_vecdeque(files_to_parse: VecDeque<String>, args: TrdPrlInfo) -> Self {
+    fn new_for_vecdeque(files_to_parse: VecDeque<Box<Path>>, args: TrdPrlConfig) -> Self {
         Self {
             files_to_parse,
             buffered_entries: Default::default(),
@@ -311,14 +331,15 @@ impl HistoryReader
 
     fn buffer_next_file(&mut self) -> bool
     {
-        let file_to_read = match self.files_to_parse.pop_front() {
-            Some(file_to_read) => { file_to_read }
-            _ => { return false; }
+        let file_to_read = if let Some(file_to_read) = self.files_to_parse.pop_front() {
+            file_to_read
+        } else {
+            return false;
         };
         let mut cur_file_reader = ReaderBuilder::new()
             .delimiter(self.args.csv_sep as u8)
             .from_path(&file_to_read)
-            .expect_with(|| panic!("Cannot read the following file: {}", file_to_read));
+            .expect_with(|| panic!("Cannot read the following file: {:?}", file_to_read));
         let col_idx_info = HistoryEntryColumnIndexer::new(
             &mut cur_file_reader,
             &file_to_read,
@@ -330,7 +351,7 @@ impl HistoryReader
 
         let process_next_entry = |(record, row_n): (Result<StringRecord, csv::Error>, _)| {
             let record = record.expect_with(
-                || panic!("Cannot parse {}-th CSV-record for the file: {}",
+                || panic!("Cannot parse {}-th CSV-record for the file: {:?}",
                           row_n,
                           file_to_read)
             );
@@ -372,8 +393,8 @@ impl HistoryReader
 impl HistoryEntryColumnIndexer
 {
     pub fn new(csv_reader: &mut Reader<File>,
-               path_for_debug: &str,
-               args: &TrdPrlInfo) -> Self
+               path_for_debug: impl AsRef<Path>,
+               args: &TrdPrlConfig) -> Self
     {
         let mut order_id_idx = None;
         let mut datetime_idx = None;
@@ -387,9 +408,11 @@ impl HistoryEntryColumnIndexer
         let price_colname = &args.price_colname;
         let bs_flag_colname = &args.buy_sell_flag_colname;
 
+        let path_for_debug = path_for_debug.as_ref();
+
         for (i, header) in csv_reader
             .headers()
-            .expect_with(|| panic!("Cannot parse header of the CSV-file: {}", path_for_debug))
+            .expect_with(|| panic!("Cannot parse header of the CSV-file: {:?}", path_for_debug))
             .into_iter()
             .enumerate()
         {
@@ -397,49 +420,49 @@ impl HistoryEntryColumnIndexer
                 if order_id_idx.is_none() {
                     order_id_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the file: {}", order_id_colname, path_for_debug)
+                    panic!("Duplicate column {} in the file: {:?}", order_id_colname, path_for_debug)
                 }
             } else if header == datetime_colname {
                 if datetime_idx.is_none() {
                     datetime_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the file: {}", datetime_colname, path_for_debug)
+                    panic!("Duplicate column {} in the file: {:?}", datetime_colname, path_for_debug)
                 }
             } else if header == size_colname {
                 if size_idx.is_none() {
                     size_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the file: {}", size_colname, path_for_debug)
+                    panic!("Duplicate column {} in the file: {:?}", size_colname, path_for_debug)
                 }
             } else if header == price_colname {
                 if price_idx.is_none() {
                     price_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the file: {}", price_colname, path_for_debug)
+                    panic!("Duplicate column {} in the file: {:?}", price_colname, path_for_debug)
                 }
             } else if header == bs_flag_colname {
                 if buy_sell_flag_idx.is_none() {
                     buy_sell_flag_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the file: {}", bs_flag_colname, path_for_debug)
+                    panic!("Duplicate column {} in the file: {:?}", bs_flag_colname, path_for_debug)
                 }
             }
         };
         Self {
             price_idx: price_idx.expect_with(
-                || panic!("Cannot find {} column in the CSV-file: {}", price_colname, path_for_debug)
+                || panic!("Cannot find {} column in the CSV-file: {:?}", price_colname, path_for_debug)
             ),
             size_idx: size_idx.expect_with(
-                || panic!("Cannot find {} column in the CSV-file: {}", size_colname, path_for_debug)
+                || panic!("Cannot find {} column in the CSV-file: {:?}", size_colname, path_for_debug)
             ),
             datetime_idx: datetime_idx.expect_with(
-                || panic!("Cannot find {} column in the CSV-file: {}", datetime_colname, path_for_debug)
+                || panic!("Cannot find {} column in the CSV-file: {:?}", datetime_colname, path_for_debug)
             ),
             buy_sell_flag_idx: buy_sell_flag_idx.expect_with(
-                || panic!("Cannot find {} column in the CSV-file: {}", bs_flag_colname, path_for_debug)
+                || panic!("Cannot find {} column in the CSV-file: {:?}", bs_flag_colname, path_for_debug)
             ),
             order_id_idx: order_id_idx.expect_with(
-                || panic!("Cannot find {} column in the CSV-file: {}", order_id_colname, path_for_debug)
+                || panic!("Cannot find {} column in the CSV-file: {:?}", order_id_colname, path_for_debug)
             ),
         }
     }

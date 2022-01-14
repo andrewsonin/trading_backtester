@@ -1,4 +1,4 @@
-pub use enum_dispatch::enum_dispatch;
+pub use {enum_dispatch::enum_dispatch, rand};
 
 use crate::types::DateTime;
 

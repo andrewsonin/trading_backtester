@@ -1,10 +1,8 @@
 use {
     crate::{
-        exchange::concrete::BasicExchange,
         replay::concrete::{
             ExchangeSession,
             GetNextObSnapshotDelay,
-            OneTickReplay,
             TradedPairLifetime,
         },
         traded_pair::{TradedPair, TradedPairParser},
@@ -12,17 +10,19 @@ use {
             DateTime,
             Identifier,
             PriceStep,
-            ReaderBuilder,
         },
         utils::{
             ExpectWith,
             input::{
-                config::from_yaml::{config_fields::*, yaml_utils::*},
-                one_tick::{OneTickTradedPairReader, TrdPrlInfo},
+                config::{
+                    from_structs::{OneTickReplayConfig, OneTickTradedPairReaderConfig},
+                    from_yaml::{config_fields::*, yaml_utils::*},
+                },
+                one_tick::TrdPrlConfig,
             },
         },
     },
-    csv::StringRecord,
+    csv::{ReaderBuilder, StringRecord},
     std::{
         collections::HashMap,
         fs::read_to_string,
@@ -234,18 +234,17 @@ mod defaults {
     pub const CSV_SEP: &str = ",";
 }
 
-pub fn parse_yaml<ExchangeID, BrokerID, Symbol, TPP, ObSnapshotDelay>(
+pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay>(
     path: impl AsRef<Path>,
     _traded_pair_parser: TPP,
     ob_snapshot_delay_scheduler: ObSnapshotDelay,
 ) -> (
-    Vec<BasicExchange<ExchangeID, BrokerID, Symbol>>,
-    OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>,
+    Vec<ExchangeID>,
+    OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>,
     DateTime,
     DateTime
 )
     where ExchangeID: Identifier + FromStr,
-          BrokerID: Identifier,
           Symbol: Identifier + FromStr,
           TPP: TradedPairParser<Symbol>,
           ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
@@ -295,7 +294,7 @@ pub fn parse_yaml<ExchangeID, BrokerID, Symbol, TPP, ObSnapshotDelay>(
         .unzip();
 
     let (traded_pair_readers, start_stop_events): (Vec<_>, Vec<_>) = parse_traded_pairs_section::<
-        ExchangeID, BrokerID, Symbol, TPP>(yml, path, defaults)
+        ExchangeID, Symbol, TPP>(yml, path, defaults)
         .into_iter()
         .unzip();
 
@@ -305,13 +304,13 @@ pub fn parse_yaml<ExchangeID, BrokerID, Symbol, TPP, ObSnapshotDelay>(
 
     (
         exchanges,
-        OneTickReplay::new(
-            start,
-            traded_pair_readers,
-            sessions.into_iter().flatten(),
-            start_stop_events.into_iter().flatten(),
+        OneTickReplayConfig {
+            start_dt: start,
+            traded_pair_configs: traded_pair_readers,
+            exchange_open_close_events: sessions.into_iter().flatten().collect(),
+            traded_pair_creation_events: start_stop_events.into_iter().flatten().collect(),
             ob_snapshot_delay_scheduler,
-        ),
+        },
         start,
         end
     )
@@ -452,17 +451,11 @@ fn parse_simulation_time_section(
     (start, end)
 }
 
-fn parse_exchanges_section<
-    'a,
-    ExchangeID: Identifier + FromStr,
-    BrokerID: Identifier,
-    Symbol: Identifier,
->(
+fn parse_exchanges_section<'a, ExchangeID: Identifier + FromStr>(
     yaml: &'a Yaml,
     path: &'a Path,
-    env: &'a Env) -> impl 'a + IntoIterator<
-    Item=(BasicExchange<ExchangeID, BrokerID, Symbol>, Vec<ExchangeSession<ExchangeID>>)
-> {
+    env: &'a Env) -> impl 'a + IntoIterator<Item=(ExchangeID, Vec<ExchangeSession<ExchangeID>>)>
+{
     const POSSIBLE_KEYS: [&str; 2] = [
         NAME,
         SESSIONS
@@ -502,7 +495,7 @@ fn parse_exchanges_section<
             let sessions = parse_exchange_sessions(
                 sessions, name, path, env.clone(), &full_section_path,
             );
-            (BasicExchange::new(name), sessions)
+            (name, sessions)
         }
     )
 }
@@ -720,7 +713,6 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
 fn parse_traded_pairs_section<
     'a,
     ExchangeID: Identifier + FromStr,
-    BrokerID: Identifier,
     Symbol: Identifier + FromStr,
     TPParser: TradedPairParser<Symbol>
 >(
@@ -728,7 +720,7 @@ fn parse_traded_pairs_section<
     path: &'a Path,
     env: Env) -> impl 'a + IntoIterator<
     Item=(
-        OneTickTradedPairReader<ExchangeID, Symbol>,
+        OneTickTradedPairReaderConfig<ExchangeID, Symbol>,
         Vec<TradedPairLifetime<ExchangeID, Symbol>>
     )
 > {
@@ -798,7 +790,18 @@ fn parse_traded_pairs_section<
             let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
             let err_log_file = try_read_yaml_hashmap_field(map, field);
             let err_log_file = if let Some(err_log_file) = err_log_file {
-                Some(expect_yaml_string(err_log_file, path, full_section_path).as_str())
+                let err_log_file = expect_yaml_string(err_log_file, path, full_section_path);
+                let err_log_file = Path::new(err_log_file);
+                if err_log_file.is_relative() {
+                    let result = path.parent()
+                        .expect_with(
+                            || unreachable!("Cannot get parent directory of the {:?}", path)
+                        )
+                        .join(err_log_file);
+                    Some(Box::from(result))
+                } else {
+                    Some(Box::from(err_log_file))
+                }
             } else {
                 None
             };
@@ -1070,14 +1073,14 @@ fn gen_traded_pair_reader<
     env: HashMap<String, YamlValue>,
     path: &Path,
     get_current_section: impl Fn() -> String,
-    err_log_file: Option<&str>) -> OneTickTradedPairReader<ExchangeID, Symbol>
+    err_log_file: Option<Box<Path>>) -> OneTickTradedPairReaderConfig<ExchangeID, Symbol>
 {
     let field = TRD;
     let full_section_path = || format!("{} :: {}", get_current_section(), field);
     let trd = read_yaml_hashmap_field(map, field, path, full_section_path);
     let trd = expect_yaml_hashmap(trd, path, full_section_path);
 
-    let (trd_files, trd_parsing_info) = gen_input_interface::<_, true>(
+    let (trd_files, trd_parsing_info) = gen_trd_prl_config::<_, true>(
         trd, env.clone(), price_step, path, full_section_path,
     );
 
@@ -1086,19 +1089,19 @@ fn gen_traded_pair_reader<
     let prl = read_yaml_hashmap_field(map, field, path, full_section_path);
     let prl = expect_yaml_hashmap(prl, path, full_section_path);
 
-    let (prl_files, prl_parsing_info) = gen_input_interface::<_, false>(
+    let (prl_files, prl_parsing_info) = gen_trd_prl_config::<_, false>(
         prl, env, price_step, path, full_section_path,
     );
 
-    OneTickTradedPairReader::new(
+    OneTickTradedPairReaderConfig {
         exchange_id,
         traded_pair,
-        &prl_files,
-        prl_parsing_info,
-        &trd_files,
-        trd_parsing_info,
+        prl_files,
+        prl_args: prl_parsing_info,
+        trd_files,
+        trd_args: trd_parsing_info,
         err_log_file,
-    )
+    }
 }
 
 const fn get_order_id_colname<const IS_TRD: bool>() -> &'static str {
@@ -1109,12 +1112,12 @@ const fn get_order_id_colname<const IS_TRD: bool>() -> &'static str {
     }
 }
 
-fn gen_input_interface<F: Fn() -> String, const IS_TRD: bool>(
+fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     map: &Hash,
     mut env: HashMap<String, YamlValue>,
     price_step: PriceStep,
     path: &Path,
-    full_section_path: F) -> (String, TrdPrlInfo)
+    full_section_path: F) -> (Box<Path>, TrdPrlConfig)
 {
     let order_id_colname = get_order_id_colname::<IS_TRD>();
     let possible_keys = [
@@ -1252,13 +1255,21 @@ fn gen_input_interface<F: Fn() -> String, const IS_TRD: bool>(
 
     let get_current_section = || format!("{} :: {}", full_section_path(), field);
     let path_list = if let YamlValue::String(v) = path_list {
-        v.to_string()
+        Path::new(v)
     } else {
         panic!("\"{}\" should be String. Got: {:?}", get_current_section(), path_list)
     };
+    let path_list = if path_list.is_relative() {
+        let result = path.parent()
+            .expect_with(|| unreachable!("Cannot get parent directory of the {:?}", path))
+            .join(path_list);
+        Box::from(result)
+    } else {
+        Box::from(path_list)
+    };
 
 
-    let info = TrdPrlInfo {
+    let info = TrdPrlConfig {
         datetime_colname,
         order_id_colname,
         price_colname,

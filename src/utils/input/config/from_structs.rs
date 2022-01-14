@@ -3,12 +3,12 @@ use {
         broker::concrete::BasicBroker,
         exchange::concrete::BasicExchange,
         replay::concrete::{
-            ExchangeSession, GetNextObSnapshotDelay, OneTickReplay, TradedPairLifetime
+            ExchangeSession, GetNextObSnapshotDelay, OneTickReplay, TradedPairLifetime,
         },
         traded_pair::TradedPair,
         trader::concrete::{SpreadWriter, VoidTrader},
         types::{DateTime, Identifier, PriceStep},
-        utils::input::{config::FromConfig, one_tick::{OneTickTradedPairReader, TrdPrlInfo}},
+        utils::input::one_tick::{OneTickTradedPairReader, TrdPrlConfig},
     },
     std::path::Path,
 };
@@ -17,30 +17,26 @@ pub struct OneTickTradedPairReaderConfig<ExchangeID: Identifier, Symbol: Identif
 {
     pub exchange_id: ExchangeID,
     pub traded_pair: TradedPair<Symbol>,
-    pub prl_files: String,
-    pub prl_args: TrdPrlInfo,
-    pub trd_files: String,
-    pub trd_args: TrdPrlInfo,
-    pub err_log_file: Option<String>,
+    pub prl_files: Box<Path>,
+    pub prl_args: TrdPrlConfig,
+    pub trd_files: Box<Path>,
+    pub trd_args: TrdPrlConfig,
+    pub err_log_file: Option<Box<Path>>,
 }
 
 impl<ExchangeID: Identifier, Symbol: Identifier>
-FromConfig<OneTickTradedPairReaderConfig<ExchangeID, Symbol>>
+From<&OneTickTradedPairReaderConfig<ExchangeID, Symbol>>
 for OneTickTradedPairReader<ExchangeID, Symbol>
 {
-    fn from_config(config: &OneTickTradedPairReaderConfig<ExchangeID, Symbol>) -> Self {
+    fn from(config: &OneTickTradedPairReaderConfig<ExchangeID, Symbol>) -> Self {
         OneTickTradedPairReader::new(
             config.exchange_id,
             config.traded_pair,
-            &config.prl_files,
+            config.prl_files.clone(),
             config.prl_args.clone(),
-            &config.trd_files,
+            config.trd_files.clone(),
             config.trd_args.clone(),
-            if let Some(file) = &config.err_log_file {
-                Some(&file)
-            } else {
-                None
-            },
+            config.err_log_file.clone(),
         )
     }
 }
@@ -62,14 +58,14 @@ impl<
     Symbol: Identifier,
     ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol>
 >
-FromConfig<OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>>
+From<&OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>>
 for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
 {
-    fn from_config(config: &OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>) -> Self
+    fn from(config: &OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>) -> Self
     {
         Self::new(
             config.start_dt,
-            config.traded_pair_configs.iter().map(FromConfig::from_config),
+            config.traded_pair_configs.iter().map(From::from),
             config.exchange_open_close_events.iter().cloned(),
             config.traded_pair_creation_events.iter().cloned(),
             config.ob_snapshot_delay_scheduler.clone(),
@@ -78,25 +74,25 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
 }
 
 impl<ExchangeID: Identifier, BrokerID: Identifier, Symbol: Identifier>
-FromConfig<ExchangeID>
+From<&ExchangeID>
 for BasicExchange<ExchangeID, BrokerID, Symbol>
 {
-    fn from_config(config: &ExchangeID) -> Self {
+    fn from(config: &ExchangeID) -> Self {
         Self::new(*config)
     }
 }
 
 impl<BrokerID: Identifier, TraderID: Identifier, ExchangeID: Identifier, Symbol: Identifier>
-FromConfig<BrokerID>
+From<&BrokerID>
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
 {
-    fn from_config(config: &BrokerID) -> Self {
+    fn from(config: &BrokerID) -> Self {
         Self::new(*config)
     }
 }
 
-impl<TraderID: Identifier> FromConfig<TraderID> for VoidTrader<TraderID> {
-    fn from_config(config: &TraderID) -> Self {
+impl<TraderID: Identifier> From<&TraderID> for VoidTrader<TraderID> {
+    fn from(config: &TraderID) -> Self {
         VoidTrader::new(*config)
     }
 }
@@ -108,10 +104,10 @@ pub struct SpreadWriterConfig<TraderID: Identifier, PS: Into<PriceStep> + Copy, 
 }
 
 impl<TraderID: Identifier, PS: Into<PriceStep> + Copy, F: AsRef<Path>>
-FromConfig<SpreadWriterConfig<TraderID, PS, F>>
+From<&SpreadWriterConfig<TraderID, PS, F>>
 for SpreadWriter<TraderID>
 {
-    fn from_config(config: &SpreadWriterConfig<TraderID, PS, F>) -> Self {
+    fn from(config: &SpreadWriterConfig<TraderID, PS, F>) -> Self {
         Self::new(config.name, config.price_step, &config.file)
     }
 }

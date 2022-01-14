@@ -11,8 +11,14 @@ pub struct DefaultTradedPairParser;
 
 impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol> for DefaultTradedPairParser
 {
-    fn parse(kind: &str, quoted_symbol: &str, base_symbol: &str) -> TradedPair<Symbol>
+    fn parse(
+        kind: impl AsRef<str>,
+        quoted_symbol: impl AsRef<str>,
+        base_symbol: impl AsRef<str>) -> TradedPair<Symbol>
     {
+        let (kind, quoted_symbol, base_symbol) = (
+            kind.as_ref(), quoted_symbol.as_ref(), base_symbol.as_ref()
+        );
         let quoted_symbol = FromStr::from_str(quoted_symbol).expect_with(
             || panic!("Cannot parse {} to Symbol", quoted_symbol)
         );

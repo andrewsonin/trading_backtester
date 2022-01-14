@@ -27,7 +27,8 @@ use {
         },
         traded_pair::TradedPair,
         trader::{request::TraderRequest, subscriptions::{Subscription, SubscriptionList}},
-        types::{Date, DateTime, Identifier, Named, OrderID, StdRng, TimeSync},
+        types::{Date, DateTime, Identifier, Named, OrderID, TimeSync},
+        utils::rand::Rng,
     },
     std::collections::{HashMap, HashSet},
 };
@@ -385,9 +386,9 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
         unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
     }
 
-    fn broker_to_exchange_latency(&self, _: ExchangeID, _: &mut StdRng, _: DateTime) -> u64 { 0 }
+    fn broker_to_exchange_latency(&self, _: ExchangeID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
 
-    fn exchange_to_broker_latency(&self, _: ExchangeID, _: &mut StdRng, _: DateTime) -> u64 { 0 }
+    fn exchange_to_broker_latency(&self, _: ExchangeID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
 
     fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID) {
         self.registered_exchanges.insert(exchange_id);

@@ -22,10 +22,10 @@ use {
             TraderAction,
             TraderActionKind,
         },
-        types::{DateTime, Duration, Identifier, SeedableRng, StdRng},
-        utils::{ExpectWith, queue::LessElementBinaryHeap},
+        types::{DateTime, Duration, Identifier},
+        utils::{ExpectWith, queue::LessElementBinaryHeap, rand::{Rng, rngs::StdRng, SeedableRng}},
     },
-    std::{cmp::Reverse, collections::HashMap},
+    std::{cmp::Reverse, collections::HashMap, marker::PhantomData},
 };
 
 pub struct Kernel<
@@ -36,7 +36,8 @@ pub struct Kernel<
     T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
     B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
     E: Exchange<ExchangeID, BrokerID, Symbol>,
-    R: Replay<ExchangeID, Symbol>
+    R: Replay<ExchangeID, Symbol>,
+    RNG: SeedableRng + Rng
 > {
     traders: HashMap<TraderID, T>,
     brokers: HashMap<BrokerID, B>,
@@ -48,7 +49,7 @@ pub struct Kernel<
     end_dt: DateTime,
     current_dt: DateTime,
 
-    rng: StdRng,
+    rng: RNG,
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
@@ -86,6 +87,30 @@ enum MessageContent<
     TraderToBroker(TraderToBroker<BrokerID, ExchangeID, Symbol>, TraderID),
 }
 
+pub struct KernelBuilder<
+    TraderID: Identifier,
+    BrokerID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
+    B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
+    E: Exchange<ExchangeID, BrokerID, Symbol>,
+    R: Replay<ExchangeID, Symbol>,
+    RNG: SeedableRng + Rng
+> {
+    traders: HashMap<TraderID, T>,
+    brokers: HashMap<BrokerID, B>,
+    exchanges: HashMap<ExchangeID, E>,
+    replay: R,
+
+    start_dt: DateTime,
+    end_dt: DateTime,
+
+    seed: Option<u64>,
+    rng: PhantomData<RNG>,
+    symbol: PhantomData<Symbol>,
+}
+
 impl<
     TraderID: Identifier,
     BrokerID: Identifier,
@@ -95,15 +120,13 @@ impl<
     B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
     E: Exchange<ExchangeID, BrokerID, Symbol>,
     R: Replay<ExchangeID, Symbol>
->
-Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R>
+> KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, StdRng>
 {
     pub fn new<CE, CB, SC>(exchanges: impl IntoIterator<Item=E>,
                            brokers: impl IntoIterator<Item=(B, CE)>,
                            traders: impl IntoIterator<Item=(T, CB)>,
-                           mut replay: R,
-                           date_range: (DateTime, DateTime),
-                           rng_seed: u64) -> Self
+                           replay: R,
+                           date_range: (DateTime, DateTime)) -> Self
         where
             CE: IntoIterator<Item=ExchangeID>,      // Connected Exchanges
             CB: IntoIterator<Item=(BrokerID, SC)>,  // Connected Brokers
@@ -179,10 +202,66 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R>
             panic!("traders contain entries with duplicate names")
         }
 
+        KernelBuilder {
+            traders,
+            brokers,
+            exchanges,
+            replay,
+            end_dt,
+            start_dt,
+            seed: None,
+            rng: Default::default(),
+            symbol: Default::default(),
+        }
+    }
+
+    pub fn with_rng<RNG: Rng + SeedableRng>
+    (self) -> KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
+    {
+        let KernelBuilder {
+            traders, brokers, exchanges, replay, end_dt, start_dt, seed, symbol, ..
+        } = self;
+        KernelBuilder {
+            traders,
+            brokers,
+            exchanges,
+            replay,
+            end_dt,
+            start_dt,
+            seed,
+            rng: Default::default(),
+            symbol,
+        }
+    }
+}
+
+impl<
+    TraderID: Identifier,
+    BrokerID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
+    B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
+    E: Exchange<ExchangeID, BrokerID, Symbol>,
+    R: Replay<ExchangeID, Symbol>,
+    RNG: Rng + SeedableRng
+> KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
+{
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    pub fn build(self) -> Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
+    {
+        let KernelBuilder {
+            traders, brokers, exchanges, mut replay, end_dt, start_dt, seed, ..
+        } = self;
+
         *replay.current_datetime_mut() = start_dt;
-        let first_message = Self::process_replay_action(
-            replay.next().expect("Replay does not contain any entries")
-        );
+        let first_message = Kernel::<
+            TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG
+        >::process_replay_action(replay.next().expect("Replay does not contain any entries"));
         if first_message.datetime < start_dt {
             panic!("First message datetime is less than the simulation start datetime")
         }
@@ -194,10 +273,28 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R>
             message_queue: LessElementBinaryHeap([Reverse(first_message)].into()),
             end_dt,
             current_dt: start_dt,
-            rng: StdRng::seed_from_u64(rng_seed),
+            rng: if let Some(seed) = seed {
+                RNG::seed_from_u64(seed)
+            } else {
+                RNG::from_entropy()
+            },
         }
     }
+}
 
+impl<
+    TraderID: Identifier,
+    BrokerID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
+    B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
+    E: Exchange<ExchangeID, BrokerID, Symbol>,
+    R: Replay<ExchangeID, Symbol>,
+    RNG: SeedableRng + Rng
+>
+Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
+{
     pub fn run_simulation(&mut self)
     {
         while let Some(message) = self.message_queue.pop()
@@ -427,7 +524,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R>
     fn process_exchange_action(
         current_dt: DateTime,
         brokers: &mut HashMap<BrokerID, B>,
-        rng: &mut StdRng,
+        rng: &mut RNG,
         action: ExchangeAction<BrokerID, Symbol>,
         exchange_id: ExchangeID) -> Message<ExchangeID, BrokerID, TraderID, Symbol>
     {
@@ -467,7 +564,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R>
     fn process_broker_action(
         current_dt: DateTime,
         traders: &mut HashMap<TraderID, T>,
-        rng: &mut StdRng,
+        rng: &mut RNG,
         broker: &mut B,
         action: BrokerAction<TraderID, ExchangeID, Symbol>,
         broker_id: BrokerID) -> Message<ExchangeID, BrokerID, TraderID, Symbol>
@@ -507,7 +604,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R>
 
     fn process_trader_action(
         current_dt: DateTime,
-        rng: &mut StdRng,
+        rng: &mut RNG,
         trader: &mut T,
         action: TraderAction<BrokerID, ExchangeID, Symbol>,
         trader_id: TraderID) -> Message<ExchangeID, BrokerID, TraderID, Symbol>

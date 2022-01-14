@@ -27,7 +27,7 @@ use {
         collections::HashMap,
         fs::read_to_string,
         iter::once,
-        path::Path,
+        path::{Path, PathBuf},
         str::FromStr,
     },
     yaml_rust::{Yaml, yaml::Hash, YamlLoader},
@@ -798,9 +798,9 @@ fn parse_traded_pairs_section<
                             || unreachable!("Cannot get parent directory of the {:?}", path)
                         )
                         .join(err_log_file);
-                    Some(Box::from(result))
+                    Some(result)
                 } else {
-                    Some(Box::from(err_log_file))
+                    Some(PathBuf::from(err_log_file))
                 }
             } else {
                 None
@@ -1073,7 +1073,7 @@ fn gen_traded_pair_reader<
     env: HashMap<String, YamlValue>,
     path: &Path,
     get_current_section: impl Fn() -> String,
-    err_log_file: Option<Box<Path>>) -> OneTickTradedPairReaderConfig<ExchangeID, Symbol>
+    err_log_file: Option<PathBuf>) -> OneTickTradedPairReaderConfig<ExchangeID, Symbol>
 {
     let field = TRD;
     let full_section_path = || format!("{} :: {}", get_current_section(), field);
@@ -1117,7 +1117,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     mut env: HashMap<String, YamlValue>,
     price_step: PriceStep,
     path: &Path,
-    full_section_path: F) -> (Box<Path>, TrdPrlConfig)
+    full_section_path: F) -> (PathBuf, TrdPrlConfig)
 {
     let order_id_colname = get_order_id_colname::<IS_TRD>();
     let possible_keys = [
@@ -1260,12 +1260,11 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
         panic!("\"{}\" should be String. Got: {:?}", get_current_section(), path_list)
     };
     let path_list = if path_list.is_relative() {
-        let result = path.parent()
+        path.parent()
             .expect_with(|| unreachable!("Cannot get parent directory of the {:?}", path))
-            .join(path_list);
-        Box::from(result)
+            .join(path_list)
     } else {
-        Box::from(path_list)
+        PathBuf::from(path_list)
     };
 
 

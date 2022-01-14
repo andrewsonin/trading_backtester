@@ -12,7 +12,7 @@ use {
         collections::{hash_map::Entry::{Occupied, Vacant}, HashMap, VecDeque},
         fs::File,
         io::{BufRead, BufReader, Write},
-        path::Path,
+        path::{Path, PathBuf},
         str::FromStr,
     },
 };
@@ -38,7 +38,7 @@ pub struct OneTickTradedPairReader<
 
 pub(crate) struct HistoryReader
 {
-    files_to_parse: VecDeque<Box<Path>>,
+    files_to_parse: VecDeque<PathBuf>,
     buffered_entries: VecDeque<HistoryEntry>,
     args: TrdPrlConfig,
 }
@@ -78,11 +78,11 @@ OneTickTradedPairReader<ExchangeID, Symbol>
     pub fn new(
         exchange_id: ExchangeID,
         traded_pair: TradedPair<Symbol>,
-        prl_files: Box<Path>,
+        prl_files: PathBuf,
         prl_args: TrdPrlConfig,
-        trd_files: Box<Path>,
+        trd_files: PathBuf,
         trd_args: TrdPrlConfig,
-        err_log_file: Option<Box<Path>>) -> Self
+        err_log_file: Option<PathBuf>) -> Self
     {
         let mut prl_reader = HistoryReader::new(prl_files, prl_args);
         let mut trd_reader = HistoryReader::new(trd_files, trd_args);
@@ -305,9 +305,9 @@ impl HistoryReader
                         let path = path.ok()?;
                         let path = Path::new(&path);
                         let result = if path.is_relative() {
-                            Box::from(files_to_parse_dir.join(path))
+                            files_to_parse_dir.join(path)
                         } else {
-                            Box::from(path)
+                            PathBuf::from(path)
                         };
                         Some(result)
                     }
@@ -321,7 +321,7 @@ impl HistoryReader
         res
     }
 
-    fn new_for_vecdeque(files_to_parse: VecDeque<Box<Path>>, args: TrdPrlConfig) -> Self {
+    fn new_for_vecdeque(files_to_parse: VecDeque<PathBuf>, args: TrdPrlConfig) -> Self {
         Self {
             files_to_parse,
             buffered_entries: Default::default(),

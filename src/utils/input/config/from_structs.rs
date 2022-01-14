@@ -10,18 +10,18 @@ use {
         types::{DateTime, Identifier, PriceStep},
         utils::input::one_tick::{OneTickTradedPairReader, TrdPrlConfig},
     },
-    std::path::Path,
+    std::path::{Path, PathBuf},
 };
 
 pub struct OneTickTradedPairReaderConfig<ExchangeID: Identifier, Symbol: Identifier>
 {
     pub exchange_id: ExchangeID,
     pub traded_pair: TradedPair<Symbol>,
-    pub prl_files: Box<Path>,
+    pub prl_files: PathBuf,
     pub prl_args: TrdPrlConfig,
-    pub trd_files: Box<Path>,
+    pub trd_files: PathBuf,
     pub trd_args: TrdPrlConfig,
-    pub err_log_file: Option<Box<Path>>,
+    pub err_log_file: Option<PathBuf>,
 }
 
 impl<ExchangeID: Identifier, Symbol: Identifier>

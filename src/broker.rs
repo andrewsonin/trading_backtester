@@ -1,6 +1,7 @@
 use crate::{
     broker::{reply::BrokerToTrader, request::BrokerToExchange},
     exchange::reply::ExchangeToBrokerReply,
+    settlement::GetSettlementLag,
     traded_pair::TradedPair,
     trader::{request::TraderRequest, subscriptions::SubscriptionList},
     types::{DateTime, Identifier, Named, TimeSync},
@@ -14,41 +15,44 @@ pub mod concrete;
 pub struct BrokerAction<
     TraderID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
     pub delay: u64,
-    pub content: BrokerActionKind<TraderID, ExchangeID, Symbol>,
+    pub content: BrokerActionKind<TraderID, ExchangeID, Symbol, Settlement>,
 }
 
 pub enum BrokerActionKind<
     TraderID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
-    BrokerToTrader(BrokerToTrader<TraderID, ExchangeID, Symbol>),
-    BrokerToExchange(BrokerToExchange<ExchangeID, Symbol>),
+    BrokerToTrader(BrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>),
+    BrokerToExchange(BrokerToExchange<ExchangeID, Symbol, Settlement>),
     WakeUp,
 }
 
 #[enum_dispatch]
-pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol>: TimeSync + Named<BrokerID>
+pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>: TimeSync + Named<BrokerID>
     where BrokerID: Identifier,
           TraderID: Identifier,
           ExchangeID: Identifier,
-          Symbol: Identifier
+          Symbol: Identifier,
+          Settlement: GetSettlementLag
 {
     fn process_trader_request(
         &mut self,
-        request: TraderRequest<ExchangeID, Symbol>,
-        trader_id: TraderID) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol>>;
+        request: TraderRequest<ExchangeID, Symbol, Settlement>,
+        trader_id: TraderID) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>;
 
     fn process_exchange_reply(
         &mut self,
-        reply: ExchangeToBrokerReply<Symbol>,
+        reply: ExchangeToBrokerReply<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol>>;
+        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>;
 
-    fn wakeup(&mut self) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol>>;
+    fn wakeup(&mut self) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>;
 
     fn broker_to_exchange_latency(
         &self,
@@ -67,6 +71,8 @@ pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol>: TimeSync + Named<Broke
     fn register_trader(
         &mut self,
         trader_id: TraderID,
-        sub_cfgs: impl IntoIterator<Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)>,
+        sub_cfgs: impl IntoIterator<
+            Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
+        >,
     );
 }

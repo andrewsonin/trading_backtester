@@ -1,6 +1,7 @@
 use {
     crate::{
         kernel::KernelBuilder,
+        settlement::GetSettlementLag,
         traded_pair::TradedPair,
         trader::subscriptions::SubscriptionList,
         types::{DateTime, Identifier},
@@ -15,7 +16,7 @@ use {
 };
 
 pub struct ParallelBacktester<
-    TraderID, BrokerID, ExchangeID, Symbol,
+    TraderID, BrokerID, ExchangeID, Symbol, Settlement,
     ExchangeConfig, ReplayConfig, BrokerConfig, TraderConfig,
     ExchangeConfigs, BrokerConfigs, PerThreadConfigs, TraderConfigs,
     ConnectedExchanges, ConnectedBrokers, SubscriptionConfigs,
@@ -25,17 +26,20 @@ pub struct ParallelBacktester<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ExchangeConfig: Sync + BuildExchange<ExchangeID, BrokerID, Symbol>,
-    BrokerConfig: Sync + BuildBroker<BrokerID, TraderID, ExchangeID, Symbol>,
-    ReplayConfig: Send + BuildReplay<ExchangeID, Symbol>,
-    TraderConfig: Send + BuildTrader<TraderID, BrokerID, ExchangeID, Symbol>,
+    Settlement: GetSettlementLag,
+    ExchangeConfig: Sync + BuildExchange<ExchangeID, BrokerID, Symbol, Settlement>,
+    BrokerConfig: Sync + BuildBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+    ReplayConfig: Send + BuildReplay<ExchangeID, Symbol, Settlement>,
+    TraderConfig: Send + BuildTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
     ExchangeConfigs: IntoIterator<Item=ExchangeConfig>,
     BrokerConfigs: IntoIterator<Item=(BrokerConfig, ConnectedExchanges)>,
     PerThreadConfigs: IntoIterator<Item=(u64, ReplayConfig, TraderConfigs)>,
     TraderConfigs: IntoIterator<Item=(TraderConfig, ConnectedBrokers)>,
     ConnectedExchanges: IntoIterator<Item=ExchangeID>,
     ConnectedBrokers: Send + IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
-    SubscriptionConfigs: IntoIterator<Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)>,
+    SubscriptionConfigs: IntoIterator<
+        Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
+    >,
     RNG: SeedableRng + Rng
 {
     num_threads: usize,
@@ -48,13 +52,13 @@ pub struct ParallelBacktester<
 }
 
 impl<
-    TraderID, BrokerID, ExchangeID, Symbol,
+    TraderID, BrokerID, ExchangeID, Symbol, Settlement,
     ExchangeConfig, ReplayConfig, BrokerConfig, TraderConfig,
     ExchangeConfigs, BrokerConfigs, PerThreadConfigs, TraderConfigs,
     ConnectedExchanges, ConnectedBrokers, SubscriptionConfigs
 >
 ParallelBacktester<
-    TraderID, BrokerID, ExchangeID, Symbol,
+    TraderID, BrokerID, ExchangeID, Symbol, Settlement,
     ExchangeConfig, ReplayConfig, BrokerConfig, TraderConfig,
     ExchangeConfigs, BrokerConfigs, PerThreadConfigs, TraderConfigs,
     ConnectedExchanges, ConnectedBrokers, SubscriptionConfigs,
@@ -64,17 +68,20 @@ ParallelBacktester<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ExchangeConfig: Sync + BuildExchange<ExchangeID, BrokerID, Symbol>,
-    BrokerConfig: Sync + BuildBroker<BrokerID, TraderID, ExchangeID, Symbol>,
-    ReplayConfig: Send + BuildReplay<ExchangeID, Symbol>,
-    TraderConfig: Send + BuildTrader<TraderID, BrokerID, ExchangeID, Symbol>,
+    Settlement: GetSettlementLag,
+    ExchangeConfig: Sync + BuildExchange<ExchangeID, BrokerID, Symbol, Settlement>,
+    BrokerConfig: Sync + BuildBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+    ReplayConfig: Send + BuildReplay<ExchangeID, Symbol, Settlement>,
+    TraderConfig: Send + BuildTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
     ExchangeConfigs: IntoIterator<Item=ExchangeConfig>,
     BrokerConfigs: IntoIterator<Item=(BrokerConfig, ConnectedExchanges)>,
     PerThreadConfigs: IntoIterator<Item=(u64, ReplayConfig, TraderConfigs)>,
     TraderConfigs: IntoIterator<Item=(TraderConfig, ConnectedBrokers)>,
     ConnectedExchanges: IntoIterator<Item=ExchangeID>,
     ConnectedBrokers: Send + IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
-    SubscriptionConfigs: IntoIterator<Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)>
+    SubscriptionConfigs: IntoIterator<
+        Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
+    >
 {
     pub fn new(
         exchange_configs: ExchangeConfigs,
@@ -94,7 +101,7 @@ ParallelBacktester<
     }
 
     pub fn with_rng<RNG: SeedableRng + Rng>(self) -> ParallelBacktester<
-        TraderID, BrokerID, ExchangeID, Symbol,
+        TraderID, BrokerID, ExchangeID, Symbol, Settlement,
         ExchangeConfig, ReplayConfig, BrokerConfig, TraderConfig,
         ExchangeConfigs, BrokerConfigs, PerThreadConfigs, TraderConfigs,
         ConnectedExchanges, ConnectedBrokers, SubscriptionConfigs,
@@ -121,14 +128,14 @@ ParallelBacktester<
 }
 
 impl<
-    TraderID, BrokerID, ExchangeID, Symbol,
+    TraderID, BrokerID, ExchangeID, Symbol, Settlement,
     ExchangeConfig, ReplayConfig, BrokerConfig, TraderConfig,
     ExchangeConfigs, BrokerConfigs, PerThreadConfigs, TraderConfigs,
     ConnectedExchanges, ConnectedBrokers, SubscriptionConfigs,
     RNG
 >
 ParallelBacktester<
-    TraderID, BrokerID, ExchangeID, Symbol,
+    TraderID, BrokerID, ExchangeID, Symbol, Settlement,
     ExchangeConfig, ReplayConfig, BrokerConfig, TraderConfig,
     ExchangeConfigs, BrokerConfigs, PerThreadConfigs, TraderConfigs,
     ConnectedExchanges, ConnectedBrokers, SubscriptionConfigs,
@@ -138,17 +145,20 @@ ParallelBacktester<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ExchangeConfig: Sync + BuildExchange<ExchangeID, BrokerID, Symbol>,
-    BrokerConfig: Sync + BuildBroker<BrokerID, TraderID, ExchangeID, Symbol>,
-    ReplayConfig: Send + BuildReplay<ExchangeID, Symbol>,
-    TraderConfig: Send + BuildTrader<TraderID, BrokerID, ExchangeID, Symbol>,
+    Settlement: GetSettlementLag,
+    ExchangeConfig: Sync + BuildExchange<ExchangeID, BrokerID, Symbol, Settlement>,
+    BrokerConfig: Sync + BuildBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+    ReplayConfig: Send + BuildReplay<ExchangeID, Symbol, Settlement>,
+    TraderConfig: Send + BuildTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
     ExchangeConfigs: IntoIterator<Item=ExchangeConfig>,
     BrokerConfigs: IntoIterator<Item=(BrokerConfig, ConnectedExchanges)>,
     PerThreadConfigs: IntoIterator<Item=(u64, ReplayConfig, TraderConfigs)>,
     TraderConfigs: IntoIterator<Item=(TraderConfig, ConnectedBrokers)>,
     ConnectedExchanges: IntoIterator<Item=ExchangeID>,
     ConnectedBrokers: Send + IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
-    SubscriptionConfigs: IntoIterator<Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)>,
+    SubscriptionConfigs: IntoIterator<
+        Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
+    >,
     RNG: SeedableRng + Rng
 {
     pub fn with_num_threads(mut self, num_threads: usize) -> Self {
@@ -207,7 +217,7 @@ ParallelBacktester<
                 .expect_with(
                     || panic!(
                         "Cannot build ThreadPool \
-                    with the following number of threads to use: {num_threads}"
+                        with the following number of threads to use: {num_threads}"
                     )
                 )
                 .install(job)

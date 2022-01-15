@@ -4,7 +4,8 @@ use {
         kernel::KernelBuilder,
         parallel::ParallelBacktester,
         replay::concrete::GetNextObSnapshotDelay,
-        traded_pair::{concrete::DefaultTradedPairParser, PairKind, SettleKind, Spot, TradedPair},
+        settlement::{concrete::VoidSettlement, GetSettlementLag},
+        traded_pair::{concrete::SpotTradedPairParser, PairKind, TradedPair},
         trader::{concrete::SpreadWriter, subscriptions::SubscriptionList},
         types::{DateTime, Identifier, PriceStep},
         utils::{
@@ -72,13 +73,13 @@ impl FromStr for SymbolName {
 #[derive(Copy, Clone)]
 struct DelayScheduler;
 
-impl<ExchangeID: Identifier, Symbol: Identifier>
-GetNextObSnapshotDelay<ExchangeID, Symbol> for DelayScheduler
+impl<ExchangeID: Identifier, Symbol: Identifier, Settlement: GetSettlementLag>
+GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement> for DelayScheduler
 {
     fn get_ob_snapshot_delay(
         &mut self,
         _: ExchangeID,
-        _: TradedPair<Symbol>,
+        _: TradedPair<Symbol, Settlement>,
         _: &mut impl Rng,
         _: DateTime) -> Option<NonZeroU64>
     {
@@ -86,8 +87,8 @@ GetNextObSnapshotDelay<ExchangeID, Symbol> for DelayScheduler
     }
 }
 
-const USD_RUB: TradedPair<SymbolName> = TradedPair {
-    kind: PairKind::Spot(Spot { settlement: SettleKind::Immediately }),
+const USD_RUB: TradedPair<SymbolName, VoidSettlement> = TradedPair {
+    kind: PairKind::Spot,
     quoted_symbol: SymbolName::USD,
     base_symbol: SymbolName::RUB,
 };
@@ -100,7 +101,7 @@ fn test_parse_yaml()
 
     let (exchange_names, replay_config, start_dt, end_dt) = parse_yaml(
         test_files.join("example_01.yml"),
-        DefaultTradedPairParser,
+        SpotTradedPairParser,
         DelayScheduler,
     );
 
@@ -143,7 +144,7 @@ fn test_parse_yaml_in_parallel()
 
     let (exchange_names, replay_config, start_dt, end_dt) = parse_yaml(
         test_files.join("example_01.yml"),
-        DefaultTradedPairParser,
+        SpotTradedPairParser,
         DelayScheduler,
     );
     let broker_configs = [

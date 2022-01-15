@@ -6,6 +6,7 @@ use {
             ExchangeToReplayReply,
         },
         replay::{Replay, ReplayAction, request::{ReplayRequest, ReplayToExchange}},
+        settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{
             DateTime,
@@ -30,12 +31,15 @@ use {
     },
 };
 
-pub trait GetNextObSnapshotDelay<ExchangeID: Identifier, Symbol: Identifier>
-{
+pub trait GetNextObSnapshotDelay<
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+> {
     fn get_ob_snapshot_delay(
         &mut self,
         exchange_id: ExchangeID,
-        traded_pair: TradedPair<Symbol>,
+        traded_pair: TradedPair<Symbol, Settlement>,
         rng: &mut impl Rng,
         current_dt: DateTime) -> Option<NonZeroU64>;
 }
@@ -43,13 +47,14 @@ pub trait GetNextObSnapshotDelay<ExchangeID: Identifier, Symbol: Identifier>
 pub struct OneTickReplay<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
+    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+    Settlement: GetSettlementLag
 > {
     current_dt: DateTime,
-    traded_pair_readers: Vec<OneTickTradedPairReader<ExchangeID, Symbol>>,
-    action_queue: LessElementBinaryHeap<(ReplayAction<ExchangeID, Symbol>, i64)>,
+    traded_pair_readers: Vec<OneTickTradedPairReader<ExchangeID, Symbol, Settlement>>,
+    action_queue: LessElementBinaryHeap<(ReplayAction<ExchangeID, Symbol, Settlement>, i64)>,
 
-    active_traded_pairs: HashSet<(ExchangeID, TradedPair<Symbol>)>,
+    active_traded_pairs: HashSet<(ExchangeID, TradedPair<Symbol, Settlement>)>,
 
     next_order_id: OrderID,
 
@@ -64,9 +69,13 @@ pub struct ExchangeSession<ExchangeID: Identifier> {
 }
 
 #[derive(Copy, Clone)]
-pub struct TradedPairLifetime<ExchangeID: Identifier, Symbol: Identifier> {
+pub struct TradedPairLifetime<
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag>
+{
     pub exchange_id: ExchangeID,
-    pub traded_pair: TradedPair<Symbol>,
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub price_step: PriceStep,
     pub start_dt: DateTime,
     pub stop_dt: Option<DateTime>,
@@ -75,15 +84,20 @@ pub struct TradedPairLifetime<ExchangeID: Identifier, Symbol: Identifier> {
 impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
+    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+    Settlement: GetSettlementLag
 >
-OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
+OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
     pub fn new(
         start_dt: DateTime,
-        traded_pair_readers: impl IntoIterator<Item=OneTickTradedPairReader<ExchangeID, Symbol>>,
+        traded_pair_readers: impl IntoIterator<
+            Item=OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
+        >,
         exchange_open_close_events: impl IntoIterator<Item=ExchangeSession<ExchangeID>>,
-        traded_pair_creation_events: impl IntoIterator<Item=TradedPairLifetime<ExchangeID, Symbol>>,
+        traded_pair_creation_events: impl IntoIterator<
+            Item=TradedPairLifetime<ExchangeID, Symbol, Settlement>
+        >,
         ob_snapshot_delay_scheduler: ObSnapshotDelay) -> Self
     {
         let mut prev_dt: HashMap<ExchangeID, DateTime> = Default::default();
@@ -187,9 +201,10 @@ OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
 impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
+    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+    Settlement: GetSettlementLag
 >
-TimeSync for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
+TimeSync for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime {
         &mut self.current_dt
@@ -199,11 +214,12 @@ TimeSync for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
 impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
+    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+    Settlement: GetSettlementLag
 >
-Iterator for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
+Iterator for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
-    type Item = ReplayAction<ExchangeID, Symbol>;
+    type Item = ReplayAction<ExchangeID, Symbol, Settlement>;
 
     fn next(&mut self) -> Option<Self::Item>
     {
@@ -227,15 +243,17 @@ Iterator for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
 impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
+    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+    Settlement: GetSettlementLag
 >
-Replay<ExchangeID, Symbol> for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
+Replay<ExchangeID, Symbol, Settlement>
+for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
     fn handle_exchange_reply(
         &mut self,
-        reply: ExchangeToReplay<Symbol>,
+        reply: ExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        rng: &mut impl Rng) -> Vec<ReplayAction<ExchangeID, Symbol>>
+        rng: &mut impl Rng) -> Vec<ReplayAction<ExchangeID, Symbol, Settlement>>
     {
         let mut get_ob_snapshot_delay = |traded_pair| {
             if let Some(delay) = self.ob_snapshot_delay_scheduler.get_ob_snapshot_delay(

@@ -1,5 +1,6 @@
 use {
     crate::{
+        settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{
             DateTime,
@@ -18,60 +19,61 @@ use {
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ExchangeToBroker<
     BrokerID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
     pub broker_id: BrokerID,
     pub exchange_dt: DateTime,
-    pub content: ExchangeToBrokerReply<Symbol>,
+    pub content: ExchangeToBrokerReply<Symbol, Settlement>,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ExchangeToReplay<Symbol: Identifier> {
-    pub content: ExchangeToReplayReply<Symbol>,
+pub struct ExchangeToReplay<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub content: ExchangeToReplayReply<Symbol, Settlement>,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum ExchangeToBrokerReply<Symbol: Identifier>
+pub enum ExchangeToBrokerReply<Symbol: Identifier, Settlement: GetSettlementLag>
 {
-    OrderAccepted(OrderAccepted<Symbol>),
+    OrderAccepted(OrderAccepted<Symbol, Settlement>),
 
-    OrderPlacementDiscarded(OrderPlacementDiscarded<Symbol>),
+    OrderPlacementDiscarded(OrderPlacementDiscarded<Symbol, Settlement>),
 
-    OrderPartiallyExecuted(OrderPartiallyExecuted<Symbol>),
+    OrderPartiallyExecuted(OrderPartiallyExecuted<Symbol, Settlement>),
 
-    OrderExecuted(OrderExecuted<Symbol>),
+    OrderExecuted(OrderExecuted<Symbol, Settlement>),
 
-    MarketOrderNotFullyExecuted(MarketOrderNotFullyExecuted<Symbol>),
+    MarketOrderNotFullyExecuted(MarketOrderNotFullyExecuted<Symbol, Settlement>),
 
-    OrderCancelled(OrderCancelled<Symbol>),
+    OrderCancelled(OrderCancelled<Symbol, Settlement>),
 
-    CannotCancelOrder(CannotCancelOrder<Symbol>),
+    CannotCancelOrder(CannotCancelOrder<Symbol, Settlement>),
 
-    ExchangeEventNotification(ExchangeEventNotification<Symbol>),
+    ExchangeEventNotification(ExchangeEventNotification<Symbol, Settlement>),
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum ExchangeToReplayReply<Symbol: Identifier>
+pub enum ExchangeToReplayReply<Symbol: Identifier, Settlement: GetSettlementLag>
 {
     CannotOpenExchange(CannotOpenExchange),
 
-    CannotStartTrades(CannotStartTrades<Symbol>),
+    CannotStartTrades(CannotStartTrades<Symbol, Settlement>),
 
-    OrderAccepted(OrderAccepted<Symbol>),
+    OrderAccepted(OrderAccepted<Symbol, Settlement>),
 
-    OrderPlacementDiscarded(OrderPlacementDiscarded<Symbol>),
+    OrderPlacementDiscarded(OrderPlacementDiscarded<Symbol, Settlement>),
 
-    OrderPartiallyExecuted(OrderPartiallyExecuted<Symbol>),
+    OrderPartiallyExecuted(OrderPartiallyExecuted<Symbol, Settlement>),
 
-    OrderExecuted(OrderExecuted<Symbol>),
+    OrderExecuted(OrderExecuted<Symbol, Settlement>),
 
-    MarketOrderNotFullyExecuted(MarketOrderNotFullyExecuted<Symbol>),
+    MarketOrderNotFullyExecuted(MarketOrderNotFullyExecuted<Symbol, Settlement>),
 
-    OrderCancelled(OrderCancelled<Symbol>),
+    OrderCancelled(OrderCancelled<Symbol, Settlement>),
 
-    CannotCancelOrder(CannotCancelOrder<Symbol>),
+    CannotCancelOrder(CannotCancelOrder<Symbol, Settlement>),
 
-    ExchangeEventNotification(ExchangeEventNotification<Symbol>),
+    ExchangeEventNotification(ExchangeEventNotification<Symbol, Settlement>),
 
     CannotCloseExchange(CannotCloseExchange),
 
@@ -86,77 +88,77 @@ pub struct CannotOpenExchange {
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct CannotStartTrades<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct CannotStartTrades<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub reason: InabilityToStartTrades,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct OrderAccepted<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct OrderAccepted<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct OrderPlacementDiscarded<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct OrderPlacementDiscarded<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub reason: PlacementDiscardingReason,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct OrderPartiallyExecuted<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct OrderPartiallyExecuted<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub price: Price,
     pub size: Size,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct OrderExecuted<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct OrderExecuted<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub price: Price,
     pub size: Size,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct MarketOrderNotFullyExecuted<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct MarketOrderNotFullyExecuted<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub remaining_size: Size,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct OrderCancelled<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct OrderCancelled<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub reason: CancellationReason,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct CannotCancelOrder<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct CannotCancelOrder<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub reason: InabilityToCancelReason,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum ExchangeEventNotification<Symbol: Identifier>
+pub enum ExchangeEventNotification<Symbol: Identifier, Settlement: GetSettlementLag>
 {
     ExchangeOpen,
 
-    TradesStarted(TradedPair<Symbol>, PriceStep),
+    TradesStarted(TradedPair<Symbol, Settlement>, PriceStep),
 
-    OrderCancelled(LimitOrderEventInfo<Symbol>),
+    OrderCancelled(LimitOrderEventInfo<Symbol, Settlement>),
 
-    OrderPlaced(LimitOrderEventInfo<Symbol>),
+    OrderPlaced(LimitOrderEventInfo<Symbol, Settlement>),
 
-    TradeExecuted(MarketOrderEventInfo<Symbol>),
+    TradeExecuted(MarketOrderEventInfo<Symbol, Settlement>),
 
-    ObSnapshot(Rc<ObSnapshot<Symbol>>),
+    ObSnapshot(Rc<ObSnapshot<Symbol, Settlement>>),
 
-    TradesStopped(TradedPair<Symbol>),
+    TradesStopped(TradedPair<Symbol, Settlement>),
 
     ExchangeClosed,
 }
@@ -241,8 +243,8 @@ pub enum InabilityToStopTrades {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub struct LimitOrderEventInfo<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct LimitOrderEventInfo<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub direction: Direction,
     pub price: Price,
@@ -250,15 +252,15 @@ pub struct LimitOrderEventInfo<Symbol: Identifier> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub struct MarketOrderEventInfo<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct MarketOrderEventInfo<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub direction: Direction,
     pub price: Price,
     pub size: Size,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ObSnapshot<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct ObSnapshot<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub state: ObState,
 }

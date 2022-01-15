@@ -1,5 +1,6 @@
 use crate::{
     broker::reply::BrokerReply,
+    settlement::GetSettlementLag,
     trader::request::TraderToBroker,
     types::{DateTime, Identifier, Named, TimeSync},
     utils::{enum_dispatch, rand::Rng},
@@ -12,36 +13,39 @@ pub mod subscriptions;
 pub struct TraderAction<
     BrokerID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
     pub delay: u64,
-    pub content: TraderActionKind<BrokerID, ExchangeID, Symbol>,
+    pub content: TraderActionKind<BrokerID, ExchangeID, Symbol, Settlement>,
 }
 
 pub enum TraderActionKind<
     BrokerID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
-    TraderToBroker(TraderToBroker<BrokerID, ExchangeID, Symbol>),
+    TraderToBroker(TraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>),
     WakeUp,
 }
 
 #[enum_dispatch]
-pub trait Trader<TraderID, BrokerID, ExchangeID, Symbol>: TimeSync + Named<TraderID>
+pub trait Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>: TimeSync + Named<TraderID>
     where TraderID: Identifier,
           BrokerID: Identifier,
           ExchangeID: Identifier,
-          Symbol: Identifier
+          Symbol: Identifier,
+          Settlement: GetSettlementLag
 {
     fn process_broker_reply(
         &mut self,
-        reply: BrokerReply<Symbol>,
+        reply: BrokerReply<Symbol, Settlement>,
         broker_id: BrokerID,
         exchange_id: ExchangeID,
-        event_dt: DateTime) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol>>;
+        event_dt: DateTime) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>>;
 
-    fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol>>;
+    fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>>;
 
     fn broker_to_trader_latency(
         &self,

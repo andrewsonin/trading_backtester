@@ -2,6 +2,7 @@ use {
     crate::{
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
         replay::{ReplayAction, request::{ReplayRequest, ReplayToExchange}},
+        settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{DateTime, Direction, Identifier, OrderID, Price, PriceStep, Size},
         utils::ExpectWith,
@@ -19,10 +20,11 @@ use {
 
 pub struct OneTickTradedPairReader<
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
     pub exchange_id: ExchangeID,
-    pub traded_pair: TradedPair<Symbol>,
+    pub traded_pair: TradedPair<Symbol, Settlement>,
 
     trd_reader: HistoryReader,
     prl_reader: HistoryReader,
@@ -72,12 +74,12 @@ pub(crate) struct HistoryEntryColumnIndexer {
     pub order_id_idx: usize,
 }
 
-impl<ExchangeID: Identifier, Symbol: Identifier>
-OneTickTradedPairReader<ExchangeID, Symbol>
+impl<ExchangeID: Identifier, Symbol: Identifier, Settlement: GetSettlementLag>
+OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
 {
     pub fn new(
         exchange_id: ExchangeID,
-        traded_pair: TradedPair<Symbol>,
+        traded_pair: TradedPair<Symbol, Settlement>,
         prl_files: PathBuf,
         prl_args: TrdPrlConfig,
         trd_files: PathBuf,
@@ -111,8 +113,9 @@ OneTickTradedPairReader<ExchangeID, Symbol>
         self.limit_submitted_to_internal.clear()
     }
 
-    pub fn next(&mut self, next_order_id: &mut OrderID) -> Option<ReplayAction<ExchangeID, Symbol>>
-    {
+    pub fn next(&mut self, next_order_id: &mut OrderID) -> Option<
+        ReplayAction<ExchangeID, Symbol, Settlement>
+    > {
         loop {
             let res;
             match (&self.next_prl, &self.next_trd)
@@ -151,7 +154,9 @@ OneTickTradedPairReader<ExchangeID, Symbol>
 
     fn create_replay_action(&self,
                             datetime: DateTime,
-                            content: ReplayRequest<Symbol>) -> ReplayAction<ExchangeID, Symbol> {
+                            content: ReplayRequest<Symbol, Settlement>) -> ReplayAction<
+        ExchangeID, Symbol, Settlement
+    > {
         ReplayAction {
             datetime,
             content: ReplayToExchange {
@@ -164,7 +169,7 @@ OneTickTradedPairReader<ExchangeID, Symbol>
     fn process_prl(
         &mut self,
         prl: HistoryEntry,
-        next_order_id: &mut OrderID) -> Option<ReplayAction<ExchangeID, Symbol>>
+        next_order_id: &mut OrderID) -> Option<ReplayAction<ExchangeID, Symbol, Settlement>>
     {
         let entry = self.active_limit_orders.entry(prl.order_id);
         if prl.size != Size(0) {
@@ -217,7 +222,7 @@ OneTickTradedPairReader<ExchangeID, Symbol>
     fn process_trd(
         &mut self,
         mut trd: HistoryEntry,
-        next_order_id: &mut OrderID) -> Option<ReplayAction<ExchangeID, Symbol>>
+        next_order_id: &mut OrderID) -> Option<ReplayAction<ExchangeID, Symbol, Settlement>>
     {
         if let Some((_, size)) = self.active_limit_orders.get_mut(&trd.order_id) {
             if *size >= trd.size {

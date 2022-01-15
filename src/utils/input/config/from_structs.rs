@@ -12,6 +12,7 @@ use {
             concrete::{ExchangeSession, GetNextObSnapshotDelay, OneTickReplay, TradedPairLifetime},
             Replay,
         },
+        settlement::GetSettlementLag,
         traded_pair::TradedPair,
         trader::{concrete::SpreadWriter, Trader},
         types::{DateTime, Identifier, PriceStep},
@@ -23,18 +24,20 @@ use {
 pub trait BuildExchange<
     ExchangeID: Identifier,
     BrokerID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
-    type E: Exchange<ExchangeID, BrokerID, Symbol>;
+    type E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>;
 
     fn build(&self) -> Self::E;
 }
 
 pub trait BuildReplay<
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
-    type R: Replay<ExchangeID, Symbol>;
+    type R: Replay<ExchangeID, Symbol, Settlement>;
 
     fn build(&self) -> Self::R;
 }
@@ -43,9 +46,10 @@ pub trait BuildBroker<
     BrokerID: Identifier,
     TraderID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
-    type B: Broker<BrokerID, TraderID, ExchangeID, Symbol>;
+    type B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>;
 
     fn build(&self) -> Self::B;
 }
@@ -54,18 +58,22 @@ pub trait BuildTrader<
     TraderID: Identifier,
     BrokerID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
-    type T: Trader<TraderID, BrokerID, ExchangeID, Symbol>;
+    type T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>;
 
     fn build(&self) -> Self::T;
 }
 
 #[derive(Clone)]
-pub struct OneTickTradedPairReaderConfig<ExchangeID: Identifier, Symbol: Identifier>
-{
+pub struct OneTickTradedPairReaderConfig<
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+> {
     pub exchange_id: ExchangeID,
-    pub traded_pair: TradedPair<Symbol>,
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub prl_files: PathBuf,
     pub prl_args: TrdPrlConfig,
     pub trd_files: PathBuf,
@@ -73,11 +81,11 @@ pub struct OneTickTradedPairReaderConfig<ExchangeID: Identifier, Symbol: Identif
     pub err_log_file: Option<PathBuf>,
 }
 
-impl<ExchangeID: Identifier, Symbol: Identifier>
-From<&OneTickTradedPairReaderConfig<ExchangeID, Symbol>>
-for OneTickTradedPairReader<ExchangeID, Symbol>
+impl<ExchangeID: Identifier, Symbol: Identifier, Settlement: GetSettlementLag>
+From<&OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>>
+for OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
 {
-    fn from(config: &OneTickTradedPairReaderConfig<ExchangeID, Symbol>) -> Self {
+    fn from(config: &OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>) -> Self {
         OneTickTradedPairReader::new(
             config.exchange_id,
             config.traded_pair,
@@ -94,24 +102,26 @@ for OneTickTradedPairReader<ExchangeID, Symbol>
 pub struct OneTickReplayConfig<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
+    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+    Settlement: GetSettlementLag
 > {
     pub start_dt: DateTime,
-    pub traded_pair_configs: Vec<OneTickTradedPairReaderConfig<ExchangeID, Symbol>>,
+    pub traded_pair_configs: Vec<OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>>,
     pub exchange_open_close_events: Vec<ExchangeSession<ExchangeID>>,
-    pub traded_pair_creation_events: Vec<TradedPairLifetime<ExchangeID, Symbol>>,
+    pub traded_pair_creation_events: Vec<TradedPairLifetime<ExchangeID, Symbol, Settlement>>,
     pub ob_snapshot_delay_scheduler: ObSnapshotDelay,
 }
 
 impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol>
+    ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+    Settlement: GetSettlementLag
 >
-BuildReplay<ExchangeID, Symbol>
-for OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>
+BuildReplay<ExchangeID, Symbol, Settlement>
+for OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
-    type R = OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>;
+    type R = OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>;
 
     fn build(&self) -> Self::R {
         Self::R::new(
@@ -126,11 +136,16 @@ for OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>
 
 pub trait InitBasicExchange {}
 
-impl<ExchangeID: Identifier + InitBasicExchange, BrokerID: Identifier, Symbol: Identifier>
-BuildExchange<ExchangeID, BrokerID, Symbol>
+impl<
+    ExchangeID: Identifier + InitBasicExchange,
+    BrokerID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+BuildExchange<ExchangeID, BrokerID, Symbol, Settlement>
 for ExchangeID
 {
-    type E = BasicExchange<ExchangeID, BrokerID, Symbol>;
+    type E = BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>;
 
     fn build(&self) -> Self::E {
         Self::E::new(*self)
@@ -143,12 +158,13 @@ impl<
     BrokerID: Identifier + InitBasicBroker,
     TraderID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 >
-BuildBroker<BrokerID, TraderID, ExchangeID, Symbol>
+BuildBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 for BrokerID
 {
-    type B = BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>;
+    type B = BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>;
 
     fn build(&self) -> Self::B {
         Self::B::new(*self)
@@ -167,10 +183,11 @@ impl<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
+    Settlement: GetSettlementLag,
     PS: Into<PriceStep> + Copy,
     F: AsRef<Path>
 >
-BuildTrader<TraderID, BrokerID, ExchangeID, Symbol>
+BuildTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 for SpreadWriterConfig<TraderID, PS, F>
 {
     type T = SpreadWriter<TraderID>;

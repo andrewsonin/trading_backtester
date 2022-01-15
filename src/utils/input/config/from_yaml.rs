@@ -5,6 +5,7 @@ use {
             GetNextObSnapshotDelay,
             TradedPairLifetime,
         },
+        settlement::GetSettlementLag,
         traded_pair::{TradedPair, TradedPairParser},
         types::{
             DateTime,
@@ -236,20 +237,21 @@ mod defaults {
     pub const CSV_SEP: &str = ",";
 }
 
-pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay>(
+pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
     path: impl AsRef<Path>,
     _traded_pair_parser: TPP,
     ob_snapshot_delay_scheduler: ObSnapshotDelay,
 ) -> (
     Vec<ExchangeID>,
-    OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>,
+    OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>,
     DateTime,
     DateTime
 )
     where ExchangeID: Identifier + FromStr,
           Symbol: Identifier + FromStr,
-          TPP: TradedPairParser<Symbol>,
-          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
+          TPP: TradedPairParser<Symbol, Settlement>,
+          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+          Settlement: GetSettlementLag
 {
     const POSSIBLE_SECTIONS: [&str; 4] = [
         DEFAULTS,
@@ -297,7 +299,7 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay>(
         .unzip();
 
     let (traded_pair_readers, start_stop_events): (Vec<_>, Vec<_>) = parse_traded_pairs_section::<
-        ExchangeID, Symbol, TPP>(yml, path, defaults)
+        ExchangeID, Symbol, Settlement, TPP>(yml, path, defaults)
         .into_iter()
         .unzip();
 
@@ -711,14 +713,15 @@ fn parse_traded_pairs_section<
     'a,
     ExchangeID: Identifier + FromStr,
     Symbol: Identifier + FromStr,
-    TPParser: TradedPairParser<Symbol>
+    Settlement: GetSettlementLag,
+    TPParser: TradedPairParser<Symbol, Settlement>
 >(
     yaml: &'a Yaml,
     path: &'a Path,
     env: Env) -> impl 'a + IntoIterator<
     Item=(
-        OneTickTradedPairReaderConfig<ExchangeID, Symbol>,
-        Vec<TradedPairLifetime<ExchangeID, Symbol>>
+        OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>,
+        Vec<TradedPairLifetime<ExchangeID, Symbol, Settlement>>
     )
 > {
     const POSSIBLE_KEYS: [&str; 9] = [
@@ -804,7 +807,7 @@ fn parse_traded_pairs_section<
                 None
             };
 
-            let traded_pair = TPParser::parse(kind, quoted, base);
+            let traded_pair = TPParser::parse(exchange, kind, quoted, base);
 
             let field = START_STOP_DATETIMES;
             let full_section_path = || format!("{SECTION} :: {i} :: {field}");
@@ -828,15 +831,17 @@ fn parse_traded_pairs_section<
 fn parse_trade_start_stops<
     ExchangeID: Identifier,
     Symbol: Identifier,
+    Settlement: GetSettlementLag
 >(
     map: &Hash,
-    traded_pair: TradedPair<Symbol>,
+    traded_pair: TradedPair<Symbol, Settlement>,
     price_step: PriceStep,
     exchange_id: ExchangeID,
     mut env: HashMap<String, YamlValue>,
     path: &Path,
-    get_current_section: impl Fn() -> String) -> Vec<TradedPairLifetime<ExchangeID, Symbol>>
-{
+    get_current_section: impl Fn() -> String) -> Vec<
+    TradedPairLifetime<ExchangeID, Symbol, Settlement>
+> {
     const POSSIBLE_KEYS: [&str; 5] = [
         PATH,
         START_COLNAME,
@@ -1062,16 +1067,17 @@ fn parse_trade_start_stops<
 
 fn gen_traded_pair_reader<
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 >(
     map: &Hash,
-    traded_pair: TradedPair<Symbol>,
+    traded_pair: TradedPair<Symbol, Settlement>,
     price_step: PriceStep,
     exchange_id: ExchangeID,
     env: HashMap<String, YamlValue>,
     path: &Path,
     get_current_section: impl Fn() -> String,
-    err_log_file: Option<PathBuf>) -> OneTickTradedPairReaderConfig<ExchangeID, Symbol>
+    err_log_file: Option<PathBuf>) -> OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>
 {
     let field = TRD;
     let full_section_path = || format!("{} :: {field}", get_current_section());

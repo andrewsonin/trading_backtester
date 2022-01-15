@@ -2,6 +2,7 @@ use {
     crate::{
         broker::reply::BrokerReply,
         exchange::reply::ExchangeEventNotification,
+        settlement::GetSettlementLag,
         trader::{Trader, TraderAction},
         types::{Date, DateTime, Identifier, Named, ObState, PriceStep, Size, TimeSync},
         utils::{ExpectWith, rand::Rng},
@@ -34,20 +35,26 @@ impl<TraderID: Identifier> Named<TraderID> for VoidTrader<TraderID>
     fn get_name(&self) -> TraderID { self.name }
 }
 
-impl<TraderID: Identifier, BrokerID: Identifier, ExchangeID: Identifier, Symbol: Identifier>
-Trader<TraderID, BrokerID, ExchangeID, Symbol>
+impl<
+    TraderID: Identifier,
+    BrokerID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 for VoidTrader<TraderID>
 {
     fn process_broker_reply(
         &mut self,
-        _: BrokerReply<Symbol>,
+        _: BrokerReply<Symbol, Settlement>,
         _: BrokerID,
         _: ExchangeID,
-        _: DateTime) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol>>
+        _: DateTime) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>>
     {
         vec![]
     }
-    fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol>> {
+    fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>> {
         vec![]
     }
     fn broker_to_trader_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
@@ -86,16 +93,22 @@ impl<TraderID: Identifier> Named<TraderID> for SpreadWriter<TraderID> {
     fn get_name(&self) -> TraderID { self.name }
 }
 
-impl<TraderID: Identifier, BrokerID: Identifier, ExchangeID: Identifier, Symbol: Identifier>
-Trader<TraderID, BrokerID, ExchangeID, Symbol>
+impl<
+    TraderID: Identifier,
+    BrokerID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 for SpreadWriter<TraderID>
 {
     fn process_broker_reply(
         &mut self,
-        reply: BrokerReply<Symbol>,
+        reply: BrokerReply<Symbol, Settlement>,
         _: BrokerID,
         _: ExchangeID,
-        event_dt: DateTime) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol>>
+        event_dt: DateTime) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>>
     {
         if let BrokerReply::ExchangeEventNotification(
             ExchangeEventNotification::ObSnapshot(snapshot)) = reply
@@ -123,9 +136,11 @@ for SpreadWriter<TraderID>
         };
         vec![]
     }
-    fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol>> {
+
+    fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>> {
         unreachable!("Trader {} did not schedule any wakeups", self.get_name())
     }
+
     fn broker_to_trader_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
     fn trader_to_broker_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
     fn upon_register_at_broker(&mut self, _: BrokerID) {}

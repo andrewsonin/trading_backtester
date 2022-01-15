@@ -37,6 +37,7 @@ use {
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
         order_book::{OrderBook, OrderBookEvent, OrderBookEventKind},
         replay::request::ReplayRequest,
+        settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{
             Date,
@@ -58,49 +59,73 @@ use {
     },
 };
 
-pub struct BasicExchange<ExchangeID: Identifier, BrokerID: Identifier, Symbol: Identifier>
-{
+pub struct BasicExchange<
+    ExchangeID: Identifier,
+    BrokerID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+> {
     current_dt: DateTime,
     name: ExchangeID,
 
     /// [Broker -> [Submitted Order ID -> Internal Order ID]]
-    broker_to_order_id: HashMap<BrokerID, HashMap<(TradedPair<Symbol>, OrderID), OrderID>>,
+    broker_to_order_id: HashMap<
+        BrokerID,
+        HashMap<(TradedPair<Symbol, Settlement>, OrderID), OrderID>
+    >,
     /// [Submitted Order ID -> Internal Order ID]
-    replay_order_ids: HashMap<(TradedPair<Symbol>, OrderID), OrderID>,
+    replay_order_ids: HashMap<(TradedPair<Symbol, Settlement>, OrderID), OrderID>,
 
     /// [Internal Order ID ->
     /// (Submitted Order ID, Whether it came from broker ( Broker ID ) or replay (None) )]
     internal_to_submitted: HashMap<OrderID, (OrderID, Option<BrokerID>)>,
 
     next_order_id: OrderID,
-    order_books: HashMap<TradedPair<Symbol>, (OrderBook, PriceStep)>,
+    order_books: HashMap<TradedPair<Symbol, Settlement>, (OrderBook, PriceStep)>,
     is_open: bool,
 }
 
-impl<ExchangeID: Identifier, BrokerID: Identifier, Symbol: Identifier> TimeSync
-for BasicExchange<ExchangeID, BrokerID, Symbol>
+impl<
+    ExchangeID: Identifier,
+    BrokerID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+TimeSync
+for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime {
         &mut self.current_dt
     }
 }
 
-impl<ExchangeID: Identifier, BrokerID: Identifier, Symbol: Identifier> Named<ExchangeID>
-for BasicExchange<ExchangeID, BrokerID, Symbol>
+impl<
+    ExchangeID: Identifier,
+    BrokerID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+Named<ExchangeID>
+for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
     fn get_name(&self) -> ExchangeID {
         self.name
     }
 }
 
-impl<ExchangeID: Identifier, BrokerID: Identifier, Symbol: Identifier>
-Exchange<ExchangeID, BrokerID, Symbol>
-for BasicExchange<ExchangeID, BrokerID, Symbol>
+impl<
+    ExchangeID: Identifier,
+    BrokerID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+Exchange<ExchangeID, BrokerID, Symbol, Settlement>
+for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
     fn process_broker_request(
         &mut self,
-        request: BrokerRequest<Symbol>,
-        broker_id: BrokerID) -> Vec<ExchangeAction<BrokerID, Symbol>>
+        request: BrokerRequest<Symbol, Settlement>,
+        broker_id: BrokerID) -> Vec<ExchangeAction<BrokerID, Symbol, Settlement>>
     {
         let get_broker_id = || broker_id;
         match request
@@ -119,7 +144,9 @@ for BasicExchange<ExchangeID, BrokerID, Symbol>
 
     fn process_replay_request(
         &mut self,
-        request: ReplayRequest<Symbol>) -> Vec<ExchangeAction<BrokerID, Symbol>>
+        request: ReplayRequest<Symbol, Settlement>) -> Vec<
+        ExchangeAction<BrokerID, Symbol, Settlement>
+    >
     {
         let get_broker_id_plug = || unreachable!("Replay does not have BrokerID");
         match request
@@ -156,8 +183,13 @@ for BasicExchange<ExchangeID, BrokerID, Symbol>
     }
 }
 
-impl<ExchangeID: Identifier, BrokerID: Identifier, Symbol: Identifier>
-BasicExchange<ExchangeID, BrokerID, Symbol>
+impl<
+    ExchangeID: Identifier,
+    BrokerID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
     pub fn new(name: ExchangeID) -> Self
     {
@@ -175,8 +207,9 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
 
     fn try_broadcast_ob_state(
         &self,
-        traded_pair: TradedPair<Symbol>) -> Vec<ExchangeAction<BrokerID, Symbol>>
-    {
+        traded_pair: TradedPair<Symbol, Settlement>) -> Vec<
+        ExchangeAction<BrokerID, Symbol, Settlement>
+    > {
         if !self.is_open {
             vec![
                 Self::create_replay_reply(
@@ -222,8 +255,8 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
 
     fn try_cancel_limit_order<GetBrokerID: Fn() -> BrokerID, const REPLAY: bool>(
         &mut self,
-        request: LimitOrderCancelRequest<Symbol>,
-        get_broker_id: GetBrokerID) -> Vec<ExchangeAction<BrokerID, Symbol>>
+        request: LimitOrderCancelRequest<Symbol, Settlement>,
+        get_broker_id: GetBrokerID) -> Vec<ExchangeAction<BrokerID, Symbol, Settlement>>
     {
         if !self.is_open {
             let cannot_cancel_order = CannotCancelOrder {
@@ -349,8 +382,9 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
 
     fn try_stop_trades(
         &mut self,
-        traded_pair: TradedPair<Symbol>) -> Vec<ExchangeAction<BrokerID, Symbol>>
-    {
+        traded_pair: TradedPair<Symbol, Settlement>) -> Vec<
+        ExchangeAction<BrokerID, Symbol, Settlement>
+    > {
         if !self.is_open {
             vec![
                 Self::create_replay_reply(
@@ -421,9 +455,9 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
         }
     }
 
-    fn create_replay_reply(
-        content: ExchangeToReplayReply<Symbol>) -> ExchangeAction<BrokerID, Symbol>
-    {
+    fn create_replay_reply(content: ExchangeToReplayReply<Symbol, Settlement>) -> ExchangeAction<
+        BrokerID, Symbol, Settlement
+    > {
         ExchangeAction {
             delay: 0,
             content: ExchangeActionKind::ExchangeToReplay(ExchangeToReplay { content }),
@@ -433,8 +467,9 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
     fn create_broker_reply(
         &self,
         broker_id: BrokerID,
-        content: ExchangeToBrokerReply<Symbol>) -> ExchangeAction<BrokerID, Symbol>
-    {
+        content: ExchangeToBrokerReply<Symbol, Settlement>) -> ExchangeAction<
+        BrokerID, Symbol, Settlement
+    > {
         ExchangeAction {
             delay: 0,
             content: ExchangeActionKind::ExchangeToBroker(
@@ -447,7 +482,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
         }
     }
 
-    fn try_open(&mut self) -> Vec<ExchangeAction<BrokerID, Symbol>> {
+    fn try_open(&mut self) -> Vec<ExchangeAction<BrokerID, Symbol, Settlement>> {
         if self.is_open {
             vec![
                 Self::create_replay_reply(
@@ -479,7 +514,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
         }
     }
 
-    fn try_close(&mut self) -> Vec<ExchangeAction<BrokerID, Symbol>>
+    fn try_close(&mut self) -> Vec<ExchangeAction<BrokerID, Symbol, Settlement>>
     {
         if self.is_open
         {
@@ -552,8 +587,8 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
 
     fn try_start_trades(
         &mut self,
-        traded_pair: TradedPair<Symbol>,
-        price_step: PriceStep) -> Vec<ExchangeAction<BrokerID, Symbol>>
+        traded_pair: TradedPair<Symbol, Settlement>,
+        price_step: PriceStep) -> Vec<ExchangeAction<BrokerID, Symbol, Settlement>>
     {
         if !self.is_open {
             vec![
@@ -601,8 +636,8 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
 
     fn try_place_market_order<GetBrokerID: Fn() -> BrokerID, const REPLAY: bool>(
         &mut self,
-        order: MarketOrderPlacingRequest<Symbol>,
-        get_broker_id: GetBrokerID) -> Vec<ExchangeAction<BrokerID, Symbol>>
+        order: MarketOrderPlacingRequest<Symbol, Settlement>,
+        get_broker_id: GetBrokerID) -> Vec<ExchangeAction<BrokerID, Symbol, Settlement>>
     {
         if !self.is_open {
             let order_discarded = OrderPlacementDiscarded {
@@ -811,8 +846,8 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
 
     fn try_place_limit_order<GetBrokerID: Fn() -> BrokerID, const REPLAY: bool>(
         &mut self,
-        order: LimitOrderPlacingRequest<Symbol>,
-        get_broker_id: GetBrokerID) -> Vec<ExchangeAction<BrokerID, Symbol>>
+        order: LimitOrderPlacingRequest<Symbol, Settlement>,
+        get_broker_id: GetBrokerID) -> Vec<ExchangeAction<BrokerID, Symbol, Settlement>>
     {
         if !self.is_open {
             let order_discarded = OrderPlacementDiscarded {
@@ -1019,10 +1054,10 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
         const REPLAY: bool
     >(
         &self,
-        actions: &mut Vec<ExchangeAction<BrokerID, Symbol>>,
+        actions: &mut Vec<ExchangeAction<BrokerID, Symbol, Settlement>>,
         remaining_size: &mut Size,
         event: OrderBookEvent,
-        traded_pair: TradedPair<Symbol>,
+        traded_pair: TradedPair<Symbol, Settlement>,
         new_order_id: OrderID,
         get_broker_id: &GetBrokerID,
     ) {

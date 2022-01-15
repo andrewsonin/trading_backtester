@@ -1,17 +1,18 @@
 use crate::{
+    settlement::GetSettlementLag,
     traded_pair::TradedPair,
     types::{Direction, Identifier, OrderID, Price, Size},
 };
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct LimitOrderCancelRequest<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct LimitOrderCancelRequest<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct LimitOrderPlacingRequest<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct LimitOrderPlacingRequest<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub direction: Direction,
     pub price: Price,
@@ -20,8 +21,8 @@ pub struct LimitOrderPlacingRequest<Symbol: Identifier> {
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct MarketOrderPlacingRequest<Symbol: Identifier> {
-    pub traded_pair: TradedPair<Symbol>,
+pub struct MarketOrderPlacingRequest<Symbol: Identifier, Settlement: GetSettlementLag> {
+    pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub direction: Direction,
     pub size: Size,

@@ -1,5 +1,6 @@
 use crate::{
     order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
+    settlement::GetSettlementLag,
     traded_pair::TradedPair,
     types::{Identifier, PriceStep},
 };
@@ -7,28 +8,29 @@ use crate::{
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ReplayToExchange<
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
     pub exchange_id: ExchangeID,
-    pub content: ReplayRequest<Symbol>,
+    pub content: ReplayRequest<Symbol, Settlement>,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum ReplayRequest<Symbol: Identifier>
+pub enum ReplayRequest<Symbol: Identifier, Settlement: GetSettlementLag>
 {
     ExchangeOpen,
 
-    StartTrades(TradedPair<Symbol>, PriceStep),
+    StartTrades(TradedPair<Symbol, Settlement>, PriceStep),
 
-    CancelLimitOrder(LimitOrderCancelRequest<Symbol>),
+    CancelLimitOrder(LimitOrderCancelRequest<Symbol, Settlement>),
 
-    PlaceMarketOrder(MarketOrderPlacingRequest<Symbol>),
+    PlaceMarketOrder(MarketOrderPlacingRequest<Symbol, Settlement>),
 
-    PlaceLimitOrder(LimitOrderPlacingRequest<Symbol>),
+    PlaceLimitOrder(LimitOrderPlacingRequest<Symbol, Settlement>),
 
-    BroadcastObStateToBrokers(TradedPair<Symbol>),
+    BroadcastObStateToBrokers(TradedPair<Symbol, Settlement>),
 
-    StopTrades(TradedPair<Symbol>),
+    StopTrades(TradedPair<Symbol, Settlement>),
 
     ExchangeClosed,
 }

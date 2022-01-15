@@ -1,65 +1,52 @@
 use {
-    crate::{types::{DateTime, Identifier, Price}, utils::enum_dispatch},
+    crate::{
+        settlement::GetSettlementLag,
+        types::{DateTime, Identifier, Price},
+        utils::enum_dispatch,
+    },
     std::str::FromStr,
 };
 
 pub mod concrete;
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct TradedPair<Name: Identifier> {
-    pub kind: PairKind,
+pub struct TradedPair<Name: Identifier, Settlement: GetSettlementLag> {
+    pub kind: PairKind<Settlement>,
     pub quoted_symbol: Name,
     pub base_symbol: Name,
 }
 
-pub trait TradedPairParser<Symbol: Identifier + FromStr> {
-    fn parse(
+#[enum_dispatch]
+pub trait TradedPairParser<
+    Symbol: Identifier + FromStr,
+    Settlement: GetSettlementLag
+> {
+    fn parse<ExchangeID: Identifier>(
+        exchange_id: ExchangeID,
         kind: impl AsRef<str>,
         quoted_symbol: impl AsRef<str>,
-        base_symbol: impl AsRef<str>) -> TradedPair<Symbol>;
-}
-
-#[enum_dispatch]
-pub trait GetSettlementDateTime {
-    fn get_settlement_dt(&self, transaction_dt: DateTime) -> DateTime;
+        base_symbol: impl AsRef<str>) -> TradedPair<Symbol, Settlement>;
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub enum PairKind {
-    Spot(Spot),
-    // TODO:
-    // Futures(Futures),
-    // Option(Option),
+pub enum PairKind<Settlement: GetSettlementLag> {
+    Spot,
+    Futures(Futures<Settlement>),
+    Option(Option<Settlement>),
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct Spot {
-    pub settlement: SettleKind,
-}
-
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub enum SettleKind {
-    Immediately,
-    // TODO:
-    // Today,
-    // TP1,
-    // TP2,
-    // TP3,
-    // Custom(GetSettlementDateTime),
-}
-
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct Futures {
+pub struct Futures<Settlement: GetSettlementLag> {
     pub maturity: DateTime,
-    pub delivery: SettleKind,
+    pub delivery: Settlement,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct Option {
+pub struct Option<Settlement: GetSettlementLag> {
     pub kind: OptionKind,
     pub strike: Price,
     pub maturity: DateTime,
-    pub delivery: SettleKind,
+    pub delivery: Settlement,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]

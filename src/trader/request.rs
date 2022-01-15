@@ -1,5 +1,6 @@
 use crate::{
     order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
+    settlement::GetSettlementLag,
     types::Identifier,
 };
 
@@ -7,18 +8,22 @@ use crate::{
 pub struct TraderToBroker<
     BrokerID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
     pub broker_id: BrokerID,
-    pub content: TraderRequest<ExchangeID, Symbol>,
+    pub content: TraderRequest<ExchangeID, Symbol, Settlement>,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum TraderRequest<ExchangeID: Identifier, Symbol: Identifier>
-{
-    CancelLimitOrder(LimitOrderCancelRequest<Symbol>, ExchangeID),
+pub enum TraderRequest<
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+> {
+    CancelLimitOrder(LimitOrderCancelRequest<Symbol, Settlement>, ExchangeID),
 
-    PlaceLimitOrder(LimitOrderPlacingRequest<Symbol>, ExchangeID),
+    PlaceLimitOrder(LimitOrderPlacingRequest<Symbol, Settlement>, ExchangeID),
 
-    PlaceMarketOrder(MarketOrderPlacingRequest<Symbol>, ExchangeID),
+    PlaceMarketOrder(MarketOrderPlacingRequest<Symbol, Settlement>, ExchangeID),
 }

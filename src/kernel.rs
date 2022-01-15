@@ -14,6 +14,7 @@ use {
             reply::{ExchangeToBroker, ExchangeToReplay},
         },
         replay::{Replay, ReplayAction, request::ReplayToExchange},
+        settlement::GetSettlementLag,
         traded_pair::TradedPair,
         trader::{
             request::TraderToBroker,
@@ -33,10 +34,11 @@ pub struct Kernel<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
-    E: Exchange<ExchangeID, BrokerID, Symbol>,
-    R: Replay<ExchangeID, Symbol>,
+    Settlement: GetSettlementLag,
+    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
+    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
+    R: Replay<ExchangeID, Symbol, Settlement>,
     RNG: SeedableRng + Rng
 > {
     traders: HashMap<TraderID, T>,
@@ -44,7 +46,9 @@ pub struct Kernel<
     exchanges: HashMap<ExchangeID, E>,
     replay: R,
 
-    message_queue: LessElementBinaryHeap<Message<ExchangeID, BrokerID, TraderID, Symbol>>,
+    message_queue: LessElementBinaryHeap<
+        Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
+    >,
 
     end_dt: DateTime,
     current_dt: DateTime,
@@ -57,10 +61,11 @@ struct Message<
     ExchangeID: Identifier,
     BrokerID: Identifier,
     TraderID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
     datetime: DateTime,
-    body: MessageContent<ExchangeID, BrokerID, TraderID, Symbol>,
+    body: MessageContent<ExchangeID, BrokerID, TraderID, Symbol, Settlement>,
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
@@ -68,23 +73,24 @@ enum MessageContent<
     ExchangeID: Identifier,
     BrokerID: Identifier,
     TraderID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
-    ReplayToExchange(ReplayToExchange<ExchangeID, Symbol>),
+    ReplayToExchange(ReplayToExchange<ExchangeID, Symbol, Settlement>),
 
-    ExchangeToReplay(ExchangeToReplay<Symbol>, ExchangeID),
+    ExchangeToReplay(ExchangeToReplay<Symbol, Settlement>, ExchangeID),
 
-    BrokerToExchange(BrokerToExchange<ExchangeID, Symbol>, BrokerID),
+    BrokerToExchange(BrokerToExchange<ExchangeID, Symbol, Settlement>, BrokerID),
 
-    ExchangeToBroker(ExchangeToBroker<BrokerID, Symbol>, ExchangeID),
+    ExchangeToBroker(ExchangeToBroker<BrokerID, Symbol, Settlement>, ExchangeID),
 
     BrokerWakeUp(BrokerID),
 
-    BrokerToTrader(BrokerToTrader<TraderID, ExchangeID, Symbol>, BrokerID),
+    BrokerToTrader(BrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>, BrokerID),
 
     TraderWakeUp(TraderID),
 
-    TraderToBroker(TraderToBroker<BrokerID, ExchangeID, Symbol>, TraderID),
+    TraderToBroker(TraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>, TraderID),
 }
 
 pub struct KernelBuilder<
@@ -92,10 +98,11 @@ pub struct KernelBuilder<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
-    E: Exchange<ExchangeID, BrokerID, Symbol>,
-    R: Replay<ExchangeID, Symbol>,
+    Settlement: GetSettlementLag,
+    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
+    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
+    R: Replay<ExchangeID, Symbol, Settlement>,
     RNG: SeedableRng + Rng
 > {
     traders: HashMap<TraderID, T>,
@@ -107,8 +114,10 @@ pub struct KernelBuilder<
     end_dt: DateTime,
 
     seed: Option<u64>,
+
     rng: PhantomData<RNG>,
     symbol: PhantomData<Symbol>,
+    settlement: PhantomData<Settlement>,
 }
 
 impl<
@@ -116,11 +125,13 @@ impl<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
-    E: Exchange<ExchangeID, BrokerID, Symbol>,
-    R: Replay<ExchangeID, Symbol>
-> KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, StdRng>
+    Settlement: GetSettlementLag,
+    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
+    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
+    R: Replay<ExchangeID, Symbol, Settlement>
+>
+KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, StdRng>
 {
     pub fn new<CE, CB, SC>(exchanges: impl IntoIterator<Item=E>,
                            brokers: impl IntoIterator<Item=(B, CE)>,
@@ -131,7 +142,7 @@ impl<
             CE: IntoIterator<Item=ExchangeID>,      // Connected Exchanges
             CB: IntoIterator<Item=(BrokerID, SC)>,  // Connected Brokers
             SC: IntoIterator<                       // Subscription Configs
-                Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)
+                Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
             >
     {
         let (start_dt, end_dt) = date_range;
@@ -210,14 +221,15 @@ impl<
             seed: None,
             rng: Default::default(),
             symbol: Default::default(),
+            settlement: Default::default(),
         }
     }
 
     pub fn with_rng<RNG: Rng + SeedableRng>(self) -> KernelBuilder<
-        TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG
+        TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG
     > {
         let KernelBuilder {
-            traders, brokers, exchanges, replay, end_dt, start_dt, seed, symbol, ..
+            traders, brokers, exchanges, replay, end_dt, start_dt, seed, ..
         } = self;
         KernelBuilder {
             traders,
@@ -228,7 +240,8 @@ impl<
             start_dt,
             seed,
             rng: Default::default(),
-            symbol,
+            symbol: Default::default(),
+            settlement: Default::default(),
         }
     }
 }
@@ -238,27 +251,30 @@ impl<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
-    E: Exchange<ExchangeID, BrokerID, Symbol>,
-    R: Replay<ExchangeID, Symbol>,
+    Settlement: GetSettlementLag,
+    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
+    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
+    R: Replay<ExchangeID, Symbol, Settlement>,
     RNG: Rng + SeedableRng
-> KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
+>
+KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
 {
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = Some(seed);
         self
     }
 
-    pub fn build(self) -> Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
-    {
+    pub fn build(self) -> Kernel<
+        TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG
+    > {
         let KernelBuilder {
             traders, brokers, exchanges, mut replay, end_dt, start_dt, seed, ..
         } = self;
 
         *replay.current_datetime_mut() = start_dt;
         let first_message = Kernel::<
-            TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG
+            TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG
         >::process_replay_action(replay.next().expect("Replay does not contain any entries"));
         if first_message.datetime < start_dt {
             panic!("First message datetime is less than the simulation start datetime")
@@ -285,13 +301,14 @@ impl<
     BrokerID: Identifier,
     ExchangeID: Identifier,
     Symbol: Identifier,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol>,
-    E: Exchange<ExchangeID, BrokerID, Symbol>,
-    R: Replay<ExchangeID, Symbol>,
+    Settlement: GetSettlementLag,
+    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
+    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
+    R: Replay<ExchangeID, Symbol, Settlement>,
     RNG: SeedableRng + Rng
 >
-Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
+Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
 {
     pub fn run_simulation(&mut self)
     {
@@ -305,7 +322,9 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
         }
     }
 
-    fn handle_message(&mut self, message: MessageContent<ExchangeID, BrokerID, TraderID, Symbol>)
+    fn handle_message(
+        &mut self,
+        message: MessageContent<ExchangeID, BrokerID, TraderID, Symbol, Settlement>)
     {
         match message
         {
@@ -349,7 +368,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
 
     fn handle_replay_to_exchange(
         &mut self,
-        request: ReplayToExchange<ExchangeID, Symbol>)
+        request: ReplayToExchange<ExchangeID, Symbol, Settlement>)
     {
         let exchange = self.exchanges.get_mut(&request.exchange_id).expect_with(
             || panic!("Kernel does not know such an Exchange: {}", request.exchange_id)
@@ -371,7 +390,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
 
     fn handle_exchange_to_replay(
         &mut self,
-        reply: ExchangeToReplay<Symbol>,
+        reply: ExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
@@ -383,7 +402,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
 
     fn handle_broker_to_exchange(
         &mut self,
-        request: BrokerToExchange<ExchangeID, Symbol>,
+        request: BrokerToExchange<ExchangeID, Symbol, Settlement>,
         broker_id: BrokerID)
     {
         let exchange = self.exchanges.get_mut(&request.exchange_id).expect_with(
@@ -406,7 +425,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
 
     fn handle_exchange_to_broker(
         &mut self,
-        reply: ExchangeToBroker<BrokerID, Symbol>,
+        reply: ExchangeToBroker<BrokerID, Symbol, Settlement>,
         exchange_id: ExchangeID)
     {
         let broker = self.brokers.get_mut(&reply.broker_id).expect_with(
@@ -451,7 +470,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
 
     fn handle_broker_to_trader(
         &mut self,
-        reply: BrokerToTrader<TraderID, ExchangeID, Symbol>,
+        reply: BrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
         broker_id: BrokerID)
     {
         let trader = self.traders.get_mut(&reply.trader_id).expect_with(
@@ -496,7 +515,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
 
     fn handle_trader_to_broker(
         &mut self,
-        request: TraderToBroker<BrokerID, ExchangeID, Symbol>,
+        request: TraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
         trader_id: TraderID)
     {
         let broker = self.brokers.get_mut(&request.broker_id).expect_with(
@@ -522,8 +541,8 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
         current_dt: DateTime,
         brokers: &mut HashMap<BrokerID, B>,
         rng: &mut RNG,
-        action: ExchangeAction<BrokerID, Symbol>,
-        exchange_id: ExchangeID) -> Message<ExchangeID, BrokerID, TraderID, Symbol>
+        action: ExchangeAction<BrokerID, Symbol, Settlement>,
+        exchange_id: ExchangeID) -> Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
     {
         let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
         let (datetime, body) = match action.content
@@ -550,8 +569,9 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
     }
 
     fn process_replay_action(
-        action: ReplayAction<ExchangeID, Symbol>) -> Message<ExchangeID, BrokerID, TraderID, Symbol>
-    {
+        action: ReplayAction<ExchangeID, Symbol, Settlement>) -> Message<
+        ExchangeID, BrokerID, TraderID, Symbol, Settlement
+    > {
         Message {
             datetime: action.datetime,
             body: MessageContent::ReplayToExchange(action.content),
@@ -563,8 +583,8 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
         traders: &mut HashMap<TraderID, T>,
         rng: &mut RNG,
         broker: &mut B,
-        action: BrokerAction<TraderID, ExchangeID, Symbol>,
-        broker_id: BrokerID) -> Message<ExchangeID, BrokerID, TraderID, Symbol>
+        action: BrokerAction<TraderID, ExchangeID, Symbol, Settlement>,
+        broker_id: BrokerID) -> Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
     {
         let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
         let (datetime, body) = match action.content
@@ -603,8 +623,8 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
         current_dt: DateTime,
         rng: &mut RNG,
         trader: &mut T,
-        action: TraderAction<BrokerID, ExchangeID, Symbol>,
-        trader_id: TraderID) -> Message<ExchangeID, BrokerID, TraderID, Symbol>
+        action: TraderAction<BrokerID, ExchangeID, Symbol, Settlement>,
+        trader_id: TraderID) -> Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
     {
         let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
         let (datetime, body) = match action.content

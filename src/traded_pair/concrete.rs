@@ -1,20 +1,23 @@
 use {
     crate::{
-        traded_pair::{PairKind, SettleKind, Spot, TradedPair, TradedPairParser},
+        settlement::concrete::VoidSettlement,
+        traded_pair::{PairKind, TradedPair, TradedPairParser},
         types::Identifier,
         utils::ExpectWith,
     },
     std::str::FromStr,
 };
 
-pub struct DefaultTradedPairParser;
+pub struct SpotTradedPairParser;
 
-impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol> for DefaultTradedPairParser
+impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol, VoidSettlement>
+for SpotTradedPairParser
 {
-    fn parse(
+    fn parse<ExchangeID: Identifier>(
+        _: ExchangeID,
         kind: impl AsRef<str>,
         quoted_symbol: impl AsRef<str>,
-        base_symbol: impl AsRef<str>) -> TradedPair<Symbol>
+        base_symbol: impl AsRef<str>) -> TradedPair<Symbol, VoidSettlement>
     {
         let (kind, quoted_symbol, base_symbol) = (
             kind.as_ref(), quoted_symbol.as_ref(), base_symbol.as_ref()
@@ -26,7 +29,7 @@ impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol> for DefaultTradedPai
             || panic!("Cannot parse {base_symbol} to Symbol")
         );
         let kind = if let "Spot" | "spot" = kind {
-            PairKind::Spot(Spot { settlement: SettleKind::Immediately })
+            PairKind::Spot
         } else {
             panic!("Cannot parse to PairKind: {kind}")
         };

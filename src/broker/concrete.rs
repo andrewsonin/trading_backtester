@@ -25,6 +25,7 @@ use {
             OrderExecuted,
             OrderPartiallyExecuted,
         },
+        settlement::GetSettlementLag,
         traded_pair::TradedPair,
         trader::{request::TraderRequest, subscriptions::{Subscription, SubscriptionList}},
         types::{Date, DateTime, Identifier, Named, OrderID, TimeSync},
@@ -37,7 +38,8 @@ pub struct BasicBroker<
     BrokerID: Identifier,
     TraderID: Identifier,
     ExchangeID: Identifier,
-    Symbol: Identifier
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
 > {
     current_dt: DateTime,
     name: BrokerID,
@@ -45,12 +47,12 @@ pub struct BasicBroker<
     /// Subscription configurations for each Trader
     trader_configs: HashMap<
         TraderID,
-        HashMap<(ExchangeID, TradedPair<Symbol>), SubscriptionList>
+        HashMap<(ExchangeID, TradedPair<Symbol, Settlement>), SubscriptionList>
     >,
     /// Map between ExchangeID + TradedPair pair
     /// and Traders that are subscribed to the corresponding pairs
     traded_pairs_info: HashMap<
-        (ExchangeID, TradedPair<Symbol>),
+        (ExchangeID, TradedPair<Symbol, Settlement>),
         Vec<(TraderID, SubscriptionList)>,
     >,
 
@@ -63,32 +65,50 @@ pub struct BasicBroker<
     next_internal_order_id: OrderID,
 }
 
-impl<BrokerID: Identifier, TraderID: Identifier, ExchangeID: Identifier, Symbol: Identifier>
+impl<
+    BrokerID: Identifier,
+    TraderID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
 TimeSync
-for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
+for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime {
         &mut self.current_dt
     }
 }
 
-impl<BrokerID: Identifier, TraderID: Identifier, ExchangeID: Identifier, Symbol: Identifier>
+impl<
+    BrokerID: Identifier,
+    TraderID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
 Named<BrokerID>
-for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
+for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
     fn get_name(&self) -> BrokerID {
         self.name
     }
 }
 
-impl<BrokerID: Identifier, TraderID: Identifier, ExchangeID: Identifier, Symbol: Identifier>
-Broker<BrokerID, TraderID, ExchangeID, Symbol>
-for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
+impl<
+    BrokerID: Identifier,
+    TraderID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
     fn process_trader_request(
         &mut self,
-        request: TraderRequest<ExchangeID, Symbol>,
-        trader_id: TraderID) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol>>
+        request: TraderRequest<ExchangeID, Symbol, Settlement>,
+        trader_id: TraderID) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>
     {
         let action = match request {
             TraderRequest::CancelLimitOrder(mut request, exchange_id) => {
@@ -198,9 +218,9 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
 
     fn process_exchange_reply(
         &mut self,
-        reply: ExchangeToBrokerReply<Symbol>,
+        reply: ExchangeToBrokerReply<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol>>
+        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>
     {
         let message = match reply {
             ExchangeToBrokerReply::OrderAccepted(accepted) => {
@@ -382,7 +402,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
         vec![message]
     }
 
-    fn wakeup(&mut self) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol>> {
+    fn wakeup(&mut self) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>> {
         unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
     }
 
@@ -397,7 +417,9 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
     fn register_trader(
         &mut self,
         trader_id: TraderID,
-        sub_cfgs: impl IntoIterator<Item=(ExchangeID, TradedPair<Symbol>, SubscriptionList)>)
+        sub_cfgs: impl IntoIterator<
+            Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
+        >)
     {
         self.trader_configs.insert(
             trader_id,
@@ -421,8 +443,14 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
     }
 }
 
-impl<BrokerID: Identifier, TraderID: Identifier, ExchangeID: Identifier, Symbol: Identifier>
-BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
+impl<
+    BrokerID: Identifier,
+    TraderID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+>
+BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
     pub fn new(name: BrokerID) -> Self {
         BasicBroker {
@@ -439,9 +467,9 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
 
     fn handle_exchange_notification(
         &mut self,
-        notification: ExchangeEventNotification<Symbol>,
+        notification: ExchangeEventNotification<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol>>
+        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>
     {
         match notification {
             ExchangeEventNotification::ExchangeOpen => {
@@ -579,8 +607,9 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
         trader_id: TraderID,
         exchange_id: ExchangeID,
         event_dt: DateTime,
-        content: BrokerReply<Symbol>) -> BrokerAction<TraderID, ExchangeID, Symbol>
-    {
+        content: BrokerReply<Symbol, Settlement>) -> BrokerAction<
+        TraderID, ExchangeID, Symbol, Settlement
+    > {
         BrokerAction {
             delay: 0,
             content: BrokerActionKind::BrokerToTrader(
@@ -596,8 +625,9 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
 
     fn create_broker_request(
         exchange_id: ExchangeID,
-        content: BrokerRequest<Symbol>) -> BrokerAction<TraderID, ExchangeID, Symbol>
-    {
+        content: BrokerRequest<Symbol, Settlement>) -> BrokerAction<
+        TraderID, ExchangeID, Symbol, Settlement
+    > {
         BrokerAction {
             delay: 0,
             content: BrokerActionKind::BrokerToExchange(

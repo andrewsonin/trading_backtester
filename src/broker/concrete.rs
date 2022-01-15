@@ -405,8 +405,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
                 .inspect(
                     |(exchange, traded_pair, subscription_config)| {
                         if !self.registered_exchanges.contains(&exchange) {
-                            panic!("Broker {} is not connected to Exchange {}",
-                                   self.name, exchange)
+                            panic!("Broker {} is not connected to Exchange {exchange}", self.name)
                         };
                         self.traded_pairs_info
                             .entry((*exchange, *traded_pair))

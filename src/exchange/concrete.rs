@@ -369,8 +369,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
                         .get(&internal_order_id)
                         .expect_with(
                             || unreachable!(
-                                "Cannot find limit order with internal ID: {}",
-                                internal_order_id
+                                "Cannot find limit order with internal ID: {internal_order_id}"
                             )
                         );
                     let order_cancelled = OrderCancelled {
@@ -1071,7 +1070,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
                         }
                     )
                 } else {
-                    panic!("Cannot find limit order with internal ID {}", order_id)
+                    panic!("Cannot find limit order with internal ID {order_id}")
                 }
             }
             OrderBookEventKind::OldOrderPartiallyExecuted(order_id) => {
@@ -1099,7 +1098,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol>
                         }
                     )
                 } else {
-                    panic!("Cannot find limit order with internal ID {}", order_id)
+                    panic!("Cannot find limit order with internal ID {order_id}")
                 }
             }
             OrderBookEventKind::NewOrderPartiallyExecuted => {

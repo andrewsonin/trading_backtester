@@ -136,7 +136,7 @@ impl<
     {
         let (start_dt, end_dt) = date_range;
         if end_dt < start_dt {
-            panic!("start_dt ({}) is less than end_dt ({})", start_dt, end_dt)
+            panic!("start_dt ({start_dt}) is less than end_dt ({end_dt})")
         }
         let exchanges: Vec<_> = exchanges.into_iter().collect();
         let n_exchanges = exchanges.len();
@@ -164,9 +164,9 @@ impl<
                             exchange.connect_broker(broker_id);
                             broker.upon_connection_to_exchange(exchange_id)
                         } else {
-                            panic!("Cannot connect Broker {} to the Exchange: {}",
-                                   broker_id,
-                                   exchange_id)
+                            panic!(
+                                "Cannot connect Broker {broker_id} to the Exchange: {exchange_id}"
+                            )
                         }
                     }
                     (broker_id, broker)
@@ -189,9 +189,7 @@ impl<
                             broker.register_trader(trader_id, subscription_config);
                             trader.upon_register_at_broker(broker_id)
                         } else {
-                            panic!("Cannot register Trader {} at the Broker: {}",
-                                   trader_id,
-                                   broker_id)
+                            panic!("Cannot register Trader {trader_id} at the Broker: {broker_id}")
                         }
                     }
                     (trader_id, trader)
@@ -315,9 +313,8 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
                 if let Some(action) = self.replay.next() {
                     if action.datetime < self.current_dt {
                         panic!(
-                            "Replay yielded action {:?} which DateTime ({}) \
+                            "Replay yielded action {action:?} which DateTime ({}) \
                             is less than the Kernel current DateTime ({})",
-                            action,
                             action.datetime,
                             self.current_dt
                         )
@@ -434,7 +431,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
     fn handle_broker_wakeup(&mut self, broker_id: BrokerID)
     {
         let broker = self.brokers.get_mut(&broker_id).expect_with(
-            || panic!("Kernel does not know such a Broker: {}", broker_id)
+            || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
         let messages = broker.wakeup()
@@ -480,7 +477,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
     fn handle_trader_wakeup(&mut self, trader_id: TraderID)
     {
         let trader = self.traders.get_mut(&trader_id).expect_with(
-            || panic!("Kernel does not know such a Trader: {}", trader_id)
+            || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
         let messages = trader.wakeup()

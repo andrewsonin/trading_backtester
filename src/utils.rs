@@ -33,6 +33,6 @@ impl<T, E> ExpectWith<T> for Result<T, E>
 
 pub fn parse_datetime(string: &str, format: &str) -> DateTime {
     DateTime::parse_from_str(string, format).expect_with(
-        || panic!("Cannot parse to DateTime: \"{}\". Datetime format used: \"{}\"", string, format)
+        || panic!("Cannot parse to DateTime: \"{string}\". Datetime format used: \"{format}\"")
     )
 }

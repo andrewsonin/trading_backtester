@@ -82,8 +82,8 @@ pub fn parallel_backtest<
             .build()
             .expect_with(
                 || panic!(
-                    "Cannot build ThreadPool with the following number of threads to use: {}",
-                    max_num_threads
+                    "Cannot build ThreadPool \
+                    with the following number of threads to use: {max_num_threads}"
                 )
             )
             .install(job)

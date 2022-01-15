@@ -93,8 +93,8 @@ OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
                     || {
                         if open_dt < start_dt {
                             panic!(
-                                "Exchange {} open_dt {} is less than start_dt {}",
-                                exchange_id, open_dt, start_dt
+                                "Exchange {exchange_id} open_dt {open_dt} is less \
+                                than start_dt {start_dt}"
                             )
                         };
                         start_dt
@@ -102,16 +102,14 @@ OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
                 );
                 if open_dt < *prev_dt {
                     panic!(
-                        "Exchange {} open/close datetime pairs \
-                        are not stored in the ascending order",
-                        exchange_id
+                        "Exchange {exchange_id} open/close datetime pairs \
+                        are not stored in the ascending order"
                     )
                 }
                 if close_dt < open_dt {
                     panic!(
-                        "Exchange {} close datetime {} is less than \
-                        the corresponding exchange open datetime {}",
-                        exchange_id, close_dt, open_dt
+                        "Exchange {exchange_id} close datetime {close_dt} is less than \
+                        the corresponding exchange open datetime {open_dt}"
                     )
                 }
                 *prev_dt = close_dt;
@@ -162,7 +160,7 @@ OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
             .map(
                 |(i, mut pair_reader)| {
                     let first_event = pair_reader.next(&mut next_order_id).expect_with(
-                        || panic!("Traded pair reader {} is empty", i)
+                        || panic!("Traded pair reader {i} is empty")
                     );
                     (Reverse((first_event, i as i64)), pair_reader)
                 }
@@ -271,9 +269,8 @@ Replay<ExchangeID, Symbol> for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay
                     ExchangeEventNotification::TradesStarted(traded_pair, _price_step) => {
                         if !self.active_traded_pairs.insert((exchange_id, traded_pair)) {
                             panic!(
-                                "Trades for traded pair already started: {} {:?}",
-                                exchange_id,
-                                traded_pair
+                                "Trades for traded pair already started: \
+                                {exchange_id} {traded_pair:?}"
                             )
                         }
                         if let Some(action) = get_ob_snapshot_delay(traded_pair) {
@@ -289,9 +286,7 @@ Replay<ExchangeID, Symbol> for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay
                         if !self.active_traded_pairs.remove(&(exchange_id, traded_pair)) {
                             panic!(
                                 "Trades for traded pair already stopped or not ever started: \
-                                {} {:?}",
-                                exchange_id,
-                                traded_pair
+                                {exchange_id} {traded_pair:?}"
                             )
                         }
                         self.traded_pair_readers.iter_mut()
@@ -309,7 +304,7 @@ Replay<ExchangeID, Symbol> for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay
                     .next()
                     .expect_with(
                         || unreachable!(
-                            "Cannot find corresponding traded pair reader for {:?}", cannot_cancel
+                            "Cannot find corresponding traded pair reader for {cannot_cancel:?}"
                         )
                     );
                 if let Some(err_log_file) = &mut reader.err_log_file {
@@ -318,9 +313,8 @@ Replay<ExchangeID, Symbol> for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay
                     {
                         writeln!(
                             err_log_file,
-                            "{} :: Cannot cancel limit order with ID {} since {}",
+                            "{} :: Cannot cancel limit order with ID {order_id} since {}",
                             self.current_dt,
-                            order_id,
                             cannot_cancel.reason
                         )
                     } else {
@@ -331,7 +325,7 @@ Replay<ExchangeID, Symbol> for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay
                             cannot_cancel.order_id,
                             cannot_cancel.reason
                         )
-                    }.expect_with(|| panic!("Cannot write to file {:?}", err_log_file))
+                    }.expect_with(|| panic!("Cannot write to file {err_log_file:?}"))
                 }
             }
             ExchangeToReplayReply::OrderPlacementDiscarded(_) |
@@ -339,7 +333,7 @@ Replay<ExchangeID, Symbol> for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay
             ExchangeToReplayReply::CannotStartTrades(_) |
             ExchangeToReplayReply::CannotCloseExchange(_) |
             ExchangeToReplayReply::CannotStopTrades(_) => {
-                panic!("{} :: {:?}. Exchange {}", self.current_dt, reply, exchange_id)
+                panic!("{} :: {reply:?}. Exchange {exchange_id}", self.current_dt)
             }
             _ => {}
         }

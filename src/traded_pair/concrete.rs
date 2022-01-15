@@ -20,15 +20,15 @@ impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol> for DefaultTradedPai
             kind.as_ref(), quoted_symbol.as_ref(), base_symbol.as_ref()
         );
         let quoted_symbol = FromStr::from_str(quoted_symbol).expect_with(
-            || panic!("Cannot parse {} to Symbol", quoted_symbol)
+            || panic!("Cannot parse {quoted_symbol} to Symbol")
         );
         let base_symbol = FromStr::from_str(base_symbol).expect_with(
-            || panic!("Cannot parse {} to Symbol", base_symbol)
+            || panic!("Cannot parse {base_symbol} to Symbol")
         );
         let kind = if let "Spot" | "spot" = kind {
             PairKind::Spot(Spot { settlement: SettleKind::Immediately })
         } else {
-            panic!("Cannot parse to PairKind: {}", kind)
+            panic!("Cannot parse to PairKind: {kind}")
         };
         TradedPair {
             kind,

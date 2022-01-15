@@ -66,9 +66,9 @@ impl<TraderID: Identifier> SpreadWriter<TraderID>
 {
     pub fn new(name: TraderID, price_step: impl Into<PriceStep>, file: impl AsRef<Path>) -> Self {
         let file = file.as_ref();
-        let file = File::create(file).expect_with(|| panic!("Cannot create file {:?}", file));
+        let file = File::create(file).expect_with(|| panic!("Cannot create file {file:?}"));
         writeln!(&file, "Timestamp,BID_PRICE,BID_SIZE,ASK_PRICE,ASK_SIZE")
-            .expect_with(|| panic!("Cannot write to file {:?}", file));
+            .expect_with(|| panic!("Cannot write to file {file:?}"));
         SpreadWriter {
             name,
             current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
@@ -110,14 +110,13 @@ for SpreadWriter<TraderID>
                 let ask_price = ask.to_f64(self.price_step);
                 if bid_price >= ask_price {
                     panic!(
-                        "Bid price should be lower than Ask price. Got: {:.4} {:.4}",
-                        bid_price, ask_price
+                        "Bid price should be lower than Ask price. \
+                        Got: {bid_price:.4} {ask_price:.4}"
                     )
                 }
                 writeln!(
                     self.file,
-                    "{},{:.4},{},{:.4},{}",
-                    event_dt, bid_price, bid_size, ask_price, ask_size
+                    "{event_dt},{bid_price:.4},{bid_size},{ask_price:.4},{ask_size}"
                 )
                     .expect_with(|| panic!("Cannot write to file {:?}", self.file))
             }

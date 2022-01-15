@@ -67,7 +67,7 @@ impl Price
     pub fn from_decimal_str(string: &str, price_step: PriceStep) -> Self
     {
         let parsed_f64 = f64::from_str(string).expect_with(
-            || panic!("Cannot parse to f64: {}", string)
+            || panic!("Cannot parse to f64: {string}")
         );
         Self::from_f64(parsed_f64, price_step)
     }
@@ -79,10 +79,8 @@ impl Price
             Price(rounded_price_steps as i64)
         } else {
             panic!(
-                "Cannot convert f64 {} to Price without loss of precision \
-                with the following price step: {}",
-                value,
-                price_step
+                "Cannot convert f64 {value} to Price without loss of precision \
+                with the following price step: {price_step}"
             )
         }
     }

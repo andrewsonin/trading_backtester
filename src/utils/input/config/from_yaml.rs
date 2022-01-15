@@ -52,11 +52,12 @@ mod yaml_utils
         match yml {
             Yaml::Hash(map) => map,
             Yaml::BadValue => panic!(
-                "{:?} does not have \"{}\" section", path, get_current_section()
+                "{path:?} does not have \"{}\" section", get_current_section()
             ),
             _ => panic!(
-                "\"{}\" section of the {:?} YAML file should contain named entries. Got {:?}",
-                get_current_section(), path, yml
+                "\"{}\" section of the {path:?} YAML file should contain named entries. \
+                Got {yml:?}",
+                get_current_section(),
             )
         }
     }
@@ -70,8 +71,9 @@ mod yaml_utils
             Yaml::Hash(map) => Some(map),
             Yaml::BadValue => None,
             _ => panic!(
-                "\"{}\" section of the {:?} YAML file should contain named entries. Got {:?}",
-                get_current_section(), path, yml
+                "\"{}\" section of the {path:?} YAML file should contain named entries. \
+                Got {yml:?}",
+                get_current_section(),
             )
         }
     }
@@ -84,11 +86,12 @@ mod yaml_utils
         match yml {
             Yaml::Array(arr) => arr,
             Yaml::BadValue => panic!(
-                "{:?} does not have \"{}\" section", path, get_current_section()
+                "{path:?} does not have \"{}\" section", get_current_section()
             ),
             _ => panic!(
-                "\"{}\" section of the {:?} YAML file should be an array of entries. Got {:?}",
-                get_current_section(), path, yml
+                "\"{}\" section of the {path:?} YAML file should be an array of entries. \
+                Got {yml:?}",
+                get_current_section(),
             )
         }
     }
@@ -101,11 +104,11 @@ mod yaml_utils
         match yml {
             Yaml::String(string) => string,
             Yaml::BadValue => panic!(
-                "{:?} does not have \"{}\" section", path, get_current_section()
+                "{path:?} does not have \"{}\" section", get_current_section()
             ),
             _ => panic!(
-                "\"{}\" section of the {:?} YAML file should be String. Got {:?}",
-                get_current_section(), path, yml
+                "\"{}\" section of the {path:?} YAML file should be String. Got {yml:?}",
+                get_current_section(),
             )
         }
     }
@@ -118,11 +121,11 @@ mod yaml_utils
         match yml {
             Yaml::Real(real) => real,
             Yaml::BadValue => panic!(
-                "{:?} does not have \"{}\" section", path, get_current_section()
+                "{path:?} does not have \"{}\" section", get_current_section()
             ),
             _ => panic!(
-                "\"{}\" section of the {:?} YAML file should be Real. Got {:?}",
-                get_current_section(), path, yml
+                "\"{}\" section of the {path:?} YAML file should be Real. Got {yml:?}",
+                get_current_section(),
             )
         }
     }
@@ -135,8 +138,7 @@ mod yaml_utils
     {
         try_read_yaml_hashmap_field(map, field).expect_with(
             || panic!(
-                "\"{}\" section of the {:?} YAML file is not found",
-                get_current_section(), path
+                "\"{}\" section of the {path:?} YAML file is not found", get_current_section()
             )
         )
     }
@@ -166,17 +168,17 @@ mod yaml_utils
         match yml {
             Yaml::Real(real) => f64::from_str(real)
                 .expect_with(
-                    || panic!("Section \"{}\". Cannot parse \"{}\" to f64",
-                              get_current_section(),
-                              real)
+                    || panic!(
+                        "Section \"{}\". Cannot parse \"{real}\" to f64",
+                        get_current_section()
+                    )
                 )
                 .into(),
             Yaml::Integer(integer) => (*integer).into(),
             Yaml::String(string) => string.into(),
             Yaml::Boolean(boolean) => (*boolean).into(),
             _ => panic!(
-                "Section \"{}\" should contain values only. Got {:?}",
-                get_current_section(), yml
+                "Section \"{}\" should contain values only. Got {yml:?}", get_current_section()
             )
         }
     }
@@ -258,17 +260,17 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay>(
 
     let path = path.as_ref();
     let yml = read_to_string(path)
-        .expect_with(|| panic!("Cannot read the following file: {:?}", path));
+        .expect_with(|| panic!("Cannot read the following file: {path:?}"));
     let yml = YamlLoader::load_from_str(&yml)
-        .expect_with(|| panic!("Bad YAML file: {:?}", path));
+        .expect_with(|| panic!("Bad YAML file: {path:?}"));
     let yml = &yml[0];
 
     let cwd = std::env::current_dir().expect("Cannot get current working directory");
     let parent_dir = path.parent().expect_with(
-        || panic!("Cannot get parent directory of the {:?}", path)
+        || panic!("Cannot get parent directory of the {path:?}")
     );
     std::env::set_current_dir(parent_dir).expect_with(
-        || panic!("Cannot set current working directory to {:?}", parent_dir)
+        || panic!("Cannot set current working directory to {parent_dir:?}")
     );
 
     const GET_CURRENT_SECTION: fn() -> String = || "~".into();
@@ -277,8 +279,9 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay>(
             let key = expect_yaml_string(key, path, GET_CURRENT_SECTION);
             if !POSSIBLE_SECTIONS.contains(&key.as_str()) {
                 panic!(
-                    "\"{}\" cannot be present in the \"{}\" section. Possible keys: {:?}",
-                    key, GET_CURRENT_SECTION(), POSSIBLE_SECTIONS
+                    "\"{key}\" cannot be present in the \"{}\" section. \
+                    Possible keys: {POSSIBLE_SECTIONS:?}",
+                    GET_CURRENT_SECTION()
                 )
             }
         }
@@ -299,7 +302,7 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay>(
         .unzip();
 
     std::env::set_current_dir(&cwd).expect_with(
-        || panic!("Cannot set current working directory to {:?}", cwd)
+        || panic!("Cannot set current working directory to {cwd:?}")
     );
 
     (
@@ -336,16 +339,17 @@ fn update_env<const KEYS_NUM: usize>(
     map.into_iter().for_each(
         |(key, value)| {
             let key = expect_yaml_string(
-                key, path, || format!("{} :: {:?}", get_current_section(), key),
+                key, path, || format!("{} :: {key:?}", get_current_section()),
             );
             if !possible_keys.contains(&key.as_str()) {
                 panic!(
-                    "\"{}\" cannot be present in the \"{}\" section. Possible keys: {:?}",
-                    key, get_current_section(), possible_keys
+                    "\"{key}\" cannot be present in the \"{}\" section. \
+                    Possible keys: {possible_keys:?}",
+                    get_current_section()
                 )
             }
             let value = expect_yaml_value(
-                value, || format!("{} :: {}", get_current_section(), key),
+                value, || format!("{} :: {key}", get_current_section()),
             );
             env.insert(key.into(), value);
         }
@@ -399,52 +403,50 @@ fn parse_simulation_time_section(
     let field = DATETIME_FORMAT;
     let datetime_format = env
         .get(field)
-        .expect_with(|| unreachable!("Section \"{}\" should contain \"{}\" value", SECTION, field));
+        .expect_with(|| unreachable!("Section \"{SECTION}\" should contain \"{field}\" value"));
 
-    let get_current_section = || format!("{} :: {}", SECTION, field);
+    let get_current_section = || format!("{SECTION} :: {field}");
     let datetime_format = if let YamlValue::String(v) = datetime_format {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), datetime_format)
+        panic!("\"{}\" should be String. Got: {datetime_format:?}", get_current_section())
     };
 
     let field = START;
     let start = env.get(field).expect_with(
-        || panic!("Section \"{}\" should contain \"{}\" value", SECTION, field)
+        || panic!("Section \"{SECTION}\" should contain \"{field}\" value")
     );
 
-    let get_current_section = || format!("{} :: {}", SECTION, field);
+    let get_current_section = || format!("{SECTION} :: {field}");
     let start = if let YamlValue::String(start) = start {
         start.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), start)
+        panic!("\"{}\" should be String. Got: {start:?}", get_current_section())
     };
     let start = DateTime::parse_from_str(start, datetime_format).expect_with(
         || panic!(
-            "Section \"{}\". Cannot parse to DateTime: \"{}\". Datetime format used: \"{}\"",
-            get_current_section(),
-            start,
-            datetime_format
+            "Section \"{}\". Cannot parse to DateTime: \"{start}\". \
+            Datetime format used: \"{datetime_format}\"",
+            get_current_section()
         )
     );
 
     let field = END;
     let end = env.get(field).expect_with(
-        || panic!("Section \"{}\" should contain \"{}\" value", SECTION, field)
+        || panic!("Section \"{SECTION}\" should contain \"{field}\" value")
     );
 
-    let get_current_section = || format!("{} :: {}", SECTION, field);
+    let get_current_section = || format!("{SECTION} :: {field}");
     let end = if let YamlValue::String(end) = end {
         end.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), end)
+        panic!("\"{}\" should be String. Got: {end:?}", get_current_section())
     };
     let end = DateTime::parse_from_str(end, datetime_format).expect_with(
         || panic!(
-            "Section \"{}\". Cannot parse to DateTime: \"{}\". Datetime format used: \"{}\"",
-            get_current_section(),
-            start,
-            datetime_format
+            "Section \"{}\". Cannot parse to DateTime: \"{start}\". \
+            Datetime format used: \"{datetime_format}\"",
+            get_current_section()
         )
     );
 
@@ -465,31 +467,34 @@ fn parse_exchanges_section<'a, ExchangeID: Identifier + FromStr>(
 
     expect_yaml_array(&yaml[SECTION], path, FULL_SECTION_PATH).into_iter().zip(1..).map(
         |(exchange, i)| {
-            let get_current_section = || format!("{} :: {}", SECTION, i);
+            let get_current_section = || format!("{SECTION} :: {i}");
             let exchange = expect_yaml_hashmap(exchange, path, get_current_section);
 
             for key in exchange.keys() {
-                let get_current_section = || format!("{} :: {} :: {:?}", SECTION, i, key);
+                let get_current_section = || format!("{SECTION} :: {i} :: {key:?}");
                 let key = expect_yaml_string(key, path, get_current_section);
                 if !POSSIBLE_KEYS.contains(&key.as_str()) {
                     panic!(
-                        "\"{}\" cannot be present in the \"{}\" section. Possible keys: {:?}",
-                        key, get_current_section(), POSSIBLE_KEYS
+                        "\"{key}\" cannot be present in the \"{}\" section. \
+                        Possible keys: {POSSIBLE_KEYS:?}",
+                        get_current_section()
                     )
                 }
             }
 
             let field = NAME;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let name = read_yaml_hashmap_field(exchange, field, path, full_section_path);
             let name = expect_yaml_string(name, path, full_section_path);
             let name = FromStr::from_str(name).expect_with(
-                || panic!("Section \"{}\". Cannot parse \"{}\" to ExchangeID",
-                          full_section_path(), name)
+                || panic!(
+                    "Section \"{}\". Cannot parse \"{name}\" to ExchangeID",
+                    full_section_path()
+                )
             );
 
             let field = SESSIONS;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let sessions = read_yaml_hashmap_field(exchange, field, path, full_section_path);
             let sessions = expect_yaml_hashmap(sessions, path, full_section_path);
             let sessions = parse_exchange_sessions(
@@ -526,11 +531,11 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let datetime_format = if let YamlValue::String(v) = datetime_format {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), datetime_format)
+        panic!("\"{}\" should be String. Got: {datetime_format:?}", get_current_section())
     };
 
 
@@ -543,7 +548,7 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let csv_sep = if let YamlValue::String(v) = csv_sep {
         v.as_str()
     } else {
@@ -560,15 +565,15 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
         .get(field)
         .expect_with(
             || panic!(
-                "Section \"{}\" should contain \"{}\" value", full_section_path(), field
+                "Section \"{}\" should contain \"{field}\" value", full_section_path()
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let open_colname = if let YamlValue::String(v) = open_colname {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), open_colname)
+        panic!("\"{}\" should be String. Got: {open_colname:?}", get_current_section())
     };
 
 
@@ -577,15 +582,15 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
         .get(field)
         .expect_with(
             || panic!(
-                "Section \"{}\" should contain \"{}\" value", full_section_path(), field
+                "Section \"{}\" should contain \"{field}\" value", full_section_path()
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let close_colname = if let YamlValue::String(v) = close_colname {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), close_colname)
+        panic!("\"{}\" should be String. Got: {close_colname:?}", get_current_section())
     };
 
 
@@ -594,26 +599,26 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
         .get(field)
         .expect_with(
             || panic!(
-                "Section \"{}\" should contain \"{}\" value", full_section_path(), field
+                "Section \"{}\" should contain \"{field}\" value", full_section_path()
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let path = if let YamlValue::String(v) = path {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), path)
+        panic!("\"{}\" should be String. Got: {path:?}", get_current_section())
     };
 
 
     let mut csv_reader = ReaderBuilder::new()
         .delimiter(csv_sep)
         .from_path(path)
-        .expect_with(|| panic!("Cannot read the following file: {}", path));
+        .expect_with(|| panic!("Cannot read the following file: {path}"));
 
     let header = csv_reader
         .headers()
-        .expect_with(|| panic!("Cannot parse header of the CSV-file: {}", path));
+        .expect_with(|| panic!("Cannot parse header of the CSV-file: {path}"));
 
     let mut open_colname_idx = None;
     let mut close_colname_idx = None;
@@ -624,38 +629,38 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
                 if open_colname_idx.is_none() {
                     open_colname_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the CSV-file {}", open_colname, path)
+                    panic!("Duplicate column {open_colname} in the CSV-file {path}")
                 }
             } else if col == close_colname {
                 if close_colname_idx.is_none() {
                     close_colname_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the CSV-file {}", close_colname, path)
+                    panic!("Duplicate column {close_colname} in the CSV-file {path}")
                 }
             }
         }
     );
     let open_colname_idx = open_colname_idx.expect_with(
-        || panic!("Cannot not find \"{}\" column in the CSV-file {}", open_colname, path)
+        || panic!("Cannot not find \"{open_colname}\" column in the CSV-file {path}")
     );
     let close_colname_idx = close_colname_idx.expect_with(
-        || panic!("Cannot not find \"{}\" column in the CSV-file {}", close_colname, path)
+        || panic!("Cannot not find \"{close_colname}\" column in the CSV-file {path}")
     );
 
     let parse_record = |(record, i): (Result<StringRecord, _>, _)| {
         let record = record.expect_with(
-            || panic!("Cannot parse {} line of the CSV-file {}", i, path)
+            || panic!("Cannot parse {i} line of the CSV-file {path}")
         );
         let open_dt = record.get(open_colname_idx).expect_with(
             || panic!(
-                "{} line of the CSV-file {} does not have value at the {} index",
-                i, path, open_colname_idx
+                "{i} line of the CSV-file {path} does not have \
+                value at the {open_colname_idx} index",
             )
         );
         let close_dt = record.get(close_colname_idx).expect_with(
             || panic!(
-                "{} line of the CSV-file {} does not have value at the {} index",
-                i, path, close_colname_idx
+                "{i} line of the CSV-file {path} does not have \
+                value at the {close_colname_idx} index",
             )
         );
         if close_dt > open_dt {
@@ -663,34 +668,27 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
                 exchange_id: name,
                 open_dt: DateTime::parse_from_str(open_dt, datetime_format).expect_with(
                     || panic!(
-                        "{} line of the CSV-file {}. \
-                        Cannot parse to DateTime: {}. Datetime format used: {}",
-                        i, path,
-                        open_dt,
-                        datetime_format
+                        "{i} line of the CSV-file {path}. Cannot parse to DateTime: {open_dt}. \
+                        Datetime format used: {datetime_format}",
                     )
                 ),
                 close_dt: DateTime::parse_from_str(close_dt, datetime_format).expect_with(
                     || panic!(
-                        "{} line of the CSV-file {}. \
-                        Cannot parse to DateTime: {}. Datetime format used: {}",
-                        i, path,
-                        close_dt,
-                        datetime_format
+                        "{i} line of the CSV-file {path}. Cannot parse to DateTime: {close_dt}. \
+                        Datetime format used: {datetime_format}"
                     )
                 ),
             }
         } else {
             panic!(
-                "{} line of the CSV-file {}. close_dt should be greater than open_dt",
-                i, path
+                "{i} line of the CSV-file {path}. close_dt should be greater than open_dt"
             )
         }
     };
     let mut record_iterator = csv_reader.records().zip(2..).map(parse_record);
 
     let first_record = record_iterator.next().expect_with(
-        || panic!("CSV-file {} does not have any entries", path)
+        || panic!("CSV-file {path} does not have any entries")
     );
     let mut last_dt = first_record.close_dt;
 
@@ -700,10 +698,9 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
                 last_dt = session.close_dt
             } else {
                 panic!(
-                    "All entries in the CSV-file {} should be sorted \
+                    "All entries in the CSV-file {path} should be sorted \
                     in ascending order by time. \
-                    I.e. each open_dt should be greater than the previous close_dt",
-                    path
+                    I.e. each open_dt should be greater than the previous close_dt"
                 )
             }
         )
@@ -740,45 +737,46 @@ fn parse_traded_pairs_section<
 
     expect_yaml_array(&yaml[SECTION], path, FULL_SECTION_PATH).into_iter().zip(1..).map(
         move |(map, i)| {
-            let get_current_section = || format!("{} :: {}", SECTION, i);
+            let get_current_section = || format!("{SECTION} :: {i}");
             let map = expect_yaml_hashmap(map, path, get_current_section);
             for key in map.keys() {
-                let get_current_section = || format!("{} :: {} :: {:?}", SECTION, i, key);
+                let get_current_section = || format!("{SECTION} :: {i} :: {key:?}");
                 let key = expect_yaml_string(key, path, get_current_section);
                 if !POSSIBLE_KEYS.contains(&key.as_str()) {
                     panic!(
-                        "\"{}\" cannot be present in the \"{}\" section. Possible keys: {:?}",
-                        key, get_current_section(), POSSIBLE_KEYS
+                        "\"{key}\" cannot be present in the \"{}\" section. \
+                        Possible keys: {POSSIBLE_KEYS:?}",
+                        get_current_section()
                     )
                 }
             }
 
             let field = EXCHANGE;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let exchange = read_yaml_hashmap_field(map, field, path, full_section_path);
             let exchange = expect_yaml_string(exchange, path, full_section_path);
             let exchange = FromStr::from_str(exchange).expect_with(
-                || panic!("Section \"{}\". Cannot parse \"{}\" to ExchangeID",
-                          full_section_path(), exchange)
+                || panic!("Section \"{}\". Cannot parse \"{exchange}\" to ExchangeID",
+                          full_section_path())
             );
 
             let field = KIND;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let kind = read_yaml_hashmap_field(map, field, path, full_section_path);
             let kind = expect_yaml_string(kind, path, full_section_path);
 
             let field = QUOTED;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let quoted = read_yaml_hashmap_field(map, field, path, full_section_path);
             let quoted = expect_yaml_string(quoted, path, full_section_path);
 
             let field = BASE;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let base = read_yaml_hashmap_field(map, field, path, full_section_path);
             let base = expect_yaml_string(base, path, full_section_path);
 
             let field = PRICE_STEP;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let price_step = read_yaml_hashmap_field(map, field, path, full_section_path);
             let price_step = expect_yaml_real(price_step, path, full_section_path);
             let price_step: PriceStep = f64::from_str(price_step).expect_with(
@@ -787,21 +785,21 @@ fn parse_traded_pairs_section<
             ).into();
 
             let field = ERR_LOG_FILE;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let err_log_file = try_read_yaml_hashmap_field(map, field);
             let err_log_file = if let Some(err_log_file) = err_log_file {
                 let err_log_file = expect_yaml_string(err_log_file, path, full_section_path);
                 let err_log_file = Path::new(err_log_file);
-                if err_log_file.is_relative() {
-                    let result = path.parent()
+                let result = if err_log_file.is_relative() {
+                    path.parent()
                         .expect_with(
-                            || unreachable!("Cannot get parent directory of the {:?}", path)
+                            || unreachable!("Cannot get parent directory of the {path:?}")
                         )
-                        .join(err_log_file);
-                    Some(result)
+                        .join(err_log_file)
                 } else {
-                    Some(PathBuf::from(err_log_file))
-                }
+                    PathBuf::from(err_log_file)
+                };
+                Some(result)
             } else {
                 None
             };
@@ -809,7 +807,7 @@ fn parse_traded_pairs_section<
             let traded_pair = TPParser::parse(kind, quoted, base);
 
             let field = START_STOP_DATETIMES;
-            let full_section_path = || format!("{} :: {} :: {}", SECTION, i, field);
+            let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let trade_start_stops = read_yaml_hashmap_field(map, field, path, full_section_path);
             let trade_start_stops = expect_yaml_hashmap(trade_start_stops, path, full_section_path);
             let trade_start_stops = parse_trade_start_stops(
@@ -847,7 +845,7 @@ fn parse_trade_start_stops<
         CSV_SEP
     ];
     const SECTION: &str = START_STOP_DATETIMES;
-    let full_section_path = || format!("{} :: {}", get_current_section(), SECTION);
+    let full_section_path = || format!("{} :: {SECTION}", get_current_section());
 
     update_env(map, &mut env, path, full_section_path, POSSIBLE_KEYS);
 
@@ -861,11 +859,11 @@ fn parse_trade_start_stops<
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let datetime_format = if let YamlValue::String(v) = datetime_format {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), datetime_format)
+        panic!("\"{}\" should be String. Got: {datetime_format:?}", get_current_section())
     };
 
 
@@ -878,14 +876,14 @@ fn parse_trade_start_stops<
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let csv_sep = if let YamlValue::String(v) = csv_sep {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), csv_sep)
+        panic!("\"{}\" should be String. Got: {csv_sep:?}", get_current_section())
     };
     if csv_sep.len() != 1 {
-        panic!("\"{}\" should contain 1 character. Got {}", get_current_section(), csv_sep)
+        panic!("\"{}\" should contain 1 character. Got {csv_sep}", get_current_section())
     }
     let csv_sep = *csv_sep.as_bytes().first().unwrap();
 
@@ -895,11 +893,11 @@ fn parse_trade_start_stops<
         .get(field)
         .expect_with(
             || panic!(
-                "Section \"{}\" should contain \"{}\" value", full_section_path(), field
+                "Section \"{}\" should contain \"{field}\" value", full_section_path()
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let start_colname = if let YamlValue::String(v) = start_colname {
         v.as_str()
     } else {
@@ -914,7 +912,7 @@ fn parse_trade_start_stops<
             || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let stop_colname = if let YamlValue::String(v) = stop_colname {
         v.as_str()
     } else {
@@ -929,7 +927,7 @@ fn parse_trade_start_stops<
             || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let path = if let YamlValue::String(v) = path {
         v.as_str()
     } else {
@@ -1076,7 +1074,7 @@ fn gen_traded_pair_reader<
     err_log_file: Option<PathBuf>) -> OneTickTradedPairReaderConfig<ExchangeID, Symbol>
 {
     let field = TRD;
-    let full_section_path = || format!("{} :: {}", get_current_section(), field);
+    let full_section_path = || format!("{} :: {field}", get_current_section());
     let trd = read_yaml_hashmap_field(map, field, path, full_section_path);
     let trd = expect_yaml_hashmap(trd, path, full_section_path);
 
@@ -1085,7 +1083,7 @@ fn gen_traded_pair_reader<
     );
 
     let field = PRL;
-    let full_section_path = || format!("{} :: {}", get_current_section(), field);
+    let full_section_path = || format!("{} :: {field}", get_current_section());
     let prl = read_yaml_hashmap_field(map, field, path, full_section_path);
     let prl = expect_yaml_hashmap(prl, path, full_section_path);
 
@@ -1145,7 +1143,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let datetime_format = if let YamlValue::String(v) = datetime_format {
         v.to_string()
     } else {
@@ -1162,7 +1160,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
             )
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let csv_sep = if let YamlValue::String(v) = csv_sep {
         v.as_str()
     } else {
@@ -1181,7 +1179,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
             || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let datetime_colname = if let YamlValue::String(v) = datetime_colname {
         v.to_string()
     } else {
@@ -1208,7 +1206,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
             || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let price_colname = if let YamlValue::String(v) = price_colname {
         v.to_string()
     } else {
@@ -1223,7 +1221,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
             || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let size_colname = if let YamlValue::String(v) = size_colname {
         v.to_string()
     } else {
@@ -1238,7 +1236,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
             || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let buy_sell_flag_colname = if let YamlValue::String(v) = buy_sell_flag_colname {
         v.to_string()
     } else {
@@ -1253,7 +1251,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
             || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
         );
 
-    let get_current_section = || format!("{} :: {}", full_section_path(), field);
+    let get_current_section = || format!("{} :: {field}", full_section_path());
     let path_list = if let YamlValue::String(v) = path_list {
         Path::new(v)
     } else {
@@ -1261,7 +1259,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     };
     let path_list = if path_list.is_relative() {
         path.parent()
-            .expect_with(|| unreachable!("Cannot get parent directory of the {:?}", path))
+            .expect_with(|| unreachable!("Cannot get parent directory of the {path:?}"))
             .join(path_list)
     } else {
         PathBuf::from(path_list)

@@ -31,9 +31,9 @@ pub struct ThreadConfig<
           ConnectedBrokers: IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
           SubscriptionConfigs: IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>
 {
-    pub rng_seed: u64,
-    pub replay_config: ReplayConfig,
-    pub trader_configs: TraderConfigs,
+    rng_seed: u64,
+    replay_config: ReplayConfig,
+    trader_configs: TraderConfigs,
     trader_id: PhantomData<TraderID>,
 }
 

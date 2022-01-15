@@ -16,7 +16,7 @@ use {
         traded_pair::TradedPair,
         trader::{concrete::SpreadWriter, Trader},
         types::{DateTime, Identifier, PriceStep},
-        utils::input::one_tick::{OneTickTradedPairReader, TrdPrlConfig},
+        utils::input::one_tick::{OneTickTradedPairReader, OneTickTrdPrlConfig},
     },
     std::path::{Path, PathBuf},
 };
@@ -75,9 +75,9 @@ pub struct OneTickTradedPairReaderConfig<
     pub exchange_id: ExchangeID,
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub prl_files: PathBuf,
-    pub prl_args: TrdPrlConfig,
+    pub prl_args: OneTickTrdPrlConfig,
     pub trd_files: PathBuf,
-    pub trd_args: TrdPrlConfig,
+    pub trd_args: OneTickTrdPrlConfig,
     pub err_log_file: Option<PathBuf>,
 }
 

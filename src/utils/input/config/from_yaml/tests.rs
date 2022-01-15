@@ -5,7 +5,7 @@ use {
         parallel::{ParallelBacktester, ThreadConfig},
         replay::concrete::GetNextObSnapshotDelay,
         settlement::{concrete::VoidSettlement, GetSettlementLag},
-        traded_pair::{concrete::SpotTradedPairParser, PairKind, TradedPair},
+        traded_pair::{PairKind, parser::concrete::SpotTradedPairParser, TradedPair},
         trader::{concrete::SpreadWriter, subscriptions::{SubscriptionConfig, SubscriptionList}},
         types::{DateTime, Identifier, PriceStep},
         utils::{

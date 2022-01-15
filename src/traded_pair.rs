@@ -1,31 +1,15 @@
-use {
-    crate::{
-        settlement::GetSettlementLag,
-        types::{DateTime, Identifier, Price},
-        utils::enum_dispatch,
-    },
-    std::str::FromStr,
+use crate::{
+    settlement::GetSettlementLag,
+    types::{DateTime, Identifier, Price},
 };
 
-pub mod concrete;
+pub mod parser;
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
 pub struct TradedPair<Name: Identifier, Settlement: GetSettlementLag> {
     pub kind: PairKind<Settlement>,
     pub quoted_symbol: Name,
     pub base_symbol: Name,
-}
-
-#[enum_dispatch]
-pub trait TradedPairParser<
-    Symbol: Identifier + FromStr,
-    Settlement: GetSettlementLag
-> {
-    fn parse<ExchangeID: Identifier>(
-        exchange_id: ExchangeID,
-        kind: impl AsRef<str>,
-        quoted_symbol: impl AsRef<str>,
-        base_symbol: impl AsRef<str>) -> TradedPair<Symbol, Settlement>;
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]

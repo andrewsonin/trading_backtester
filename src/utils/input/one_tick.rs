@@ -26,8 +26,8 @@ pub struct OneTickTradedPairReader<
     pub exchange_id: ExchangeID,
     pub traded_pair: TradedPair<Symbol, Settlement>,
 
-    trd_reader: HistoryReader,
-    prl_reader: HistoryReader,
+    trd_reader: OneTickHistoryReader,
+    prl_reader: OneTickHistoryReader,
 
     next_trd: Option<HistoryEntry>,
     next_prl: Option<HistoryEntry>,
@@ -38,11 +38,11 @@ pub struct OneTickTradedPairReader<
     pub err_log_file: Option<File>,
 }
 
-pub(crate) struct HistoryReader
+pub(crate) struct OneTickHistoryReader
 {
     files_to_parse: VecDeque<PathBuf>,
     buffered_entries: VecDeque<HistoryEntry>,
-    args: TrdPrlConfig,
+    args: OneTickTrdPrlConfig,
 }
 
 #[derive(Copy, Clone)]
@@ -55,7 +55,7 @@ pub(crate) struct HistoryEntry {
 }
 
 #[derive(Clone)]
-pub struct TrdPrlConfig {
+pub struct OneTickTrdPrlConfig {
     pub datetime_colname: String,
     pub order_id_colname: String,
     pub price_colname: String,
@@ -66,7 +66,7 @@ pub struct TrdPrlConfig {
     pub price_step: f64,
 }
 
-pub(crate) struct HistoryEntryColumnIndexer {
+pub(crate) struct OneTickHistoryEntryColumnIndexer {
     pub price_idx: usize,
     pub size_idx: usize,
     pub datetime_idx: usize,
@@ -81,13 +81,13 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         exchange_id: ExchangeID,
         traded_pair: TradedPair<Symbol, Settlement>,
         prl_files: PathBuf,
-        prl_args: TrdPrlConfig,
+        prl_args: OneTickTrdPrlConfig,
         trd_files: PathBuf,
-        trd_args: TrdPrlConfig,
+        trd_args: OneTickTrdPrlConfig,
         err_log_file: Option<PathBuf>) -> Self
     {
-        let mut prl_reader = HistoryReader::new(prl_files, prl_args);
-        let mut trd_reader = HistoryReader::new(trd_files, trd_args);
+        let mut prl_reader = OneTickHistoryReader::new(prl_files, prl_args);
+        let mut trd_reader = OneTickHistoryReader::new(trd_files, trd_args);
         Self {
             exchange_id,
             next_prl: prl_reader.next(),
@@ -276,7 +276,7 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
     }
 }
 
-impl Iterator for HistoryReader {
+impl Iterator for OneTickHistoryReader {
     type Item = HistoryEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -289,9 +289,9 @@ impl Iterator for HistoryReader {
     }
 }
 
-impl HistoryReader
+impl OneTickHistoryReader
 {
-    fn new(files_to_parse: impl AsRef<Path>, args: TrdPrlConfig) -> Self
+    fn new(files_to_parse: impl AsRef<Path>, args: OneTickTrdPrlConfig) -> Self
     {
         let files_to_parse = files_to_parse.as_ref();
         let files = {
@@ -325,7 +325,7 @@ impl HistoryReader
         res
     }
 
-    fn new_for_vecdeque(files_to_parse: VecDeque<PathBuf>, args: TrdPrlConfig) -> Self {
+    fn new_for_vecdeque(files_to_parse: VecDeque<PathBuf>, args: OneTickTrdPrlConfig) -> Self {
         Self {
             files_to_parse,
             buffered_entries: Default::default(),
@@ -344,7 +344,7 @@ impl HistoryReader
             .delimiter(self.args.csv_sep as u8)
             .from_path(&file_to_read)
             .expect_with(|| panic!("Cannot read the following file: {file_to_read:?}"));
-        let col_idx_info = HistoryEntryColumnIndexer::new(
+        let col_idx_info = OneTickHistoryEntryColumnIndexer::new(
             &mut cur_file_reader,
             &file_to_read,
             &self.args,
@@ -391,11 +391,11 @@ impl HistoryReader
     }
 }
 
-impl HistoryEntryColumnIndexer
+impl OneTickHistoryEntryColumnIndexer
 {
     pub fn new(csv_reader: &mut Reader<File>,
                path_for_debug: impl AsRef<Path>,
-               args: &TrdPrlConfig) -> Self
+               args: &OneTickTrdPrlConfig) -> Self
     {
         let path_for_debug = path_for_debug.as_ref();
 

@@ -27,14 +27,14 @@ pub struct OrderBook {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) struct OrderBookEvent {
+pub struct OrderBookEvent {
     pub size: Size,
     pub price: Price,
     pub kind: OrderBookEventKind,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) enum OrderBookEventKind {
+pub enum OrderBookEventKind {
     NewOrderExecuted,
     NewOrderPartiallyExecuted,
     OldOrderExecuted(OrderID),

@@ -6,7 +6,7 @@ use {
             TradedPairLifetime,
         },
         settlement::GetSettlementLag,
-        traded_pair::{TradedPair, TradedPairParser},
+        traded_pair::{parser::TradedPairParser, TradedPair},
         types::{
             DateTime,
             Identifier,
@@ -19,7 +19,7 @@ use {
                     from_structs::{OneTickReplayConfig, OneTickTradedPairReaderConfig},
                     from_yaml::{config_fields::*, yaml_utils::*},
                 },
-                one_tick::TrdPrlConfig,
+                one_tick::OneTickTrdPrlConfig,
             },
         },
     },
@@ -1121,7 +1121,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     mut env: HashMap<String, YamlValue>,
     price_step: PriceStep,
     path: &Path,
-    full_section_path: F) -> (PathBuf, TrdPrlConfig)
+    full_section_path: F) -> (PathBuf, OneTickTrdPrlConfig)
 {
     let order_id_colname = get_order_id_colname::<IS_TRD>();
     let possible_keys = [
@@ -1272,7 +1272,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     };
 
 
-    let info = TrdPrlConfig {
+    let info = OneTickTrdPrlConfig {
         datetime_colname,
         order_id_colname,
         price_colname,

@@ -2,7 +2,7 @@ use {
     crate::{
         broker::concrete::BasicBroker,
         kernel::KernelBuilder,
-        parallel::ParallelBacktester,
+        parallel::{ParallelBacktester, ThreadConfig},
         replay::concrete::GetNextObSnapshotDelay,
         settlement::{concrete::VoidSettlement, GetSettlementLag},
         traded_pair::{concrete::SpotTradedPairParser, PairKind, TradedPair},
@@ -158,37 +158,37 @@ fn test_parse_yaml_in_parallel()
     let trader_subscriptions = [
         (BrokerName::Broker1, [subscription_config])
     ];
-    let first_thread_configs = (
+    let first_thread_config = ThreadConfig::new(
         42,
         replay_config.clone(),
         [
             (
-                SpreadWriterConfig {
-                    name: 0,
-                    file: test_files.join("example_01").join("simulated_spread_par_01.csv"),
-                    price_step: PriceStep(0.0025),
-                },
+                SpreadWriterConfig::new(
+                    0,
+                    test_files.join("example_01").join("simulated_spread_par_01.csv"),
+                    PriceStep(0.0025),
+                ),
                 trader_subscriptions
             )
-        ]
+        ],
     );
-    let second_thread_configs = (
+    let second_thread_config = ThreadConfig::new(
         4122,
-        replay_config,
+        replay_config.clone(),
         [
             (
-                SpreadWriterConfig {
-                    name: 1,
-                    file: test_files.join("example_01").join("simulated_spread_par_02.csv"),
-                    price_step: PriceStep(0.0025),
-                },
+                SpreadWriterConfig::new(
+                    1,
+                    test_files.join("example_01").join("simulated_spread_par_01.csv"),
+                    PriceStep(0.0025),
+                ),
                 trader_subscriptions
             )
-        ]
+        ],
     );
     let per_thread_configs = [
-        first_thread_configs.clone(),
-        second_thread_configs.clone()
+        first_thread_config.clone(),
+        second_thread_config.clone()
     ];
 
     ParallelBacktester::new(
@@ -200,9 +200,9 @@ fn test_parse_yaml_in_parallel()
         .run_simulation();
 
     let per_thread_configs = [
-        first_thread_configs.clone(),
-        second_thread_configs.clone(),
-        second_thread_configs
+        first_thread_config.clone(),
+        second_thread_config.clone(),
+        second_thread_config
     ];
 
     ParallelBacktester::new(

@@ -178,6 +178,18 @@ pub struct SpreadWriterConfig<TraderID: Identifier, PS: Into<PriceStep> + Copy, 
     pub price_step: PS,
 }
 
+impl<TraderID: Identifier, PS: Into<PriceStep> + Copy, F: AsRef<Path>>
+SpreadWriterConfig<TraderID, PS, F>
+{
+    pub fn new(name: TraderID, file: F, price_step: PS) -> Self {
+        Self {
+            name,
+            file,
+            price_step,
+        }
+    }
+}
+
 impl<
     TraderID: Identifier,
     BrokerID: Identifier,

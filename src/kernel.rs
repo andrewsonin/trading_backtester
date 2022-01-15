@@ -15,10 +15,9 @@ use {
         },
         replay::{Replay, ReplayAction, request::ReplayToExchange},
         settlement::GetSettlementLag,
-        traded_pair::TradedPair,
         trader::{
             request::TraderToBroker,
-            subscriptions::SubscriptionList,
+            subscriptions::SubscriptionConfig,
             Trader,
             TraderAction,
             TraderActionKind,
@@ -141,9 +140,7 @@ KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, St
         where
             CE: IntoIterator<Item=ExchangeID>,      // Connected Exchanges
             CB: IntoIterator<Item=(BrokerID, SC)>,  // Connected Brokers
-            SC: IntoIterator<                       // Subscription Configs
-                Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
-            >
+            SC: IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>
     {
         let (start_dt, end_dt) = date_range;
         if end_dt < start_dt {

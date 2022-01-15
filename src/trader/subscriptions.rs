@@ -1,12 +1,31 @@
-use bitmask::bitmask;
+use {
+    bitmask::bitmask,
+    crate::{
+        settlement::GetSettlementLag,
+        traded_pair::TradedPair,
+        types::Identifier,
+    },
+};
 
 bitmask! {
+    #[derive(Debug)]
     pub mask SubscriptionList: u8 where flags Subscription {
         Trades                = 0b00000001,
         NewLimitOrders        = 0b00000010,
         CancelledLimitOrders  = 0b00000100,
         ObSnapshots           = 0b00001000
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SubscriptionConfig<
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    Settlement: GetSettlementLag
+> {
+    pub exchange: ExchangeID,
+    pub traded_pair: TradedPair<Symbol, Settlement>,
+    pub subscription: SubscriptionList,
 }
 
 impl SubscriptionList {
@@ -35,5 +54,21 @@ impl SubscriptionList {
     pub fn to_ob_snapshots(mut self) -> Self {
         self |= Subscription::ObSnapshots;
         self
+    }
+}
+
+impl<ExchangeID: Identifier, Symbol: Identifier, Settlement: GetSettlementLag>
+SubscriptionConfig<ExchangeID, Symbol, Settlement>
+{
+    pub fn new(
+        exchange: ExchangeID,
+        traded_pair: TradedPair<Symbol, Settlement>,
+        subscription: SubscriptionList) -> Self
+    {
+        Self {
+            exchange,
+            traded_pair,
+            subscription,
+        }
     }
 }

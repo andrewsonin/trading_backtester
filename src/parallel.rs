@@ -2,8 +2,7 @@ use {
     crate::{
         kernel::KernelBuilder,
         settlement::GetSettlementLag,
-        traded_pair::TradedPair,
-        trader::subscriptions::SubscriptionList,
+        trader::subscriptions::SubscriptionConfig,
         types::{DateTime, Identifier},
         utils::{
             ExpectWith,
@@ -37,9 +36,7 @@ pub struct ParallelBacktester<
     TraderConfigs: IntoIterator<Item=(TraderConfig, ConnectedBrokers)>,
     ConnectedExchanges: IntoIterator<Item=ExchangeID>,
     ConnectedBrokers: Send + IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
-    SubscriptionConfigs: IntoIterator<
-        Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
-    >,
+    SubscriptionConfigs: IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>,
     RNG: SeedableRng + Rng
 {
     num_threads: usize,
@@ -79,9 +76,7 @@ ParallelBacktester<
     TraderConfigs: IntoIterator<Item=(TraderConfig, ConnectedBrokers)>,
     ConnectedExchanges: IntoIterator<Item=ExchangeID>,
     ConnectedBrokers: Send + IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
-    SubscriptionConfigs: IntoIterator<
-        Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
-    >
+    SubscriptionConfigs: IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>
 {
     pub fn new(
         exchange_configs: ExchangeConfigs,
@@ -156,9 +151,7 @@ ParallelBacktester<
     TraderConfigs: IntoIterator<Item=(TraderConfig, ConnectedBrokers)>,
     ConnectedExchanges: IntoIterator<Item=ExchangeID>,
     ConnectedBrokers: Send + IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
-    SubscriptionConfigs: IntoIterator<
-        Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
-    >,
+    SubscriptionConfigs: IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>,
     RNG: SeedableRng + Rng
 {
     pub fn with_num_threads(mut self, num_threads: usize) -> Self {

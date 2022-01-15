@@ -6,7 +6,7 @@ use {
         replay::concrete::GetNextObSnapshotDelay,
         settlement::{concrete::VoidSettlement, GetSettlementLag},
         traded_pair::{concrete::SpotTradedPairParser, PairKind, TradedPair},
-        trader::{concrete::SpreadWriter, subscriptions::SubscriptionList},
+        trader::{concrete::SpreadWriter, subscriptions::{SubscriptionConfig, SubscriptionList}},
         types::{DateTime, Identifier, PriceStep},
         utils::{
             input::config::{
@@ -113,20 +113,16 @@ fn test_parse_yaml()
             [ExchangeName::MOEX, ExchangeName::NYSE]
         )
     ];
+    let subscription_config = SubscriptionConfig::new(
+        ExchangeName::MOEX,
+        USD_RUB,
+        SubscriptionList::subscribe().to_ob_snapshots(),
+    );
     let traders = [
         (
             SpreadWriter::new(0, 0.0025, simulated_spreads_file_path),
             [
-                (
-                    BrokerName::Broker1,
-                    [
-                        (
-                            ExchangeName::MOEX,
-                            USD_RUB,
-                            SubscriptionList::subscribe().to_ob_snapshots()
-                        )
-                    ]
-                )
+                (BrokerName::Broker1, [subscription_config])
             ]
         )
     ];
@@ -154,17 +150,13 @@ fn test_parse_yaml_in_parallel()
         )
     ];
 
+    let subscription_config = SubscriptionConfig::new(
+        ExchangeName::MOEX,
+        USD_RUB,
+        SubscriptionList::subscribe().to_ob_snapshots(),
+    );
     let trader_subscriptions = [
-        (
-            BrokerName::Broker1,
-            [
-                (
-                    ExchangeName::MOEX,
-                    USD_RUB,
-                    SubscriptionList::subscribe().to_ob_snapshots()
-                )
-            ]
-        )
+        (BrokerName::Broker1, [subscription_config])
     ];
     let first_thread_configs = (
         42,

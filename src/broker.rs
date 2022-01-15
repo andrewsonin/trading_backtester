@@ -2,8 +2,7 @@ use crate::{
     broker::{reply::BrokerToTrader, request::BrokerToExchange},
     exchange::reply::ExchangeToBrokerReply,
     settlement::GetSettlementLag,
-    traded_pair::TradedPair,
-    trader::{request::TraderRequest, subscriptions::SubscriptionList},
+    trader::{request::TraderRequest, subscriptions::SubscriptionConfig},
     types::{DateTime, Identifier, Named, TimeSync},
     utils::{enum_dispatch, rand::Rng},
 };
@@ -71,8 +70,6 @@ pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>: TimeSync +
     fn register_trader(
         &mut self,
         trader_id: TraderID,
-        sub_cfgs: impl IntoIterator<
-            Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
-        >,
+        sub_cfgs: impl IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>,
     );
 }

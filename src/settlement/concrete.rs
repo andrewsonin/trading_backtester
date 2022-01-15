@@ -1,7 +1,7 @@
 use crate::{
     settlement::GetSettlementLag,
     types::DateTime,
-    utils::{constants::*},
+    utils::constants::*,
 };
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]

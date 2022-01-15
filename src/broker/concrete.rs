@@ -27,7 +27,10 @@ use {
         },
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
-        trader::{request::TraderRequest, subscriptions::{Subscription, SubscriptionList}},
+        trader::{
+            request::TraderRequest,
+            subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
+        },
         types::{Date, DateTime, Identifier, Named, OrderID, TimeSync},
         utils::rand::Rng,
     },
@@ -417,27 +420,25 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn register_trader(
         &mut self,
         trader_id: TraderID,
-        sub_cfgs: impl IntoIterator<
-            Item=(ExchangeID, TradedPair<Symbol, Settlement>, SubscriptionList)
-        >)
+        sub_cfgs: impl IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>)
     {
         self.trader_configs.insert(
             trader_id,
             sub_cfgs.into_iter()
                 .inspect(
-                    |(exchange, traded_pair, subscription_config)| {
+                    |SubscriptionConfig { exchange, traded_pair, subscription }| {
                         if !self.registered_exchanges.contains(&exchange) {
                             panic!("Broker {} is not connected to Exchange {exchange}", self.name)
                         };
                         self.traded_pairs_info
                             .entry((*exchange, *traded_pair))
                             .or_default()
-                            .push((trader_id, *subscription_config))
+                            .push((trader_id, *subscription))
                     }
                 )
                 .map(
-                    |(exchange, traded_pair, subscription_config)|
-                        ((exchange, traded_pair), subscription_config)
+                    |SubscriptionConfig { exchange, traded_pair, subscription }|
+                        ((exchange, traded_pair), subscription)
                 ).collect(),
         );
     }

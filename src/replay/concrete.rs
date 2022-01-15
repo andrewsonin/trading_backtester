@@ -75,7 +75,7 @@ pub struct TradedPairLifetime<ExchangeID: Identifier, Symbol: Identifier> {
 impl<
     ExchangeID: Identifier,
     Symbol: Identifier,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>,
+    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol>
 >
 OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
 {

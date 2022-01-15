@@ -1,18 +1,67 @@
 use {
     crate::{
-        broker::concrete::BasicBroker,
-        exchange::concrete::BasicExchange,
-        replay::concrete::{
-            ExchangeSession, GetNextObSnapshotDelay, OneTickReplay, TradedPairLifetime,
+        broker::{
+            Broker,
+            concrete::BasicBroker,
+        },
+        exchange::{
+            concrete::BasicExchange,
+            Exchange,
+        },
+        replay::{
+            concrete::{ExchangeSession, GetNextObSnapshotDelay, OneTickReplay, TradedPairLifetime},
+            Replay,
         },
         traded_pair::TradedPair,
-        trader::concrete::{SpreadWriter, VoidTrader},
+        trader::{concrete::SpreadWriter, Trader},
         types::{DateTime, Identifier, PriceStep},
         utils::input::one_tick::{OneTickTradedPairReader, TrdPrlConfig},
     },
     std::path::{Path, PathBuf},
 };
 
+pub trait BuildExchange<
+    ExchangeID: Identifier,
+    BrokerID: Identifier,
+    Symbol: Identifier
+> {
+    type E: Exchange<ExchangeID, BrokerID, Symbol>;
+
+    fn build(&self) -> Self::E;
+}
+
+pub trait BuildReplay<
+    ExchangeID: Identifier,
+    Symbol: Identifier
+> {
+    type R: Replay<ExchangeID, Symbol>;
+
+    fn build(&self) -> Self::R;
+}
+
+pub trait BuildBroker<
+    BrokerID: Identifier,
+    TraderID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier
+> {
+    type B: Broker<BrokerID, TraderID, ExchangeID, Symbol>;
+
+    fn build(&self) -> Self::B;
+}
+
+pub trait BuildTrader<
+    TraderID: Identifier,
+    BrokerID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier
+> {
+    type T: Trader<TraderID, BrokerID, ExchangeID, Symbol>;
+
+    fn build(&self) -> Self::T;
+}
+
+#[derive(Clone)]
 pub struct OneTickTradedPairReaderConfig<ExchangeID: Identifier, Symbol: Identifier>
 {
     pub exchange_id: ExchangeID,
@@ -41,6 +90,7 @@ for OneTickTradedPairReader<ExchangeID, Symbol>
     }
 }
 
+#[derive(Clone)]
 pub struct OneTickReplayConfig<
     ExchangeID: Identifier,
     Symbol: Identifier,
@@ -58,56 +108,74 @@ impl<
     Symbol: Identifier,
     ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol>
 >
-From<&OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>>
-for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>
+BuildReplay<ExchangeID, Symbol>
+for OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>
 {
-    fn from(config: &OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay>) -> Self
-    {
-        Self::new(
-            config.start_dt,
-            config.traded_pair_configs.iter().map(From::from),
-            config.exchange_open_close_events.iter().cloned(),
-            config.traded_pair_creation_events.iter().cloned(),
-            config.ob_snapshot_delay_scheduler.clone(),
+    type R = OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay>;
+
+    fn build(&self) -> Self::R {
+        Self::R::new(
+            self.start_dt,
+            self.traded_pair_configs.iter().map(From::from),
+            self.exchange_open_close_events.iter().cloned(),
+            self.traded_pair_creation_events.iter().cloned(),
+            self.ob_snapshot_delay_scheduler.clone(),
         )
     }
 }
 
-impl<ExchangeID: Identifier, BrokerID: Identifier, Symbol: Identifier>
-From<&ExchangeID>
-for BasicExchange<ExchangeID, BrokerID, Symbol>
+pub trait InitBasicExchange {}
+
+impl<ExchangeID: Identifier + InitBasicExchange, BrokerID: Identifier, Symbol: Identifier>
+BuildExchange<ExchangeID, BrokerID, Symbol>
+for ExchangeID
 {
-    fn from(config: &ExchangeID) -> Self {
-        Self::new(*config)
+    type E = BasicExchange<ExchangeID, BrokerID, Symbol>;
+
+    fn build(&self) -> Self::E {
+        Self::E::new(*self)
     }
 }
 
-impl<BrokerID: Identifier, TraderID: Identifier, ExchangeID: Identifier, Symbol: Identifier>
-From<&BrokerID>
-for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>
+pub trait InitBasicBroker {}
+
+impl<
+    BrokerID: Identifier + InitBasicBroker,
+    TraderID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier
+>
+BuildBroker<BrokerID, TraderID, ExchangeID, Symbol>
+for BrokerID
 {
-    fn from(config: &BrokerID) -> Self {
-        Self::new(*config)
+    type B = BasicBroker<BrokerID, TraderID, ExchangeID, Symbol>;
+
+    fn build(&self) -> Self::B {
+        Self::B::new(*self)
     }
 }
 
-impl<TraderID: Identifier> From<&TraderID> for VoidTrader<TraderID> {
-    fn from(config: &TraderID) -> Self {
-        VoidTrader::new(*config)
-    }
-}
-
+#[derive(Clone, Copy)]
 pub struct SpreadWriterConfig<TraderID: Identifier, PS: Into<PriceStep> + Copy, F: AsRef<Path>> {
     pub name: TraderID,
     pub file: F,
     pub price_step: PS,
 }
 
-impl<TraderID: Identifier, PS: Into<PriceStep> + Copy, F: AsRef<Path>>
-From<&SpreadWriterConfig<TraderID, PS, F>>
-for SpreadWriter<TraderID>
+impl<
+    TraderID: Identifier,
+    BrokerID: Identifier,
+    ExchangeID: Identifier,
+    Symbol: Identifier,
+    PS: Into<PriceStep> + Copy,
+    F: AsRef<Path>
+>
+BuildTrader<TraderID, BrokerID, ExchangeID, Symbol>
+for SpreadWriterConfig<TraderID, PS, F>
 {
-    fn from(config: &SpreadWriterConfig<TraderID, PS, F>) -> Self {
-        Self::new(config.name, config.price_step, &config.file)
+    type T = SpreadWriter<TraderID>;
+
+    fn build(&self) -> Self::T {
+        Self::T::new(self.name, self.price_step, &self.file)
     }
 }

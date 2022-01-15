@@ -213,9 +213,9 @@ impl<
         }
     }
 
-    pub fn with_rng<RNG: Rng + SeedableRng>
-    (self) -> KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG>
-    {
+    pub fn with_rng<RNG: Rng + SeedableRng>(self) -> KernelBuilder<
+        TraderID, BrokerID, ExchangeID, Symbol, T, B, E, R, RNG
+    > {
         let KernelBuilder {
             traders, brokers, exchanges, replay, end_dt, start_dt, seed, symbol, ..
         } = self;

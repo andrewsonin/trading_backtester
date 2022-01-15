@@ -1,13 +1,25 @@
 use {
     crate::{
         broker::concrete::BasicBroker,
-        exchange::concrete::BasicExchange,
         kernel::KernelBuilder,
-        replay::concrete::{GetNextObSnapshotDelay, OneTickReplay},
+        parallel::ParallelBacktester,
+        replay::concrete::GetNextObSnapshotDelay,
         traded_pair::{concrete::DefaultTradedPairParser, PairKind, SettleKind, Spot, TradedPair},
         trader::{concrete::SpreadWriter, subscriptions::SubscriptionList},
-        types::{DateTime, Identifier},
-        utils::{input::config::from_yaml::parse_yaml, rand::{Rng, rngs::StdRng}},
+        types::{DateTime, Identifier, PriceStep},
+        utils::{
+            input::config::{
+                from_structs::{
+                    BuildExchange,
+                    BuildReplay,
+                    InitBasicBroker,
+                    InitBasicExchange,
+                    SpreadWriterConfig,
+                },
+                from_yaml::parse_yaml,
+            },
+            rand::{Rng, rngs::StdRng},
+        },
     },
     std::{num::NonZeroU64, path::Path, str::FromStr},
 };
@@ -18,10 +30,14 @@ enum ExchangeName {
     NYSE,
 }
 
+impl InitBasicExchange for ExchangeName {}
+
 #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
 enum BrokerName {
     Broker1
 }
+
+impl InitBasicBroker for BrokerName {}
 
 #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
 enum SymbolName {
@@ -80,20 +96,22 @@ const USD_RUB: TradedPair<SymbolName> = TradedPair {
 fn test_parse_yaml()
 {
     let test_files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+    let simulated_spreads_file_path = test_files.join("example_01").join("simulated_spread.csv");
 
-    let (exchange_configs, replay_config, start_dt, end_dt) = parse_yaml(
+    let (exchange_names, replay_config, start_dt, end_dt) = parse_yaml(
         test_files.join("example_01.yml"),
         DefaultTradedPairParser,
         DelayScheduler,
     );
+
+    let exchanges = exchange_names.iter().map(BuildExchange::build);
+    let replay = replay_config.build();
     let brokers = [
         (
             BasicBroker::new(BrokerName::Broker1),
             [ExchangeName::MOEX, ExchangeName::NYSE]
         )
     ];
-
-    let simulated_spreads_file_path = test_files.join("example_01").join("simulated_spread.csv");
     let traders = [
         (
             SpreadWriter::new(0, 0.0025, simulated_spreads_file_path),
@@ -101,21 +119,106 @@ fn test_parse_yaml()
                 (
                     BrokerName::Broker1,
                     [
-                        (ExchangeName::MOEX, USD_RUB, SubscriptionList::all())
+                        (
+                            ExchangeName::MOEX,
+                            USD_RUB,
+                            SubscriptionList::subscribe().to_ob_snapshots()
+                        )
                     ]
                 )
             ]
         )
     ];
-    let mut kernel = KernelBuilder::new(
-        exchange_configs.iter().map(BasicExchange::from),
-        brokers,
-        traders,
-        OneTickReplay::from(&replay_config),
-        (start_dt, end_dt),
-    )
+    KernelBuilder::new(exchanges, brokers, traders, replay, (start_dt, end_dt))
         .with_seed(3344)
         .with_rng::<StdRng>()
-        .build();
-    kernel.run_simulation()
+        .build()
+        .run_simulation()
+}
+
+#[test]
+fn test_parse_yaml_in_parallel()
+{
+    let test_files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+
+    let (exchange_names, replay_config, start_dt, end_dt) = parse_yaml(
+        test_files.join("example_01.yml"),
+        DefaultTradedPairParser,
+        DelayScheduler,
+    );
+    let broker_configs = [
+        (
+            BrokerName::Broker1,
+            [ExchangeName::MOEX]
+        )
+    ];
+
+    let trader_subscriptions = [
+        (
+            BrokerName::Broker1,
+            [
+                (
+                    ExchangeName::MOEX,
+                    USD_RUB,
+                    SubscriptionList::subscribe().to_ob_snapshots()
+                )
+            ]
+        )
+    ];
+    let first_thread_configs = (
+        42,
+        replay_config.clone(),
+        [
+            (
+                SpreadWriterConfig {
+                    name: 0,
+                    file: test_files.join("example_01").join("simulated_spread_par_01.csv"),
+                    price_step: PriceStep(0.0025),
+                },
+                trader_subscriptions
+            )
+        ]
+    );
+    let second_thread_configs = (
+        4122,
+        replay_config,
+        [
+            (
+                SpreadWriterConfig {
+                    name: 1,
+                    file: test_files.join("example_01").join("simulated_spread_par_02.csv"),
+                    price_step: PriceStep(0.0025),
+                },
+                trader_subscriptions
+            )
+        ]
+    );
+    let per_thread_configs = [
+        first_thread_configs.clone(),
+        second_thread_configs.clone()
+    ];
+
+    ParallelBacktester::new(
+        exchange_names.clone(),
+        broker_configs,
+        per_thread_configs,
+        (start_dt, end_dt),
+    )
+        .run_simulation();
+
+    let per_thread_configs = [
+        first_thread_configs.clone(),
+        second_thread_configs.clone(),
+        second_thread_configs
+    ];
+
+    ParallelBacktester::new(
+        exchange_names,
+        broker_configs,
+        per_thread_configs,
+        (start_dt, end_dt),
+    )
+        .with_rng::<StdRng>()
+        .with_num_threads(2)
+        .run_simulation()
 }

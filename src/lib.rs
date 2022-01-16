@@ -41,7 +41,7 @@ pub mod prelude {
         settlement::{concrete as settlement_examples, GetSettlementLag},
         traded_pair::{
             Futures,
-            Option,
+            OptionContract,
             OptionKind,
             PairKind,
             parser::{concrete as traded_pair_parser_examples, TradedPairParser},
@@ -58,6 +58,7 @@ pub mod prelude {
         types::*,
         utils::{
             constants,
+            derive_more,
             enum_dispatch,
             ExpectWith,
             input::{

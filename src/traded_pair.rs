@@ -16,7 +16,7 @@ pub struct TradedPair<Name: Identifier, Settlement: GetSettlementLag> {
 pub enum PairKind<Settlement: GetSettlementLag> {
     Spot,
     Futures(Futures<Settlement>),
-    Option(Option<Settlement>),
+    OptionContract(OptionContract<Settlement>),
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
@@ -26,7 +26,7 @@ pub struct Futures<Settlement: GetSettlementLag> {
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct Option<Settlement: GetSettlementLag> {
+pub struct OptionContract<Settlement: GetSettlementLag> {
     pub kind: OptionKind,
     pub strike: Price,
     pub maturity: DateTime,

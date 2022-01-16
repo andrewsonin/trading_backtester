@@ -248,10 +248,10 @@ impl<
 Replay<ExchangeID, Symbol, Settlement>
 for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
-    fn handle_exchange_reply<KM: Ord>(
+    fn handle_exchange_reply<KernelMessage: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KM>,
-        process_action: impl Fn(ReplayAction<ExchangeID, Symbol, Settlement>) -> KM,
+        mut message_pusher: MessagePusher<KernelMessage>,
+        process_action: impl Fn(Self::Item) -> KernelMessage,
         reply: ExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID,
         rng: &mut impl Rng,

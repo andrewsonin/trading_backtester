@@ -7,9 +7,12 @@ pub use chrono::{
 };
 
 use {
-    crate::utils::{enum_dispatch, ExpectWith},
-    derive_more,
-    derive_more::{Add, AddAssign, From, FromStr, Into, Sub, SubAssign, Sum},
+    crate::utils::{
+        derive_more,
+        derive_more::{Add, AddAssign, From, FromStr, Into, Sub, SubAssign, Sum},
+        enum_dispatch,
+        ExpectWith,
+    },
     std::{
         cmp::Ordering,
         fmt::{Debug, Display},

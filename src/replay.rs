@@ -30,7 +30,7 @@ pub trait Replay<ExchangeID, Symbol, Settlement>: TimeSync + Iterator<
     fn handle_exchange_reply<KernelMessage: Ord>(
         &mut self,
         message_pusher: MessagePusher<KernelMessage>,
-        process_action: impl Fn(ReplayAction<ExchangeID, Symbol, Settlement>) -> KernelMessage,
+        process_action: impl Fn(Self::Item) -> KernelMessage,
         reply: ExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID,
         rng: &mut impl Rng,

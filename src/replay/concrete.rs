@@ -19,7 +19,7 @@ use {
         utils::{
             ExpectWith,
             input::one_tick::OneTickTradedPairReader,
-            queue::LessElementBinaryHeap,
+            queue::{LessElementBinaryHeap, MessagePusher},
             rand::Rng,
         },
     },
@@ -89,16 +89,15 @@ impl<
 >
 OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
-    pub fn new(
+    pub fn new<TPR, EOC, TPC>(
         start_dt: DateTime,
-        traded_pair_readers: impl IntoIterator<
-            Item=OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
-        >,
-        exchange_open_close_events: impl IntoIterator<Item=ExchangeSession<ExchangeID>>,
-        traded_pair_creation_events: impl IntoIterator<
-            Item=TradedPairLifetime<ExchangeID, Symbol, Settlement>
-        >,
+        traded_pair_readers: TPR,
+        exchange_open_close_events: EOC,
+        traded_pair_creation_events: TPC,
         ob_snapshot_delay_scheduler: ObSnapshotDelay) -> Self
+        where TPR: IntoIterator<Item=OneTickTradedPairReader<ExchangeID, Symbol, Settlement>>,
+              EOC: IntoIterator<Item=ExchangeSession<ExchangeID>>,
+              TPC: IntoIterator<Item=TradedPairLifetime<ExchangeID, Symbol, Settlement>>
     {
         let mut prev_dt: HashMap<ExchangeID, DateTime> = Default::default();
         let open_close_iterator = exchange_open_close_events.into_iter().map(
@@ -249,12 +248,14 @@ impl<
 Replay<ExchangeID, Symbol, Settlement>
 for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
-    fn handle_exchange_reply(
+    fn handle_exchange_reply<KM: Ord>(
         &mut self,
+        mut message_pusher: MessagePusher<KM>,
+        process_action: impl Fn(ReplayAction<ExchangeID, Symbol, Settlement>) -> KM,
         reply: ExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        rng: &mut impl Rng) -> Vec<ReplayAction<ExchangeID, Symbol, Settlement>>
-    {
+        rng: &mut impl Rng,
+    ) {
         let mut get_ob_snapshot_delay = |traded_pair| {
             if let Some(delay) = self.ob_snapshot_delay_scheduler.get_ob_snapshot_delay(
                 exchange_id, traded_pair, rng, self.current_dt,
@@ -276,13 +277,14 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                 match notification
                 {
                     ExchangeEventNotification::ExchangeOpen => {
-                        return self.active_traded_pairs.iter().filter_map(
+                        let action_iterator = self.active_traded_pairs.iter().filter_map(
                             |(tp_exchange_id, traded_pair)| if *tp_exchange_id != exchange_id {
                                 None
                             } else {
                                 get_ob_snapshot_delay(*traded_pair)
                             }
-                        ).collect();
+                        );
+                        message_pusher.extend(action_iterator.map(process_action))
                     }
                     ExchangeEventNotification::TradesStarted(traded_pair, _price_step) => {
                         if !self.active_traded_pairs.insert((exchange_id, traded_pair)) {
@@ -292,12 +294,12 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                             )
                         }
                         if let Some(action) = get_ob_snapshot_delay(traded_pair) {
-                            return vec![action];
+                            message_pusher.push(process_action(action))
                         }
                     }
                     ExchangeEventNotification::ObSnapshot(snapshot) => {
                         if let Some(action) = get_ob_snapshot_delay(snapshot.traded_pair) {
-                            return vec![action];
+                            message_pusher.push(process_action(action))
                         }
                     }
                     ExchangeEventNotification::TradesStopped(traded_pair) => {
@@ -355,6 +357,5 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             }
             _ => {}
         }
-        vec![]
     }
 }

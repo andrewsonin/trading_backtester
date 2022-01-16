@@ -23,7 +23,11 @@ use {
             TraderActionKind,
         },
         types::{DateTime, Duration, Identifier},
-        utils::{ExpectWith, queue::LessElementBinaryHeap, rand::{Rng, rngs::StdRng, SeedableRng}},
+        utils::{
+            ExpectWith,
+            queue::{LessElementBinaryHeap, MessagePusher},
+            rand::{Rng, rngs::StdRng, SeedableRng},
+        },
     },
     std::{cmp::Reverse, collections::HashMap, marker::PhantomData},
 };
@@ -56,7 +60,7 @@ pub struct Kernel<
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
-struct Message<
+pub struct Message<
     ExchangeID: Identifier,
     BrokerID: Identifier,
     TraderID: Identifier,
@@ -321,8 +325,8 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
 
     fn handle_message(
         &mut self,
-        message: MessageContent<ExchangeID, BrokerID, TraderID, Symbol, Settlement>)
-    {
+        message: MessageContent<ExchangeID, BrokerID, TraderID, Symbol, Settlement>,
+    ) {
         match message
         {
             MessageContent::ReplayToExchange(replay_request) => {
@@ -365,83 +369,92 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
 
     fn handle_replay_to_exchange(
         &mut self,
-        request: ReplayToExchange<ExchangeID, Symbol, Settlement>)
-    {
+        request: ReplayToExchange<ExchangeID, Symbol, Settlement>,
+    ) {
         let exchange = self.exchanges.get_mut(&request.exchange_id).expect_with(
             || panic!("Kernel does not know such an Exchange: {}", request.exchange_id)
         );
         *exchange.current_datetime_mut() = self.current_dt;
-        let messages = exchange.process_replay_request(request.content)
-            .into_iter()
-            .map(
-                |action| Self::process_exchange_action(
-                    self.current_dt,
-                    &mut self.brokers,
-                    &mut self.rng,
-                    action,
-                    request.exchange_id,
-                )
+        let process_exchange_action = |action|
+            Self::process_exchange_action(
+                self.current_dt,
+                &mut self.brokers,
+                &mut self.rng,
+                action,
+                request.exchange_id,
             );
-        self.message_queue.extend(messages)
+        exchange.process_replay_request(
+            MessagePusher::new(&mut self.message_queue),
+            process_exchange_action,
+            request.content,
+        )
     }
 
     fn handle_exchange_to_replay(
         &mut self,
         reply: ExchangeToReplay<Symbol, Settlement>,
-        exchange_id: ExchangeID)
-    {
+        exchange_id: ExchangeID,
+    ) {
         *self.replay.current_datetime_mut() = self.current_dt;
-        let messages = self.replay.handle_exchange_reply(reply, exchange_id, &mut self.rng)
-            .into_iter()
-            .map(Self::process_replay_action);
-        self.message_queue.extend(messages)
+        self.replay.handle_exchange_reply(
+            MessagePusher::new(&mut self.message_queue),
+            Self::process_replay_action,
+            reply,
+            exchange_id,
+            &mut self.rng,
+        )
     }
 
     fn handle_broker_to_exchange(
         &mut self,
         request: BrokerToExchange<ExchangeID, Symbol, Settlement>,
-        broker_id: BrokerID)
-    {
+        broker_id: BrokerID,
+    ) {
         let exchange = self.exchanges.get_mut(&request.exchange_id).expect_with(
             || panic!("Kernel does not know such an Exchange: {}", request.exchange_id)
         );
         *exchange.current_datetime_mut() = self.current_dt;
-        let messages = exchange.process_broker_request(request.content, broker_id)
-            .into_iter()
-            .map(
-                |action| Self::process_exchange_action(
-                    self.current_dt,
-                    &mut self.brokers,
-                    &mut self.rng,
-                    action,
-                    request.exchange_id,
-                )
+        let process_exchange_action = |action|
+            Self::process_exchange_action(
+                self.current_dt,
+                &mut self.brokers,
+                &mut self.rng,
+                action,
+                request.exchange_id,
             );
-        self.message_queue.extend(messages)
+        exchange.process_broker_request(
+            MessagePusher::new(&mut self.message_queue),
+            process_exchange_action,
+            request.content,
+            broker_id,
+        )
     }
 
     fn handle_exchange_to_broker(
         &mut self,
         reply: ExchangeToBroker<BrokerID, Symbol, Settlement>,
-        exchange_id: ExchangeID)
-    {
+        exchange_id: ExchangeID,
+    ) {
         let broker = self.brokers.get_mut(&reply.broker_id).expect_with(
             || panic!("Kernel does not know such a Broker: {}", reply.broker_id)
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let messages = broker.process_exchange_reply(reply.content, exchange_id, reply.exchange_dt)
-            .into_iter()
-            .map(
-                |action| Self::process_broker_action(
-                    self.current_dt,
-                    &mut self.traders,
-                    &mut self.rng,
-                    broker,
-                    action,
-                    reply.broker_id,
-                )
+        let process_broker_action = |action, broker: &B|
+            Self::process_broker_action(
+                self.current_dt,
+                &mut self.traders,
+                &mut self.rng,
+                broker,
+                action,
+                reply.broker_id,
             );
-        self.message_queue.extend(messages)
+        broker.process_exchange_reply(
+            MessagePusher::new(&mut self.message_queue),
+            process_broker_action,
+            reply.content,
+            exchange_id,
+            reply.exchange_dt,
+        )
     }
 
     fn handle_broker_wakeup(&mut self, broker_id: BrokerID)
@@ -450,44 +463,46 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let messages = broker.wakeup()
-            .into_iter()
-            .map(
-                |action| Self::process_broker_action(
-                    self.current_dt,
-                    &mut self.traders,
-                    &mut self.rng,
-                    broker,
-                    action,
-                    broker_id,
-                )
+        let process_broker_action = |action, broker: &B|
+            Self::process_broker_action(
+                self.current_dt,
+                &mut self.traders,
+                &mut self.rng,
+                broker,
+                action,
+                broker_id,
             );
-        self.message_queue.extend(messages)
+        broker.wakeup(
+            MessagePusher::new(&mut self.message_queue),
+            process_broker_action,
+        )
     }
 
     fn handle_broker_to_trader(
         &mut self,
         reply: BrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-        broker_id: BrokerID)
-    {
+        broker_id: BrokerID,
+    ) {
         let trader = self.traders.get_mut(&reply.trader_id).expect_with(
             || panic!("Kernel does not know such a Trader: {}", reply.trader_id)
         );
         *trader.current_datetime_mut() = self.current_dt;
-        let messages = trader.process_broker_reply(
-            reply.content, broker_id, reply.exchange_id, reply.event_dt,
-        )
-            .into_iter()
-            .map(
-                |action| Self::process_trader_action(
-                    self.current_dt,
-                    &mut self.rng,
-                    trader,
-                    action,
-                    reply.trader_id,
-                )
+        let process_trader_action = |action, trader: &T|
+            Self::process_trader_action(
+                self.current_dt,
+                &mut self.rng,
+                trader,
+                action,
+                reply.trader_id,
             );
-        self.message_queue.extend(messages)
+        trader.process_broker_reply(
+            MessagePusher::new(&mut self.message_queue),
+            process_trader_action,
+            reply.content,
+            broker_id,
+            reply.exchange_id,
+            reply.event_dt,
+        )
     }
 
     fn handle_trader_wakeup(&mut self, trader_id: TraderID)
@@ -496,42 +511,44 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
             || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
-        let messages = trader.wakeup()
-            .into_iter()
-            .map(
-                |action| Self::process_trader_action(
-                    self.current_dt,
-                    &mut self.rng,
-                    trader,
-                    action,
-                    trader_id,
-                )
+        let process_trader_action = |action, trader: &T|
+            Self::process_trader_action(
+                self.current_dt,
+                &mut self.rng,
+                trader,
+                action,
+                trader_id,
             );
-        self.message_queue.extend(messages)
+        trader.wakeup(
+            MessagePusher::new(&mut self.message_queue),
+            process_trader_action,
+        )
     }
 
     fn handle_trader_to_broker(
         &mut self,
         request: TraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-        trader_id: TraderID)
-    {
+        trader_id: TraderID,
+    ) {
         let broker = self.brokers.get_mut(&request.broker_id).expect_with(
             || panic!("Kernel does not know such an Broker: {}", request.broker_id)
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let messages = broker.process_trader_request(request.content, trader_id)
-            .into_iter()
-            .map(
-                |action| Self::process_broker_action(
-                    self.current_dt,
-                    &mut self.traders,
-                    &mut self.rng,
-                    broker,
-                    action,
-                    request.broker_id,
-                )
+        let process_broker_action = |action, broker: &B|
+            Self::process_broker_action(
+                self.current_dt,
+                &mut self.traders,
+                &mut self.rng,
+                broker,
+                action,
+                request.broker_id,
             );
-        self.message_queue.extend(messages)
+        broker.process_trader_request(
+            MessagePusher::new(&mut self.message_queue),
+            process_broker_action,
+            request.content,
+            trader_id,
+        )
     }
 
     fn process_exchange_action(
@@ -579,7 +596,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
         current_dt: DateTime,
         traders: &mut HashMap<TraderID, T>,
         rng: &mut RNG,
-        broker: &mut B,
+        broker: &B,
         action: BrokerAction<TraderID, ExchangeID, Symbol, Settlement>,
         broker_id: BrokerID) -> Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
     {
@@ -619,7 +636,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
     fn process_trader_action(
         current_dt: DateTime,
         rng: &mut RNG,
-        trader: &mut T,
+        trader: &T,
         action: TraderAction<BrokerID, ExchangeID, Symbol, Settlement>,
         trader_id: TraderID) -> Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
     {

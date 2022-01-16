@@ -4,7 +4,7 @@ use crate::{
     settlement::GetSettlementLag,
     trader::{request::TraderRequest, subscriptions::SubscriptionConfig},
     types::{DateTime, Identifier, Named, TimeSync},
-    utils::{enum_dispatch, rand::Rng},
+    utils::{enum_dispatch, queue::MessagePusher, rand::Rng},
 };
 
 pub mod reply;
@@ -40,18 +40,28 @@ pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>: TimeSync +
           Symbol: Identifier,
           Settlement: GetSettlementLag
 {
-    fn process_trader_request(
+    fn process_trader_request<KernelMessage: Ord>(
         &mut self,
+        message_pusher: MessagePusher<KernelMessage>,
+        process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         request: TraderRequest<ExchangeID, Symbol, Settlement>,
-        trader_id: TraderID) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>;
+        trader_id: TraderID,
+    );
 
-    fn process_exchange_reply(
+    fn process_exchange_reply<KernelMessage: Ord>(
         &mut self,
+        message_pusher: MessagePusher<KernelMessage>,
+        process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         reply: ExchangeToBrokerReply<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>;
+        exchange_dt: DateTime,
+    );
 
-    fn wakeup(&mut self) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>;
+    fn wakeup<KernelMessage: Ord>(
+        &mut self,
+        message_pusher: MessagePusher<KernelMessage>,
+        process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
+    );
 
     fn broker_to_exchange_latency(
         &self,

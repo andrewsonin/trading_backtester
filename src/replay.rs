@@ -3,7 +3,7 @@ use crate::{
     replay::request::ReplayToExchange,
     settlement::GetSettlementLag,
     types::{DateTime, Identifier, TimeSync},
-    utils::{enum_dispatch, rand::Rng},
+    utils::{enum_dispatch, queue::MessagePusher, rand::Rng},
 };
 
 pub mod request;
@@ -27,9 +27,12 @@ pub trait Replay<ExchangeID, Symbol, Settlement>: TimeSync + Iterator<
           Symbol: Identifier,
           Settlement: GetSettlementLag
 {
-    fn handle_exchange_reply(
+    fn handle_exchange_reply<KernelMessage: Ord>(
         &mut self,
+        message_pusher: MessagePusher<KernelMessage>,
+        process_action: impl Fn(ReplayAction<ExchangeID, Symbol, Settlement>) -> KernelMessage,
         reply: ExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        rng: &mut impl Rng) -> Vec<ReplayAction<ExchangeID, Symbol, Settlement>>;
+        rng: &mut impl Rng,
+    );
 }

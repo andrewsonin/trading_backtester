@@ -20,8 +20,25 @@ impl<T: Ord> LessElementBinaryHeap<T>
 
 impl<T: Ord> Extend<T> for LessElementBinaryHeap<T>
 {
-    fn extend<I: IntoIterator<Item=T>>(&mut self, iter: I)
-    {
+    fn extend<I: IntoIterator<Item=T>>(&mut self, iter: I) {
         self.0.extend(iter.into_iter().map(Reverse))
+    }
+}
+
+pub struct MessagePusher<'a, T: Ord> (&'a mut LessElementBinaryHeap<T>);
+
+impl<'a, T: Ord> MessagePusher<'a, T> {
+    pub fn new(queue: &'a mut LessElementBinaryHeap<T>) -> Self {
+        Self(queue)
+    }
+
+    pub fn push(&mut self, item: T) {
+        self.0.push(item)
+    }
+}
+
+impl<'a, T: Ord> Extend<T> for MessagePusher<'a, T> {
+    fn extend<I: IntoIterator<Item=T>>(&mut self, iter: I) {
+        self.0.extend(iter)
     }
 }

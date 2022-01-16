@@ -5,7 +5,7 @@ use {
         settlement::GetSettlementLag,
         trader::{Trader, TraderAction},
         types::{Date, DateTime, Identifier, Named, ObState, PriceStep, Size, TimeSync},
-        utils::{ExpectWith, rand::Rng},
+        utils::{ExpectWith, queue::MessagePusher, rand::Rng},
     },
     std::{fs::File, io::Write, path::Path},
 };
@@ -45,18 +45,22 @@ impl<
 Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 for VoidTrader<TraderID>
 {
-    fn process_broker_reply(
+    fn process_broker_reply<KM: Ord>(
         &mut self,
+        _: MessagePusher<KM>,
+        _: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KM,
         _: BrokerReply<Symbol, Settlement>,
         _: BrokerID,
         _: ExchangeID,
-        _: DateTime) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>>
-    {
-        vec![]
-    }
-    fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>> {
-        vec![]
-    }
+        _: DateTime,
+    ) {}
+
+    fn wakeup<KM: Ord>(
+        &mut self,
+        _: MessagePusher<KM>,
+        _: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KM,
+    ) {}
+
     fn broker_to_trader_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
     fn trader_to_broker_latency(&self, _: BrokerID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
@@ -103,13 +107,15 @@ impl<
 Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 for SpreadWriter<TraderID>
 {
-    fn process_broker_reply(
+    fn process_broker_reply<KM: Ord>(
         &mut self,
+        _: MessagePusher<KM>,
+        _: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KM,
         reply: BrokerReply<Symbol, Settlement>,
         _: BrokerID,
         _: ExchangeID,
-        event_dt: DateTime) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>>
-    {
+        event_dt: DateTime,
+    ) {
         if let BrokerReply::ExchangeEventNotification(
             ExchangeEventNotification::ObSnapshot(snapshot)) = reply
         {
@@ -133,11 +139,14 @@ for SpreadWriter<TraderID>
                 )
                     .expect_with(|| panic!("Cannot write to file {:?}", self.file))
             }
-        };
-        vec![]
+        }
     }
 
-    fn wakeup(&mut self) -> Vec<TraderAction<BrokerID, ExchangeID, Symbol, Settlement>> {
+    fn wakeup<KM: Ord>(
+        &mut self,
+        _: MessagePusher<KM>,
+        _: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KM,
+    ) {
         unreachable!("Trader {} did not schedule any wakeups", self.get_name())
     }
 

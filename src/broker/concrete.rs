@@ -32,7 +32,7 @@ use {
             subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
         },
         types::{Date, DateTime, Identifier, Named, OrderID, TimeSync},
-        utils::rand::Rng,
+        utils::{queue::MessagePusher, rand::Rng},
     },
     std::collections::{HashMap, HashSet},
 };
@@ -108,11 +108,13 @@ impl<
 Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
-    fn process_trader_request(
+    fn process_trader_request<KernelMessage: Ord>(
         &mut self,
+        mut message_pusher: MessagePusher<KernelMessage>,
+        mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         request: TraderRequest<ExchangeID, Symbol, Settlement>,
-        trader_id: TraderID) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>
-    {
+        trader_id: TraderID,
+    ) {
         let action = match request {
             TraderRequest::CancelLimitOrder(mut request, exchange_id) => {
                 if self.registered_exchanges.contains(&exchange_id) {
@@ -216,15 +218,17 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 }
             }
         };
-        vec![action]
+        message_pusher.push(process_action(action, &self))
     }
 
-    fn process_exchange_reply(
+    fn process_exchange_reply<KernelMessage: Ord>(
         &mut self,
+        mut message_pusher: MessagePusher<KernelMessage>,
+        mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         reply: ExchangeToBrokerReply<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>
-    {
+        exchange_dt: DateTime,
+    ) {
         let message = match reply {
             ExchangeToBrokerReply::OrderAccepted(accepted) => {
                 if let Some((trader_id, order_id)) = self.internal_to_submitted.get(
@@ -399,13 +403,24 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 }
             }
             ExchangeToBrokerReply::ExchangeEventNotification(notification) => {
-                return self.handle_exchange_notification(notification, exchange_id, exchange_dt);
+                self.handle_exchange_notification(
+                    message_pusher,
+                    process_action,
+                    notification,
+                    exchange_id,
+                    exchange_dt,
+                );
+                return;
             }
         };
-        vec![message]
+        message_pusher.push(process_action(message, &self))
     }
 
-    fn wakeup(&mut self) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>> {
+    fn wakeup<KernelMessage: Ord>(
+        &mut self,
+        _: MessagePusher<KernelMessage>,
+        _: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
+    ) {
         unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
     }
 
@@ -420,8 +435,8 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn register_trader(
         &mut self,
         trader_id: TraderID,
-        sub_cfgs: impl IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>)
-    {
+        sub_cfgs: impl IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>,
+    ) {
         self.trader_configs.insert(
             trader_id,
             sub_cfgs.into_iter()
@@ -466,15 +481,18 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         }
     }
 
-    fn handle_exchange_notification(
+    fn handle_exchange_notification<KernelMessage: Ord>(
         &mut self,
+        mut message_pusher: MessagePusher<KernelMessage>,
+        mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         notification: ExchangeEventNotification<Symbol, Settlement>,
         exchange_id: ExchangeID,
-        exchange_dt: DateTime) -> Vec<BrokerAction<TraderID, ExchangeID, Symbol, Settlement>>
-    {
+        exchange_dt: DateTime,
+    ) {
+        let process_action = |action| process_action(action, &self);
         match notification {
             ExchangeEventNotification::ExchangeOpen => {
-                self.trader_configs.keys().map(
+                let action_iterator = self.trader_configs.keys().map(
                     |trader_id| Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
@@ -483,10 +501,11 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                             ExchangeEventNotification::ExchangeOpen
                         ),
                     )
-                ).collect()
+                );
+                message_pusher.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::TradesStarted(traded_pair, price_step) => {
-                self.trader_configs.keys().map(
+                let action_iterator = self.trader_configs.keys().map(
                     |trader_id| Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
@@ -495,10 +514,11 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                             ExchangeEventNotification::TradesStarted(traded_pair, price_step)
                         ),
                     )
-                ).collect()
+                );
+                message_pusher.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::OrderCancelled(cancelled) => {
-                self.trader_configs.iter().filter_map(
+                let action_iterator = self.trader_configs.iter().filter_map(
                     |(trader_id, configs)| {
                         if let Some(config) = configs.get(&(exchange_id, cancelled.traded_pair)) {
                             if config.contains(Subscription::CancelledLimitOrders) {
@@ -515,10 +535,11 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         }
                         None
                     }
-                ).collect()
+                );
+                message_pusher.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::OrderPlaced(placed) => {
-                self.trader_configs.iter().filter_map(
+                let action_iterator = self.trader_configs.iter().filter_map(
                     |(trader_id, configs)| {
                         if let Some(config) = configs.get(&(exchange_id, placed.traded_pair)) {
                             if config.contains(Subscription::NewLimitOrders) {
@@ -535,10 +556,11 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         }
                         None
                     }
-                ).collect()
+                );
+                message_pusher.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::TradeExecuted(trade) => {
-                self.trader_configs.iter().filter_map(
+                let action_iterator = self.trader_configs.iter().filter_map(
                     |(trader_id, configs)| {
                         if let Some(config) = configs.get(&(exchange_id, trade.traded_pair)) {
                             if config.contains(Subscription::Trades) {
@@ -555,10 +577,11 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         }
                         None
                     }
-                ).collect()
+                );
+                message_pusher.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::ObSnapshot(ob_snapshot) => {
-                self.trader_configs.iter().filter_map(
+                let action_iterator = self.trader_configs.iter().filter_map(
                     |(trader_id, configs)| {
                         if let Some(config) = configs.get(&(exchange_id, ob_snapshot.traded_pair)) {
                             if config.contains(Subscription::ObSnapshots) {
@@ -575,10 +598,11 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         }
                         None
                     }
-                ).collect()
+                );
+                message_pusher.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::TradesStopped(traded_pair) => {
-                self.trader_configs.keys().map(
+                let action_iterator = self.trader_configs.keys().map(
                     |trader_id| Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
@@ -587,10 +611,11 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                             ExchangeEventNotification::TradesStopped(traded_pair)
                         ),
                     )
-                ).collect()
+                );
+                message_pusher.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::ExchangeClosed => {
-                self.trader_configs.keys().map(
+                let action_iterator = self.trader_configs.keys().map(
                     |trader_id| Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
@@ -599,7 +624,8 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                             ExchangeEventNotification::ExchangeClosed
                         ),
                     )
-                ).collect()
+                );
+                message_pusher.extend(action_iterator.map(process_action))
             }
         }
     }

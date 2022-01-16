@@ -9,7 +9,7 @@ pub struct VoidSettlement;
 
 impl GetSettlementLag for VoidSettlement {
     fn get_settlement_lag(&self, _: DateTime) -> u64 {
-        unreachable!("VoidSettlement::get_settlement_dt method called")
+        unreachable!("VoidSettlement::get_settlement_lag method called")
     }
 }
 

@@ -34,9 +34,6 @@ use {
     yaml_rust::{Yaml, yaml::Hash, YamlLoader},
 };
 
-#[cfg(test)]
-mod tests;
-
 mod yaml_utils
 {
     use {

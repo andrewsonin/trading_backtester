@@ -38,7 +38,7 @@ Exchanges:
 Traded Pairs:
 
   - exchange: MOEX
-    kind:     Spot
+    kind:     "Base :: Spot"
     quoted:   USD
     base:     RUB
     price_step: 0.0025

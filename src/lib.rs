@@ -40,6 +40,7 @@ pub mod prelude {
         },
         settlement::{concrete as settlement_examples, GetSettlementLag},
         traded_pair::{
+            concrete as traded_pair_examples,
             Futures,
             OptionContract,
             OptionKind,
@@ -80,8 +81,13 @@ mod tests {
             kernel::KernelBuilder,
             parallel::{ParallelBacktester, ThreadConfig},
             replay::concrete::GetNextObSnapshotDelay,
-            settlement::{concrete::VoidSettlement, GetSettlementLag},
-            traded_pair::{PairKind, parser::concrete::SpotTradedPairParser, TradedPair},
+            settlement::{concrete::SpotSettlement, GetSettlementLag},
+            traded_pair::{
+                concrete::SPOT_BASE,
+                PairKind,
+                parser::concrete::SpotBaseTradedPairParser,
+                TradedPair,
+            },
             trader::{concrete::SpreadWriter, subscriptions::{SubscriptionConfig, SubscriptionList}},
             types::{DateTime, Identifier, PriceStep},
             utils::{
@@ -163,8 +169,8 @@ mod tests {
         }
     }
 
-    const USD_RUB: TradedPair<SymbolName, VoidSettlement> = TradedPair {
-        kind: PairKind::Spot,
+    const USD_RUB: TradedPair<SymbolName, SpotSettlement> = TradedPair {
+        kind: PairKind::Base(SPOT_BASE),
         quoted_symbol: SymbolName::USD,
         base_symbol: SymbolName::RUB,
     };
@@ -179,7 +185,7 @@ mod tests {
 
         let (exchange_names, replay_config, start_dt, end_dt) = parse_yaml(
             test_files.join("example_01.yml"),
-            SpotTradedPairParser,
+            SpotBaseTradedPairParser,
             DelayScheduler,
         );
 
@@ -218,7 +224,7 @@ mod tests {
 
         let (exchange_names, replay_config, start_dt, end_dt) = parse_yaml(
             test_files.join("example_01.yml"),
-            SpotTradedPairParser,
+            SpotBaseTradedPairParser,
             DelayScheduler,
         );
         let broker_configs = [

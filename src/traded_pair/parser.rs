@@ -23,24 +23,24 @@ pub trait TradedPairParser<
 pub mod concrete {
     use {
         crate::{
-            settlement::concrete::VoidSettlement,
-            traded_pair::{PairKind, parser::TradedPairParser, TradedPair},
+            settlement::concrete::SpotSettlement,
+            traded_pair::{concrete::SPOT_BASE, PairKind, parser::TradedPairParser, TradedPair},
             types::Identifier,
             utils::ExpectWith,
         },
         std::str::FromStr,
     };
 
-    pub struct SpotTradedPairParser;
+    pub struct SpotBaseTradedPairParser;
 
-    impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol, VoidSettlement>
-    for SpotTradedPairParser
+    impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol, SpotSettlement>
+    for SpotBaseTradedPairParser
     {
         fn parse<ExchangeID: Identifier>(
             _: ExchangeID,
             kind: impl AsRef<str>,
             quoted_symbol: impl AsRef<str>,
-            base_symbol: impl AsRef<str>) -> TradedPair<Symbol, VoidSettlement>
+            base_symbol: impl AsRef<str>) -> TradedPair<Symbol, SpotSettlement>
         {
             let (kind, quoted_symbol, base_symbol) = (
                 kind.as_ref(), quoted_symbol.as_ref(), base_symbol.as_ref()
@@ -51,10 +51,14 @@ pub mod concrete {
             let base_symbol = FromStr::from_str(base_symbol).expect_with(
                 || panic!("Cannot parse {base_symbol} to Symbol")
             );
-            let kind = if let "Spot" | "spot" = kind {
-                PairKind::Spot
+            const PATTERN: &str = "base :: spot";
+            let kind = if let PATTERN = kind.to_lowercase().as_str() {
+                PairKind::Base(SPOT_BASE)
             } else {
-                panic!("Cannot parse to PairKind: {kind}")
+                panic!(
+                    "Cannot parse to {SPOT_BASE:?} traded pair: \"{kind}\". \
+                    Expected: \"{PATTERN}\""
+                )
             };
             TradedPair {
                 kind,

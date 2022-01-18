@@ -1,43 +1,48 @@
-use crate::{
+pub use crate::{
     settlement::GetSettlementLag,
-    types::{DateTime, Identifier, Price},
+    types::{DateTime, Identifier, Named, Price},
+    utils::enum_dispatch,
 };
 
-pub mod concrete;
 pub mod parser;
 
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct TradedPair<Name: Identifier, Settlement: GetSettlementLag> {
-    pub kind: PairKind<Settlement>,
-    pub quoted_symbol: Name,
-    pub base_symbol: Name,
+    pub quoted_asset: Asset<Name>,
+    pub base_asset: Base<Name>,
+    pub settlement: Settlement,
+}
+
+#[enum_dispatch(Named<Name>)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
+pub enum Asset<Name: Identifier> {
+    Base(Base<Name>),
+    Futures(Futures<Name>),
+    OptionContract(OptionContract<Name>),
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub enum PairKind<Settlement: GetSettlementLag> {
-    Base(Base<Settlement>),
-    Futures(Futures<Settlement>),
-    OptionContract(OptionContract<Settlement>),
+pub struct Base<Name: Identifier> {
+    pub symbol: Name,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct Base<Settlement: GetSettlementLag> {
-    pub delivery: Settlement,
-}
-
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct Futures<Settlement: GetSettlementLag> {
-    pub delivery: Settlement,
+pub struct Futures<Name: Identifier> {
+    pub symbol: Name,
+    pub underlying_symbol: Name,
+    pub settlement_symbol: Name,
     pub maturity: DateTime,
     pub strike: Price,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct OptionContract<Settlement: GetSettlementLag> {
+pub struct OptionContract<Name: Identifier> {
+    pub symbol: Name,
+    pub underlying_symbol: Name,
+    pub settlement_symbol: Name,
+    pub maturity: DateTime,
+    pub strike: Price,
     pub kind: OptionKind,
-    pub delivery: Settlement,
-    pub maturity: DateTime,
-    pub strike: Price,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
@@ -46,8 +51,51 @@ pub enum OptionKind {
     EuroCall,
 }
 
-impl<Settlement: GetSettlementLag> Base<Settlement> {
-    pub fn new(delivery: Settlement) -> Self {
-        Self { delivery }
+impl<Name: Identifier> Base<Name> {
+    pub fn new(symbol: Name) -> Self {
+        Self { symbol }
+    }
+}
+
+impl<Name: Identifier> Futures<Name> {
+    pub fn new(
+        symbol: Name,
+        underlying_symbol: Name,
+        settlement_symbol: Name,
+        maturity: DateTime,
+        strike: Price) -> Self
+    {
+        Self { symbol, underlying_symbol, settlement_symbol, maturity, strike }
+    }
+}
+
+impl<Name: Identifier> OptionContract<Name> {
+    pub fn new(
+        symbol: Name,
+        underlying_symbol: Name,
+        settlement_symbol: Name,
+        maturity: DateTime,
+        strike: Price,
+        kind: OptionKind) -> Self
+    {
+        Self { symbol, underlying_symbol, settlement_symbol, maturity, strike, kind }
+    }
+}
+
+impl<Name: Identifier> Named<Name> for Base<Name> {
+    fn get_name(&self) -> Name {
+        self.symbol
+    }
+}
+
+impl<Name: Identifier> Named<Name> for Futures<Name> {
+    fn get_name(&self) -> Name {
+        self.symbol
+    }
+}
+
+impl<Name: Identifier> Named<Name> for OptionContract<Name> {
+    fn get_name(&self) -> Name {
+        self.symbol
     }
 }

@@ -40,11 +40,11 @@ pub mod prelude {
         },
         settlement::{concrete as settlement_examples, GetSettlementLag},
         traded_pair::{
-            concrete as traded_pair_examples,
+            Asset,
+            Base,
             Futures,
             OptionContract,
             OptionKind,
-            PairKind,
             parser::{concrete as traded_pair_parser_examples, TradedPairParser},
             TradedPair,
         },
@@ -83,8 +83,8 @@ mod tests {
             replay::concrete::GetNextObSnapshotDelay,
             settlement::{concrete::SpotSettlement, GetSettlementLag},
             traded_pair::{
-                concrete::SPOT_BASE,
-                PairKind,
+                Asset,
+                Base,
                 parser::concrete::SpotBaseTradedPairParser,
                 TradedPair,
             },
@@ -169,15 +169,15 @@ mod tests {
         }
     }
 
-    const USD_RUB: TradedPair<SymbolName, SpotSettlement> = TradedPair {
-        kind: PairKind::Base(SPOT_BASE),
-        quoted_symbol: SymbolName::USD,
-        base_symbol: SymbolName::RUB,
-    };
-
     #[test]
     fn test_parse_yaml()
     {
+        let usd_rub = TradedPair {
+            quoted_asset: Asset::Base(Base::new(SymbolName::USD)),
+            base_asset: Base::new(SymbolName::RUB),
+            settlement: SpotSettlement,
+        };
+
         let test_files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
         let simulated_spreads_file_path = test_files
             .join("example_01")
@@ -199,7 +199,7 @@ mod tests {
         ];
         let subscription_config = SubscriptionConfig::new(
             ExchangeName::MOEX,
-            USD_RUB,
+            usd_rub,
             SubscriptionList::subscribe().to_ob_snapshots(),
         );
         let traders = [
@@ -220,6 +220,12 @@ mod tests {
     #[test]
     fn test_parse_yaml_in_parallel()
     {
+        let usd_rub = TradedPair {
+            quoted_asset: Asset::Base(Base::new(SymbolName::USD)),
+            base_asset: Base::new(SymbolName::RUB),
+            settlement: SpotSettlement,
+        };
+
         let test_files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
 
         let (exchange_names, replay_config, start_dt, end_dt) = parse_yaml(
@@ -236,7 +242,7 @@ mod tests {
 
         let subscription_config = SubscriptionConfig::new(
             ExchangeName::MOEX,
-            USD_RUB,
+            usd_rub,
             SubscriptionList::subscribe().to_ob_snapshots(),
         );
         let trader_subscriptions = [

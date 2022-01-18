@@ -24,12 +24,14 @@ pub mod concrete {
     use {
         crate::{
             settlement::concrete::SpotSettlement,
-            traded_pair::{concrete::SPOT_BASE, PairKind, parser::TradedPairParser, TradedPair},
+            traded_pair::{Asset, parser::TradedPairParser, TradedPair},
             types::Identifier,
             utils::ExpectWith,
         },
         std::str::FromStr,
     };
+
+    use crate::prelude::Base;
 
     pub struct SpotBaseTradedPairParser;
 
@@ -45,25 +47,28 @@ pub mod concrete {
             let (kind, quoted_symbol, base_symbol) = (
                 kind.as_ref(), quoted_symbol.as_ref(), base_symbol.as_ref()
             );
+
             let quoted_symbol = FromStr::from_str(quoted_symbol).expect_with(
                 || panic!("Cannot parse {quoted_symbol} to Symbol")
             );
-            let base_symbol = FromStr::from_str(base_symbol).expect_with(
-                || panic!("Cannot parse {base_symbol} to Symbol")
-            );
             const PATTERN: &str = "base :: spot";
-            let kind = if let PATTERN = kind.to_lowercase().as_str() {
-                PairKind::Base(SPOT_BASE)
+            let quoted_symbol = if let PATTERN = kind.to_lowercase().as_str() {
+                Asset::Base(Base::new(quoted_symbol))
             } else {
                 panic!(
-                    "Cannot parse to {SPOT_BASE:?} traded pair: \"{kind}\". \
+                    "Cannot parse to TradedPair<Symbol, SpotSettlement>: \"{kind}\". \
                     Expected: \"{PATTERN}\""
                 )
             };
+
+            let base_symbol = FromStr::from_str(base_symbol).expect_with(
+                || panic!("Cannot parse {base_symbol} to Symbol")
+            );
+            let base_symbol = Base::new(base_symbol);
             TradedPair {
-                kind,
-                quoted_symbol,
-                base_symbol,
+                quoted_asset: quoted_symbol,
+                base_asset: base_symbol,
+                settlement: SpotSettlement,
             }
         }
     }

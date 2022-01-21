@@ -19,7 +19,7 @@ use {
         utils::{
             ExpectWith,
             input::one_tick::OneTickTradedPairReader,
-            queue::{LessElementBinaryHeap, MessagePusher},
+            queue::{LessElementBinaryHeap, MessageReceiver},
             rand::Rng,
         },
     },
@@ -250,7 +250,7 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
     fn handle_exchange_reply<KernelMessage: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KernelMessage>,
+        mut message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl Fn(Self::Item) -> KernelMessage,
         reply: ExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID,
@@ -284,7 +284,7 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                                 get_ob_snapshot_delay(*traded_pair)
                             }
                         );
-                        message_pusher.extend(action_iterator.map(process_action))
+                        message_receiver.extend(action_iterator.map(process_action))
                     }
                     ExchangeEventNotification::TradesStarted(traded_pair, _price_step) => {
                         if !self.active_traded_pairs.insert((exchange_id, traded_pair)) {
@@ -294,12 +294,12 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                             )
                         }
                         if let Some(action) = get_ob_snapshot_delay(traded_pair) {
-                            message_pusher.push(process_action(action))
+                            message_receiver.push(process_action(action))
                         }
                     }
                     ExchangeEventNotification::ObSnapshot(snapshot) => {
                         if let Some(action) = get_ob_snapshot_delay(snapshot.traded_pair) {
-                            message_pusher.push(process_action(action))
+                            message_receiver.push(process_action(action))
                         }
                     }
                     ExchangeEventNotification::TradesStopped(traded_pair) => {

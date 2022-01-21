@@ -8,12 +8,12 @@ edition = "2021"
 [dependencies]
 chrono = "^0.4.19"
 derive_more = "^0.99.17"
-enum_dispatch = "^0.3.7"
 rand = "^0.8.4"
 bitmask = "^0.5"
 csv = "^1.1.6"
 yaml-rust = "^0.4.5"
 rayon = "^1.5.1"
+derive_macros = { path = "derive_macros" }
 
 [profile.test]
 opt-level = 3

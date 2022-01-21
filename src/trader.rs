@@ -3,7 +3,7 @@ use crate::{
     settlement::GetSettlementLag,
     trader::request::TraderToBroker,
     types::{DateTime, Identifier, Named, TimeSync},
-    utils::{enum_dispatch, queue::MessagePusher, rand::Rng},
+    utils::{queue::MessageReceiver, rand::Rng},
 };
 
 pub mod request;
@@ -30,7 +30,6 @@ pub enum TraderActionKind<
     WakeUp,
 }
 
-#[enum_dispatch]
 pub trait Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>: TimeSync + Named<TraderID>
     where TraderID: Identifier,
           BrokerID: Identifier,
@@ -40,7 +39,7 @@ pub trait Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>: TimeSync +
 {
     fn process_broker_reply<KernelMessage: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KernelMessage>,
+        message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         reply: BrokerReply<Symbol, Settlement>,
         broker_id: BrokerID,
@@ -50,7 +49,7 @@ pub trait Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>: TimeSync +
 
     fn wakeup<KernelMessage: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KernelMessage>,
+        message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
     );
 

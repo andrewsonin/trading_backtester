@@ -25,9 +25,9 @@ impl<T: Ord> Extend<T> for LessElementBinaryHeap<T>
     }
 }
 
-pub struct MessagePusher<'a, T: Ord> (&'a mut LessElementBinaryHeap<T>);
+pub struct MessageReceiver<'a, T: Ord> (&'a mut LessElementBinaryHeap<T>);
 
-impl<'a, T: Ord> MessagePusher<'a, T> {
+impl<'a, T: Ord> MessageReceiver<'a, T> {
     pub fn new(queue: &'a mut LessElementBinaryHeap<T>) -> Self {
         Self(queue)
     }
@@ -37,7 +37,7 @@ impl<'a, T: Ord> MessagePusher<'a, T> {
     }
 }
 
-impl<'a, T: Ord> Extend<T> for MessagePusher<'a, T> {
+impl<'a, T: Ord> Extend<T> for MessageReceiver<'a, T> {
     fn extend<I: IntoIterator<Item=T>>(&mut self, iter: I) {
         self.0.extend(iter)
     }

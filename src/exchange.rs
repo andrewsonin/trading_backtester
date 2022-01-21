@@ -4,7 +4,7 @@ use crate::{
     replay::request::ReplayRequest,
     settlement::GetSettlementLag,
     types::{Identifier, Named, TimeSync},
-    utils::{enum_dispatch, queue::MessagePusher},
+    utils::queue::MessageReceiver,
 };
 
 pub mod reply;
@@ -28,7 +28,6 @@ pub enum ExchangeActionKind<
     ExchangeToReplay(ExchangeToReplay<Symbol, Settlement>),
 }
 
-#[enum_dispatch]
 pub trait Exchange<ExchangeID, BrokerID, Symbol, Settlement>: TimeSync + Named<ExchangeID>
     where ExchangeID: Identifier,
           BrokerID: Identifier,
@@ -37,7 +36,7 @@ pub trait Exchange<ExchangeID, BrokerID, Symbol, Settlement>: TimeSync + Named<E
 {
     fn process_broker_request<KernelMessage: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KernelMessage>,
+        message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KernelMessage,
         request: BrokerRequest<Symbol, Settlement>,
         broker_id: BrokerID,
@@ -45,7 +44,7 @@ pub trait Exchange<ExchangeID, BrokerID, Symbol, Settlement>: TimeSync + Named<E
 
     fn process_replay_request<KernelMessage: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KernelMessage>,
+        message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KernelMessage,
         request: ReplayRequest<Symbol, Settlement>,
     );

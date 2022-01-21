@@ -25,7 +25,7 @@ use {
         types::{DateTime, Duration, Identifier},
         utils::{
             ExpectWith,
-            queue::{LessElementBinaryHeap, MessagePusher},
+            queue::{LessElementBinaryHeap, MessageReceiver},
             rand::{Rng, rngs::StdRng, SeedableRng},
         },
     },
@@ -384,7 +384,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
                 request.exchange_id,
             );
         exchange.process_replay_request(
-            MessagePusher::new(&mut self.message_queue),
+            MessageReceiver::new(&mut self.message_queue),
             process_exchange_action,
             request.content,
         )
@@ -397,7 +397,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
     ) {
         *self.replay.current_datetime_mut() = self.current_dt;
         self.replay.handle_exchange_reply(
-            MessagePusher::new(&mut self.message_queue),
+            MessageReceiver::new(&mut self.message_queue),
             Self::process_replay_action,
             reply,
             exchange_id,
@@ -423,7 +423,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
                 request.exchange_id,
             );
         exchange.process_broker_request(
-            MessagePusher::new(&mut self.message_queue),
+            MessageReceiver::new(&mut self.message_queue),
             process_exchange_action,
             request.content,
             broker_id,
@@ -449,7 +449,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
                 reply.broker_id,
             );
         broker.process_exchange_reply(
-            MessagePusher::new(&mut self.message_queue),
+            MessageReceiver::new(&mut self.message_queue),
             process_broker_action,
             reply.content,
             exchange_id,
@@ -473,7 +473,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
                 broker_id,
             );
         broker.wakeup(
-            MessagePusher::new(&mut self.message_queue),
+            MessageReceiver::new(&mut self.message_queue),
             process_broker_action,
         )
     }
@@ -496,7 +496,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
                 reply.trader_id,
             );
         trader.process_broker_reply(
-            MessagePusher::new(&mut self.message_queue),
+            MessageReceiver::new(&mut self.message_queue),
             process_trader_action,
             reply.content,
             broker_id,
@@ -520,7 +520,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
                 trader_id,
             );
         trader.wakeup(
-            MessagePusher::new(&mut self.message_queue),
+            MessageReceiver::new(&mut self.message_queue),
             process_trader_action,
         )
     }
@@ -544,7 +544,7 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
                 request.broker_id,
             );
         broker.process_trader_request(
-            MessagePusher::new(&mut self.message_queue),
+            MessageReceiver::new(&mut self.message_queue),
             process_broker_action,
             request.content,
             trader_id,

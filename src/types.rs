@@ -8,11 +8,9 @@ pub use chrono::{
 
 use {
     crate::{
-        traded_pair::{Asset, Base, Futures, OptionContract},
         utils::{
             derive_more,
             derive_more::{Add, AddAssign, From, FromStr, Into, Sub, SubAssign, Sum},
-            enum_dispatch,
             ExpectWith,
         },
     },
@@ -24,17 +22,14 @@ use {
     },
 };
 
-#[enum_dispatch]
 pub trait Identifier: Hash + Ord + Copy + Send + Sync + Display + Debug {}
 
 impl<T: Hash + Ord + Copy + Send + Sync + Display + Debug> Identifier for T {}
 
-#[enum_dispatch]
 pub trait Named<Name: Identifier> {
     fn get_name(&self) -> Name;
 }
 
-#[enum_dispatch]
 pub trait TimeSync {
     fn current_datetime_mut(&mut self) -> &mut DateTime;
 }

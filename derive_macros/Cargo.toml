@@ -1,0 +1,15 @@
+[package]
+name = "derive_macros"
+version = "0.0.0"
+authors = ["Andrew Sonin <sonin.cel@yandex.ru>"]
+description = "A `cargo generate` template for quick-starting a procedural macro crate"
+keywords = ["template", "proc_macro", "procmacro"]
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "^1"
+proc-macro2 = "^1"
+syn = "^1"

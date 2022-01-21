@@ -50,7 +50,7 @@ use {
             Size,
             TimeSync,
         },
-        utils::{ExpectWith, queue::MessagePusher},
+        utils::{ExpectWith, queue::MessageReceiver},
     },
     std::{
         collections::{hash_map::Entry::*, HashMap},
@@ -124,7 +124,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
     fn process_broker_request<KM: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KM>,
+        message_receiver: MessageReceiver<KM>,
         process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KM,
         request: BrokerRequest<Symbol, Settlement>,
         broker_id: BrokerID,
@@ -134,17 +134,17 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         {
             BrokerRequest::CancelLimitOrder(request) => {
                 self.try_cancel_limit_order::<_, _, _, false>(
-                    message_pusher, process_action, request, get_broker_id,
+                    message_receiver, process_action, request, get_broker_id,
                 )
             }
             BrokerRequest::PlaceLimitOrder(order) => {
                 self.try_place_limit_order::<_, _, _, false>(
-                    message_pusher, process_action, order, get_broker_id,
+                    message_receiver, process_action, order, get_broker_id,
                 )
             }
             BrokerRequest::PlaceMarketOrder(order) => {
                 self.try_place_market_order::<_, _, _, false>(
-                    message_pusher, process_action, order, get_broker_id,
+                    message_receiver, process_action, order, get_broker_id,
                 )
             }
         }
@@ -152,7 +152,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 
     fn process_replay_request<KM: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KM>,
+        message_receiver: MessageReceiver<KM>,
         process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KM,
         request: ReplayRequest<Symbol, Settlement>,
     ) {
@@ -160,34 +160,34 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         match request
         {
             ReplayRequest::ExchangeOpen => {
-                self.try_open(message_pusher, process_action)
+                self.try_open(message_receiver, process_action)
             }
             ReplayRequest::StartTrades(traded_pair, price_step) => {
-                self.try_start_trades(message_pusher, process_action, traded_pair, price_step)
+                self.try_start_trades(message_receiver, process_action, traded_pair, price_step)
             }
             ReplayRequest::PlaceMarketOrder(order) => {
                 self.try_place_market_order::<_, _, _, true>(
-                    message_pusher, process_action, order, get_broker_id_plug,
+                    message_receiver, process_action, order, get_broker_id_plug,
                 )
             }
             ReplayRequest::PlaceLimitOrder(order) => {
                 self.try_place_limit_order::<_, _, _, true>(
-                    message_pusher, process_action, order, get_broker_id_plug,
+                    message_receiver, process_action, order, get_broker_id_plug,
                 )
             }
             ReplayRequest::CancelLimitOrder(request) => {
                 self.try_cancel_limit_order::<_, _, _, true>(
-                    message_pusher, process_action, request, get_broker_id_plug,
+                    message_receiver, process_action, request, get_broker_id_plug,
                 )
             }
             ReplayRequest::StopTrades(traded_pair) => {
-                self.try_stop_trades(message_pusher, process_action, traded_pair)
+                self.try_stop_trades(message_receiver, process_action, traded_pair)
             }
             ReplayRequest::ExchangeClosed => {
-                self.try_close(message_pusher, process_action)
+                self.try_close(message_receiver, process_action)
             }
             ReplayRequest::BroadcastObStateToBrokers(traded_pair) => {
-                self.try_broadcast_ob_state(message_pusher, process_action, traded_pair)
+                self.try_broadcast_ob_state(message_receiver, process_action, traded_pair)
             }
         }
     }
@@ -221,7 +221,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 
     fn try_broadcast_ob_state<KM: Ord>(
         &self,
-        mut message_pusher: MessagePusher<KM>,
+        mut message_receiver: MessageReceiver<KM>,
         mut process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KM,
         traded_pair: TradedPair<Symbol, Settlement>,
     ) {
@@ -233,7 +233,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     }
                 )
             );
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         } else if let Some((order_book, _price_step)) = self.order_books.get(&traded_pair) {
             let ob_snapshot = Rc::new(
                 ObSnapshot { traded_pair, state: order_book.get_ob_state() }
@@ -254,7 +254,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     )
                 )
             );
-            message_pusher.extend(action_iterator.map(process_action))
+            message_receiver.extend(action_iterator.map(process_action))
         } else {
             let reply = Self::create_replay_reply(
                 ExchangeToReplayReply::CannotBroadcastObState(
@@ -263,7 +263,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     }
                 )
             );
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         }
     }
 
@@ -274,7 +274,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         const REPLAY: bool
     >(
         &mut self,
-        mut message_pusher: MessagePusher<KM>,
+        mut message_receiver: MessageReceiver<KM>,
         mut process_action: ProcessAction,
         request: LimitOrderCancelRequest<Symbol, Settlement>,
         get_broker_id: GetBrokerID,
@@ -295,7 +295,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::CannotCancelOrder(cannot_cancel_order),
                 )
             };
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         };
         let order_id_map = if REPLAY {
@@ -312,7 +312,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 get_broker_id(),
                 ExchangeToBrokerReply::CannotCancelOrder(cannot_cancel_order),
             );
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         };
         let cannot_cancel_order = if let Some(internal_order_id) = order_id_map.get(
@@ -348,7 +348,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                         );
                         let action_iterator = once_with(replay_reply)
                             .chain(broker_notification_iterator);
-                        message_pusher.extend(action_iterator.map(process_action))
+                        message_receiver.extend(action_iterator.map(process_action))
                     } else {
                         let replay_notification = || Self::create_replay_reply(
                             ExchangeToReplayReply::ExchangeEventNotification(
@@ -370,7 +370,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                         let action_iterator = once_with(replay_notification)
                             .chain(once_with(broker_reply))
                             .chain(broker_notification_iterator);
-                        message_pusher.extend(action_iterator.map(process_action))
+                        message_receiver.extend(action_iterator.map(process_action))
                     };
                     return;
                 } else {
@@ -397,12 +397,12 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 ExchangeToBrokerReply::CannotCancelOrder(cannot_cancel_order),
             )
         };
-        message_pusher.push(process_action(reply))
+        message_receiver.push(process_action(reply))
     }
 
     fn try_stop_trades<KM: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KM>,
+        mut message_receiver: MessageReceiver<KM>,
         mut process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KM,
         traded_pair: TradedPair<Symbol, Settlement>,
     ) {
@@ -414,7 +414,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     }
                 )
             );
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         } else if let Occupied(entry) = self.order_books.entry(traded_pair) {
             let (ob, _price_step) = entry.remove();
             let order_cancel_iterator = ob.get_all_ids().into_iter().map(
@@ -460,7 +460,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 )
             );
             let action_iterator = order_cancel_iterator.chain(trades_stopped_iterator);
-            message_pusher.extend(action_iterator.map(process_action))
+            message_receiver.extend(action_iterator.map(process_action))
         } else {
             let reply = Self::create_replay_reply(
                 ExchangeToReplayReply::CannotStopTrades(
@@ -469,7 +469,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     }
                 )
             );
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         }
     }
 
@@ -502,7 +502,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 
     fn try_open<KM: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KM>,
+        mut message_receiver: MessageReceiver<KM>,
         mut process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KM,
     ) {
         if self.is_open {
@@ -513,7 +513,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     }
                 )
             );
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         } else {
             self.is_open = true;
             let action_iterator = once_with(
@@ -532,13 +532,13 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     )
                 )
             );
-            message_pusher.extend(action_iterator.map(process_action))
+            message_receiver.extend(action_iterator.map(process_action))
         }
     }
 
     fn try_close<KM: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KM>,
+        mut message_receiver: MessageReceiver<KM>,
         mut process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KM,
     ) {
         if self.is_open
@@ -589,7 +589,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 )
             );
             let action_iterator = broker_notification_iterator.chain(replay_notification_iterator);
-            message_pusher.extend(action_iterator.map(process_action));
+            message_receiver.extend(action_iterator.map(process_action));
             self.broker_to_order_id.values_mut().for_each(HashMap::clear);
             self.replay_order_ids.clear();
             self.internal_to_submitted.clear();
@@ -603,13 +603,13 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     }
                 )
             );
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         }
     }
 
     fn try_start_trades<KM: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KM>,
+        mut message_receiver: MessageReceiver<KM>,
         mut process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KM,
         traded_pair: TradedPair<Symbol, Settlement>,
         price_step: PriceStep,
@@ -623,7 +623,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     }
                 )
             );
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         } else if let Vacant(entry) = self.order_books.entry(traded_pair) {
             entry.insert((OrderBook::new(), price_step));
             let broker_notification_iterator = self.broker_to_order_id.keys().map(
@@ -642,7 +642,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 )
             )
                 .chain(broker_notification_iterator);
-            message_pusher.extend(action_iterator.map(process_action))
+            message_receiver.extend(action_iterator.map(process_action))
         } else {
             let reply = Self::create_replay_reply(
                 ExchangeToReplayReply::CannotStartTrades(
@@ -652,7 +652,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     }
                 )
             );
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         }
     }
 
@@ -663,7 +663,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         const REPLAY: bool
     >(
         &mut self,
-        mut message_pusher: MessagePusher<KM>,
+        mut message_receiver: MessageReceiver<KM>,
         mut process_action: ProcessAction,
         order: MarketOrderPlacingRequest<Symbol, Settlement>,
         get_broker_id: GetBrokerID,
@@ -684,7 +684,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
                 )
             };
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         }
         if order.size == Size(0) {
@@ -703,7 +703,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
                 )
             };
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         }
         let order_id_map = if REPLAY {
@@ -720,7 +720,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 get_broker_id(),
                 ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
             );
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         };
         let order_id_map = if let Vacant(entry) = order_id_map.entry(
@@ -743,7 +743,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
                 )
             };
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         };
         if let Some((order_book, _price_step)) = self.order_books.get_mut(&order.traded_pair)
@@ -765,7 +765,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     order_book_events.into_iter()
                         .for_each(
                             |event| self.interpret_ob_event::<_, _, _, false, true, REPLAY>(
-                                &mut message_pusher,
+                                &mut message_receiver,
                                 &mut process_action,
                                 &mut remaining_size,
                                 event,
@@ -782,7 +782,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     order_book_events.into_iter()
                         .for_each(
                             |event| self.interpret_ob_event::<_, _, _, false, false, REPLAY>(
-                                &mut message_pusher,
+                                &mut message_receiver,
                                 &mut process_action,
                                 &mut remaining_size,
                                 event,
@@ -799,7 +799,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     order_book_events.into_iter()
                         .for_each(
                             |event| self.interpret_ob_event::<_, _, _, true, true, REPLAY>(
-                                &mut message_pusher,
+                                &mut message_receiver,
                                 &mut process_action,
                                 &mut remaining_size,
                                 event,
@@ -816,7 +816,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     order_book_events.into_iter()
                         .for_each(
                             |event| self.interpret_ob_event::<_, _, _, true, false, REPLAY>(
-                                &mut message_pusher,
+                                &mut message_receiver,
                                 &mut process_action,
                                 &mut remaining_size,
                                 event,
@@ -847,7 +847,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                         ),
                     )
                 };
-                message_pusher.push(process_action(notification))
+                message_receiver.push(process_action(notification))
             }
         } else {
             let order_discarded = OrderPlacementDiscarded {
@@ -865,7 +865,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
                 )
             };
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         }
     }
 
@@ -876,7 +876,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         const REPLAY: bool
     >(
         &mut self,
-        mut message_pusher: MessagePusher<KM>,
+        mut message_receiver: MessageReceiver<KM>,
         mut process_action: ProcessAction,
         order: LimitOrderPlacingRequest<Symbol, Settlement>,
         get_broker_id: GetBrokerID,
@@ -897,7 +897,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
                 )
             };
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         }
         if order.size == Size(0) {
@@ -916,7 +916,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
                 )
             };
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         }
         let order_id_map = if REPLAY {
@@ -933,7 +933,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 get_broker_id(),
                 ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
             );
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         };
         let order_id_map = if let Vacant(entry) = order_id_map.entry(
@@ -956,7 +956,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
                 )
             };
-            message_pusher.push(process_action(reply));
+            message_receiver.push(process_action(reply));
             return;
         };
         if let Some((order_book, _price_step)) = self.order_books.get_mut(&order.traded_pair)
@@ -978,7 +978,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     order_book_events.into_iter()
                         .for_each(
                             |event| self.interpret_ob_event::<_, _, _, false, true, REPLAY>(
-                                &mut message_pusher,
+                                &mut message_receiver,
                                 &mut process_action,
                                 &mut remaining_size,
                                 event,
@@ -995,7 +995,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     order_book_events.into_iter()
                         .for_each(
                             |event| self.interpret_ob_event::<_, _, _, false, false, REPLAY>(
-                                &mut message_pusher,
+                                &mut message_receiver,
                                 &mut process_action,
                                 &mut remaining_size,
                                 event,
@@ -1012,7 +1012,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     order_book_events.into_iter()
                         .for_each(
                             |event| self.interpret_ob_event::<_, _, _, true, true, REPLAY>(
-                                &mut message_pusher,
+                                &mut message_receiver,
                                 &mut process_action,
                                 &mut remaining_size,
                                 event,
@@ -1029,7 +1029,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     order_book_events.into_iter()
                         .for_each(
                             |event| self.interpret_ob_event::<_, _, _, true, false, REPLAY>(
-                                &mut message_pusher,
+                                &mut message_receiver,
                                 &mut process_action,
                                 &mut remaining_size,
                                 event,
@@ -1054,7 +1054,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderAccepted(order_accepted),
                 )
             };
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         } else {
             let order_discarded = OrderPlacementDiscarded {
                 traded_pair: order.traded_pair,
@@ -1071,7 +1071,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     ExchangeToBrokerReply::OrderPlacementDiscarded(order_discarded),
                 )
             };
-            message_pusher.push(process_action(reply))
+            message_receiver.push(process_action(reply))
         }
     }
 
@@ -1084,7 +1084,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         const REPLAY: bool
     >(
         &self,
-        message_pusher: &mut MessagePusher<KM>,
+        message_receiver: &mut MessageReceiver<KM>,
         mut process_action: ProcessAction,
         remaining_size: &mut Size,
         event: OrderBookEvent,
@@ -1133,7 +1133,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                             ExchangeToReplayReply::OrderExecuted(order_executed)
                         )
                     };
-                    message_pusher.push(process_action(notification))
+                    message_receiver.push(process_action(notification))
                 } else {
                     panic!("Cannot find limit order with internal ID {order_id}")
                 }
@@ -1160,7 +1160,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                             )
                         )
                     };
-                    message_pusher.push(process_action(notification))
+                    message_receiver.push(process_action(notification))
                 } else {
                     panic!("Cannot find limit order with internal ID {order_id}")
                 }
@@ -1188,7 +1188,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     )
                 };
                 if DUMMY {
-                    message_pusher.push(process_action(reply))
+                    message_receiver.push(process_action(reply))
                 } else if REPLAY {
                     let broker_notification_iterator = self.broker_to_order_id.keys().map(
                         |broker_id| self.create_broker_reply(
@@ -1196,7 +1196,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                             create_broker_notification(),
                         )
                     );
-                    message_pusher.extend(
+                    message_receiver.extend(
                         once(reply)
                             .chain(broker_notification_iterator)
                             .map(process_action)
@@ -1212,7 +1212,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                                 create_broker_notification(),
                             )
                         );
-                    message_pusher.extend(
+                    message_receiver.extend(
                         [reply, replay_notification]
                             .into_iter()
                             .chain(broker_notification_iterator)
@@ -1239,7 +1239,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     )
                 };
                 if DUMMY {
-                    message_pusher.push(process_action(reply))
+                    message_receiver.push(process_action(reply))
                 } else if REPLAY {
                     let broker_notification_iterator = self.broker_to_order_id.keys().map(
                         |broker_id| self.create_broker_reply(
@@ -1247,7 +1247,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                             create_broker_notification(),
                         )
                     );
-                    message_pusher.extend(
+                    message_receiver.extend(
                         once(reply)
                             .chain(broker_notification_iterator)
                             .map(process_action)
@@ -1263,7 +1263,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                                 create_broker_notification(),
                             )
                         );
-                    message_pusher.extend(
+                    message_receiver.extend(
                         [reply, replay_notification]
                             .into_iter()
                             .chain(broker_notification_iterator)

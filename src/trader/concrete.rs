@@ -5,7 +5,7 @@ use {
         settlement::GetSettlementLag,
         trader::{Trader, TraderAction},
         types::{Date, DateTime, Identifier, Named, ObState, PriceStep, Size, TimeSync},
-        utils::{ExpectWith, queue::MessagePusher, rand::Rng},
+        utils::{ExpectWith, queue::MessageReceiver, rand::Rng},
     },
     std::{fs::File, io::Write, path::Path},
 };
@@ -47,7 +47,7 @@ for VoidTrader<TraderID>
 {
     fn process_broker_reply<KM: Ord>(
         &mut self,
-        _: MessagePusher<KM>,
+        _: MessageReceiver<KM>,
         _: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KM,
         _: BrokerReply<Symbol, Settlement>,
         _: BrokerID,
@@ -57,7 +57,7 @@ for VoidTrader<TraderID>
 
     fn wakeup<KM: Ord>(
         &mut self,
-        _: MessagePusher<KM>,
+        _: MessageReceiver<KM>,
         _: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KM,
     ) {}
 
@@ -109,7 +109,7 @@ for SpreadWriter<TraderID>
 {
     fn process_broker_reply<KM: Ord>(
         &mut self,
-        _: MessagePusher<KM>,
+        _: MessageReceiver<KM>,
         _: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KM,
         reply: BrokerReply<Symbol, Settlement>,
         _: BrokerID,
@@ -144,7 +144,7 @@ for SpreadWriter<TraderID>
 
     fn wakeup<KM: Ord>(
         &mut self,
-        _: MessagePusher<KM>,
+        _: MessageReceiver<KM>,
         _: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KM,
     ) {
         unreachable!("Trader {} did not schedule any wakeups", self.get_name())

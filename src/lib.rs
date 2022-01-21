@@ -12,7 +12,9 @@ pub mod types;
 pub mod utils;
 
 pub mod prelude {
+    pub use derive_macros;
     pub use crate::{
+        enum_def,
         broker::{
             Broker,
             BrokerAction,
@@ -60,14 +62,13 @@ pub mod prelude {
         utils::{
             constants,
             derive_more,
-            enum_dispatch,
             ExpectWith,
             input::{
                 config::{from_structs::*, from_yaml::parse_yaml},
                 one_tick::OneTickTradedPairReader,
             },
             parse_datetime,
-            queue::{LessElementBinaryHeap, MessagePusher},
+            queue::{LessElementBinaryHeap, MessageReceiver},
             rand,
         },
     };
@@ -76,35 +77,15 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{
-            broker::concrete::BasicBroker,
-            kernel::KernelBuilder,
-            parallel::{ParallelBacktester, ThreadConfig},
-            replay::concrete::GetNextObSnapshotDelay,
-            settlement::{concrete::SpotSettlement, GetSettlementLag},
-            traded_pair::{
-                Asset,
-                Base,
-                parser::concrete::SpotBaseTradedPairParser,
-                TradedPair,
-            },
-            trader::{concrete::SpreadWriter, subscriptions::{SubscriptionConfig, SubscriptionList}},
-            types::{DateTime, Identifier, PriceStep},
-            utils::{
-                input::config::{
-                    from_structs::{
-                        BuildExchange,
-                        BuildReplay,
-                        InitBasicBroker,
-                        InitBasicExchange,
-                        SpreadWriterConfig,
-                    },
-                    from_yaml::parse_yaml,
-                },
-                rand::{Rng, rngs::StdRng},
-            },
-        },
         std::{num::NonZeroU64, path::Path, str::FromStr},
+        crate::prelude::*,
+        rand::{Rng, rngs::StdRng},
+        replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
+        settlement_examples::SpotSettlement,
+        broker_examples::BasicBroker,
+        traded_pair_parser_examples::SpotBaseTradedPairParser,
+        trader_examples::SpreadWriter,
+        exchange_reply::ExchangeToReplay,
     };
 
     #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
@@ -304,5 +285,26 @@ mod tests {
             .with_rng::<StdRng>()
             .with_num_threads(2)
             .run_simulation()
+    }
+
+    #[allow(dead_code)]
+    mod test_enum_def {
+        use super::*;
+
+        enum_def! {
+            #[derive(derive_macros::Replay)]
+            #[replay(ExchangeID, Symbol, Settlement)]
+            ReplayEnum<
+                ExchangeID: Identifier,
+                Symbol: Identifier,
+                Settlement: GetSettlementLag,
+                ObSnapshotDelay: Sized + Copy
+            > where
+                ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+                ObSnapshotDelay: Clone
+            {
+                OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+            }
+        }
     }
 }

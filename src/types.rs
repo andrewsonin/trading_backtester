@@ -15,7 +15,6 @@ use {
         utils::{
             derive_more,
             derive_more::{Add, AddAssign, From, FromStr, Into, Sub, SubAssign, Sum},
-            ExpectWith,
         },
     },
     std::{
@@ -73,8 +72,8 @@ impl Price
 {
     pub fn from_decimal_str(string: &str, price_step: PriceStep) -> Self
     {
-        let parsed_f64 = f64::from_str(string).expect_with(
-            || panic!("Cannot parse to f64: {string}")
+        let parsed_f64 = f64::from_str(string).unwrap_or_else(
+            |err| panic!("Cannot parse to f64: {string}. Error: {err}")
         );
         Self::from_f64(parsed_f64, price_step)
     }

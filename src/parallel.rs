@@ -7,7 +7,6 @@ use {
         trader::{TraderToBroker, TraderToItself},
         types::{DateTime, Id},
         utils::{
-            ExpectWith,
             input::config::from_structs::{BuildBroker, BuildExchange, BuildReplay, BuildTrader},
             rand::{Rng, rngs::StdRng, SeedableRng},
         },
@@ -339,10 +338,11 @@ ParallelBacktester<
             ThreadPoolBuilder::new()
                 .num_threads(num_threads)
                 .build()
-                .expect_with(
-                    || panic!(
+                .unwrap_or_else(
+                    |err| panic!(
                         "Cannot build ThreadPool \
-                        with the following number of threads to use: {num_threads}"
+                        with the following number of threads to use: {num_threads}. \
+                        Error: {err}"
                     )
                 )
                 .install(job)

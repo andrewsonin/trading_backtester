@@ -51,7 +51,7 @@ use {
             Size,
             TimeSync,
         },
-        utils::{ExpectWith, queue::MessageReceiver, rand::Rng},
+        utils::{queue::MessageReceiver, rand::Rng},
     },
     std::{
         collections::{hash_map::Entry::*, HashMap},
@@ -479,7 +479,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 |internal_order_id| {
                     let (order_id, from) = self.internal_to_submitted
                         .get(&internal_order_id)
-                        .expect_with(
+                        .unwrap_or_else(
                             || unreachable!(
                                 "Cannot find limit order with internal ID: {internal_order_id}"
                             )

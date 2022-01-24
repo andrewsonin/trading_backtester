@@ -14,7 +14,7 @@ use {
             TraderToItself,
         },
         types::{Date, DateTime, Id, Named, Nothing, ObState, PriceStep, Size, TimeSync},
-        utils::{ExpectWith, queue::MessageReceiver, rand::Rng},
+        utils::{queue::MessageReceiver, rand::Rng},
     },
     std::{fs::File, io::Write, path::Path},
 };
@@ -87,9 +87,11 @@ impl<TraderID: Id> SpreadWriter<TraderID>
 {
     pub fn new(name: TraderID, price_step: impl Into<PriceStep>, file: impl AsRef<Path>) -> Self {
         let file = file.as_ref();
-        let file = File::create(file).expect_with(|| panic!("Cannot create file {file:?}"));
+        let file = File::create(file).unwrap_or_else(
+            |err| panic!("Cannot create file {file:?}. Error: {err}")
+        );
         writeln!(&file, "Timestamp,BID_PRICE,BID_SIZE,ASK_PRICE,ASK_SIZE")
-            .expect_with(|| panic!("Cannot write to file {file:?}"));
+            .unwrap_or_else(|err| panic!("Cannot write to file {file:?}. Error: {err}"));
         SpreadWriter {
             name,
             current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
@@ -175,7 +177,9 @@ for SpreadWriter<TraderID>
                     "{},{bid_price:.4},{bid_size},{ask_price:.4},{ask_size}",
                     reply.event_dt
                 )
-                    .expect_with(|| panic!("Cannot write to file {:?}", self.file))
+                    .unwrap_or_else(
+                        |err| panic!("Cannot write to file {:?}. Error: {err}", self.file)
+                    )
             }
         }
     }

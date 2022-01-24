@@ -72,7 +72,6 @@ pub mod prelude {
             constants,
             derive_macros,
             derive_more,
-            ExpectWith,
             input::{
                 config::{from_structs::*, from_yaml::parse_yaml},
                 one_tick::OneTickTradedPairReader,

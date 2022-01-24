@@ -9,7 +9,6 @@ use {
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{DateTime, Direction, Id, Nothing, OrderID, Price, PriceStep, Size},
-        utils::ExpectWith,
     },
     csv::{Reader, ReaderBuilder, StringRecord},
     std::{
@@ -101,8 +100,8 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
             active_limit_orders: Default::default(),
             traded_pair,
             err_log_file: if let Some(err_log_file) = err_log_file {
-                let file = File::create(&err_log_file).expect_with(
-                    || panic!("Cannot create file {err_log_file:?}")
+                let file = File::create(&err_log_file).unwrap_or_else(
+                    |err| panic!("Cannot create file {err_log_file:?}. Error: {err}")
                 );
                 Some(file)
             } else {
@@ -224,7 +223,7 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
                 "{} :: Cannot cancel limit order with ID {} since it has not been submitted",
                 prl.datetime,
                 prl.order_id
-            ).expect_with(|| panic!("Cannot write to file {err_log_file:?}"))
+            ).unwrap_or_else(|err| panic!("Cannot write to file {err_log_file:?}. Error: {err}"))
         }
         None
     }
@@ -247,7 +246,9 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
                         trd.datetime,
                         trd.order_id,
                         trd.size
-                    ).expect_with(|| panic!("Cannot write to file {err_log_file:?}"))
+                    ).unwrap_or_else(
+                        |err| panic!("Cannot write to file {err_log_file:?}. Error: {err}")
+                    )
                 }
                 trd.size = *size;
                 *size = Size(0)
@@ -281,7 +282,7 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
                 trd.datetime,
                 trd.order_id,
                 trd.size
-            ).expect_with(|| panic!("Cannot write to file {err_log_file:?}"))
+            ).unwrap_or_else(|err| panic!("Cannot write to file {err_log_file:?}. Error: {err}"))
         }
         None
     }
@@ -307,10 +308,10 @@ impl OneTickHistoryReader
         let files_to_parse = files_to_parse.as_ref();
         let files = {
             let files_to_parse = Path::new(files_to_parse);
-            let file = File::open(files_to_parse).expect_with(
-                || panic!("Cannot read the following file: {files_to_parse:?}")
+            let file = File::open(files_to_parse).unwrap_or_else(
+                |err| panic!("Cannot read the following file: {files_to_parse:?}. Error: {err}")
             );
-            let files_to_parse_dir = files_to_parse.parent().expect_with(
+            let files_to_parse_dir = files_to_parse.parent().unwrap_or_else(
                 || panic!("Cannot get parent directory of the {files_to_parse:?}")
             );
             BufReader::new(&file)
@@ -354,7 +355,9 @@ impl OneTickHistoryReader
         let mut cur_file_reader = ReaderBuilder::new()
             .delimiter(self.args.csv_sep as u8)
             .from_path(&file_to_read)
-            .expect_with(|| panic!("Cannot read the following file: {file_to_read:?}"));
+            .unwrap_or_else(
+                |err| panic!("Cannot read the following file: {file_to_read:?}. Error: {err}")
+            );
         let col_idx_info = OneTickHistoryEntryColumnIndexer::new(
             &mut cur_file_reader,
             &file_to_read,
@@ -365,8 +368,11 @@ impl OneTickHistoryReader
         let datetime_format = &self.args.datetime_format;
 
         let process_next_entry = |(record, row_n): (Result<StringRecord, csv::Error>, _)| {
-            let record = record.expect_with(
-                || panic!("Cannot parse {row_n}-th CSV-record for the file: {file_to_read:?}")
+            let record = record.unwrap_or_else(
+                |err| panic!(
+                    "Cannot parse {row_n}-th CSV-record for the file: {file_to_read:?}. \
+                    Error: {err}"
+                )
             );
             let datetime = &record[col_idx_info.datetime_idx];
             let order_id = &record[col_idx_info.order_id_idx];
@@ -375,14 +381,14 @@ impl OneTickHistoryReader
             let bs_flag = &record[col_idx_info.buy_sell_flag_idx];
 
             HistoryEntry {
-                datetime: DateTime::parse_from_str(datetime, datetime_format).expect_with(
-                    || panic!(
+                datetime: DateTime::parse_from_str(datetime, datetime_format).unwrap_or_else(
+                    |err| panic!(
                         "Cannot parse to NaiveDateTime: {datetime}. \
-                        Datetime format used: {datetime_format}"
+                        Datetime format used: {datetime_format}. Error: {err}"
                     )
                 ),
-                size: Size::from_str(size).expect_with(
-                    || panic!("Cannot parse to Size (i64): {size}")
+                size: Size::from_str(size).unwrap_or_else(
+                    |err| panic!("Cannot parse to Size (i64): {size}. Error: {err}")
                 ),
                 direction: match bs_flag {
                     "0" | "B" | "b" | "False" | "false" => Direction::Buy,
@@ -390,8 +396,8 @@ impl OneTickHistoryReader
                     _ => panic!("Cannot parse buy-sell flag: {bs_flag}")
                 },
                 price: Price::from_decimal_str(price, price_step),
-                order_id: OrderID::from_str(order_id).expect_with(
-                    || panic!("Cannot parse to OrderID (u64): {order_id}")
+                order_id: OrderID::from_str(order_id).unwrap_or_else(
+                    |err| panic!("Cannot parse to OrderID (u64): {order_id}. Error: {err}")
                 ),
             }
         };
@@ -424,7 +430,11 @@ impl OneTickHistoryEntryColumnIndexer
 
         for (i, header) in csv_reader
             .headers()
-            .expect_with(|| panic!("Cannot parse header of the CSV-file: {path_for_debug:?}"))
+            .unwrap_or_else(
+                |err| panic!(
+                    "Cannot parse header of the CSV-file: {path_for_debug:?}. Error: {err}"
+                )
+            )
             .into_iter()
             .enumerate()
         {
@@ -460,19 +470,19 @@ impl OneTickHistoryEntryColumnIndexer
                 }
             }
         };
-        let price_idx = price_idx.expect_with(
+        let price_idx = price_idx.unwrap_or_else(
             || panic!("Cannot find {price_colname} column in the CSV-file: {path_for_debug:?}")
         );
-        let size_idx = size_idx.expect_with(
+        let size_idx = size_idx.unwrap_or_else(
             || panic!("Cannot find {size_colname} column in the CSV-file: {path_for_debug:?}")
         );
-        let datetime_idx = datetime_idx.expect_with(
+        let datetime_idx = datetime_idx.unwrap_or_else(
             || panic!("Cannot find {datetime_colname} column in the CSV-file: {path_for_debug:?}")
         );
-        let buy_sell_flag_idx = buy_sell_flag_idx.expect_with(
+        let buy_sell_flag_idx = buy_sell_flag_idx.unwrap_or_else(
             || panic!("Cannot find {bs_flag_colname} column in the CSV-file: {path_for_debug:?}")
         );
-        let order_id_idx = order_id_idx.expect_with(
+        let order_id_idx = order_id_idx.unwrap_or_else(
             || panic!("Cannot find {order_id_colname} column in the CSV-file: {path_for_debug:?}")
         );
         Self {

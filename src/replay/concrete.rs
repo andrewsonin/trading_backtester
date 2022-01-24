@@ -23,7 +23,6 @@ use {
             TimeSync,
         },
         utils::{
-            ExpectWith,
             input::one_tick::OneTickTradedPairReader,
             queue::{LessElementBinaryHeap, MessageReceiver},
             rand::Rng,
@@ -191,7 +190,7 @@ OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             .enumerate()
             .map(
                 |(i, mut pair_reader)| {
-                    let first_event = pair_reader.next(&mut next_order_id).expect_with(
+                    let first_event = pair_reader.next(&mut next_order_id).unwrap_or_else(
                         || panic!("Traded pair reader {i} is empty")
                     );
                     (Reverse((first_event, i as i64)), pair_reader)
@@ -245,7 +244,7 @@ Iterator for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             if reader_idx != -1 {
                 if let Some(next_action) = self.traded_pair_readers
                     .get_mut(reader_idx as usize)
-                    .expect_with(|| unreachable!("Index is out of bounds"))
+                    .unwrap_or_else(|| unreachable!("Index is out of bounds"))
                     .next(&mut self.next_order_id)
                 {
                     self.action_queue.push((next_action, reader_idx))
@@ -358,7 +357,7 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                     .skip_while(|reader| reader.exchange_id != exchange_id
                         || reader.traded_pair != cannot_cancel.traded_pair)
                     .next()
-                    .expect_with(
+                    .unwrap_or_else(
                         || unreachable!(
                             "Cannot find corresponding traded pair reader for {cannot_cancel:?}"
                         )
@@ -381,7 +380,9 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                             cannot_cancel.order_id,
                             cannot_cancel.reason
                         )
-                    }.expect_with(|| panic!("Cannot write to file {err_log_file:?}"))
+                    }.unwrap_or_else(
+                        |err| panic!("Cannot write to file {err_log_file:?}. Error: {err}")
+                    )
                 }
             }
             BasicExchangeToReplayReply::OrderPlacementDiscarded(_) |

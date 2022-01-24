@@ -13,7 +13,6 @@ use {
             PriceStep,
         },
         utils::{
-            ExpectWith,
             input::{
                 config::{
                     from_structs::{OneTickReplayConfig, OneTickTradedPairReaderConfig},
@@ -37,7 +36,6 @@ use {
 mod yaml_utils
 {
     use {
-        crate::utils::ExpectWith,
         std::{path::Path, str::FromStr},
         yaml_rust::{Yaml, yaml::{Array, Hash}},
     };
@@ -134,7 +132,7 @@ mod yaml_utils
         path: &Path,
         get_current_section: impl Fn() -> String) -> &'a Yaml
     {
-        try_read_yaml_hashmap_field(map, field).expect_with(
+        try_read_yaml_hashmap_field(map, field).unwrap_or_else(
             || panic!(
                 "\"{}\" section of the {path:?} YAML file is not found", get_current_section()
             )
@@ -165,9 +163,9 @@ mod yaml_utils
     {
         match yml {
             Yaml::Real(real) => f64::from_str(real)
-                .expect_with(
-                    || panic!(
-                        "Section \"{}\". Cannot parse \"{real}\" to f64",
+                .unwrap_or_else(
+                    |err| panic!(
+                        "Section \"{}\". Cannot parse \"{real}\" to f64. Error: {err}",
                         get_current_section()
                     )
                 )
@@ -259,17 +257,17 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
 
     let path = path.as_ref();
     let yml = read_to_string(path)
-        .expect_with(|| panic!("Cannot read the following file: {path:?}"));
+        .unwrap_or_else(|err| panic!("Cannot read the following file: {path:?}. Error: {err}"));
     let yml = YamlLoader::load_from_str(&yml)
-        .expect_with(|| panic!("Bad YAML file: {path:?}"));
+        .unwrap_or_else(|err| panic!("Bad YAML file: {path:?}. Error: {err}"));
     let yml = &yml[0];
 
     let cwd = std::env::current_dir().expect("Cannot get current working directory");
-    let parent_dir = path.parent().expect_with(
+    let parent_dir = path.parent().unwrap_or_else(
         || panic!("Cannot get parent directory of the {path:?}")
     );
-    std::env::set_current_dir(parent_dir).expect_with(
-        || panic!("Cannot set current working directory to {parent_dir:?}")
+    std::env::set_current_dir(parent_dir).unwrap_or_else(
+        |err| panic!("Cannot set current working directory to {parent_dir:?}. Error: {err}")
     );
 
     const GET_CURRENT_SECTION: fn() -> String = || "~".into();
@@ -300,8 +298,8 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
         .into_iter()
         .unzip();
 
-    std::env::set_current_dir(&cwd).expect_with(
-        || panic!("Cannot set current working directory to {cwd:?}")
+    std::env::set_current_dir(&cwd).unwrap_or_else(
+        |err| panic!("Cannot set current working directory to {cwd:?}. Error: {err}")
     );
 
     (
@@ -402,7 +400,7 @@ fn parse_simulation_time_section(
     let field = DATETIME_FORMAT;
     let datetime_format = env
         .get(field)
-        .expect_with(|| unreachable!("Section \"{SECTION}\" should contain \"{field}\" value"));
+        .unwrap_or_else(|| unreachable!("Section \"{SECTION}\" should contain \"{field}\" value"));
 
     let get_current_section = || format!("{SECTION} :: {field}");
     let datetime_format = if let YamlValue::String(v) = datetime_format {
@@ -412,7 +410,7 @@ fn parse_simulation_time_section(
     };
 
     let field = START;
-    let start = env.get(field).expect_with(
+    let start = env.get(field).unwrap_or_else(
         || panic!("Section \"{SECTION}\" should contain \"{field}\" value")
     );
 
@@ -422,16 +420,16 @@ fn parse_simulation_time_section(
     } else {
         panic!("\"{}\" should be String. Got: {start:?}", get_current_section())
     };
-    let start = DateTime::parse_from_str(start, datetime_format).expect_with(
-        || panic!(
+    let start = DateTime::parse_from_str(start, datetime_format).unwrap_or_else(
+        |err| panic!(
             "Section \"{}\". Cannot parse to DateTime: \"{start}\". \
-            Datetime format used: \"{datetime_format}\"",
+            Datetime format used: \"{datetime_format}\". Error: {err}",
             get_current_section()
         )
     );
 
     let field = END;
-    let end = env.get(field).expect_with(
+    let end = env.get(field).unwrap_or_else(
         || panic!("Section \"{SECTION}\" should contain \"{field}\" value")
     );
 
@@ -441,10 +439,10 @@ fn parse_simulation_time_section(
     } else {
         panic!("\"{}\" should be String. Got: {end:?}", get_current_section())
     };
-    let end = DateTime::parse_from_str(end, datetime_format).expect_with(
-        || panic!(
+    let end = DateTime::parse_from_str(end, datetime_format).unwrap_or_else(
+        |err| panic!(
             "Section \"{}\". Cannot parse to DateTime: \"{start}\". \
-            Datetime format used: \"{datetime_format}\"",
+            Datetime format used: \"{datetime_format}\". Error: {err}",
             get_current_section()
         )
     );
@@ -485,8 +483,8 @@ fn parse_exchanges_section<'a, ExchangeID: Id + FromStr>(
             let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let name = read_yaml_hashmap_field(exchange, field, path, full_section_path);
             let name = expect_yaml_string(name, path, full_section_path);
-            let name = FromStr::from_str(name).expect_with(
-                || panic!(
+            let name = FromStr::from_str(name).unwrap_or_else(
+                |_| panic!(
                     "Section \"{}\". Cannot parse \"{name}\" to ExchangeID",
                     full_section_path()
                 )
@@ -524,7 +522,7 @@ fn parse_exchange_sessions<ExchangeID: Id>(
     let field = DATETIME_FORMAT;
     let datetime_format = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || unreachable!(
                 "Section \"{}\" should contain \"{}\" value", full_section_path(), field
             )
@@ -541,7 +539,7 @@ fn parse_exchange_sessions<ExchangeID: Id>(
     let field = CSV_SEP;
     let csv_sep = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || unreachable!(
                 "Section \"{}\" should contain \"{}\" value", full_section_path(), field
             )
@@ -551,10 +549,10 @@ fn parse_exchange_sessions<ExchangeID: Id>(
     let csv_sep = if let YamlValue::String(v) = csv_sep {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), csv_sep)
+        panic!("\"{}\" should be String. Got: {csv_sep:?}", get_current_section())
     };
     if csv_sep.len() != 1 {
-        panic!("\"{}\" should contain 1 character. Got {}", get_current_section(), csv_sep)
+        panic!("\"{}\" should contain 1 character. Got {csv_sep}", get_current_section())
     }
     let csv_sep = *csv_sep.as_bytes().first().unwrap();
 
@@ -562,7 +560,7 @@ fn parse_exchange_sessions<ExchangeID: Id>(
     let field = OPEN_COLNAME;
     let open_colname = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || panic!(
                 "Section \"{}\" should contain \"{field}\" value", full_section_path()
             )
@@ -579,7 +577,7 @@ fn parse_exchange_sessions<ExchangeID: Id>(
     let field = CLOSE_COLNAME;
     let close_colname = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || panic!(
                 "Section \"{}\" should contain \"{field}\" value", full_section_path()
             )
@@ -596,7 +594,7 @@ fn parse_exchange_sessions<ExchangeID: Id>(
     let field = PATH;
     let path = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || panic!(
                 "Section \"{}\" should contain \"{field}\" value", full_section_path()
             )
@@ -613,11 +611,11 @@ fn parse_exchange_sessions<ExchangeID: Id>(
     let mut csv_reader = ReaderBuilder::new()
         .delimiter(csv_sep)
         .from_path(path)
-        .expect_with(|| panic!("Cannot read the following file: {path}"));
+        .unwrap_or_else(|err| panic!("Cannot read the following file: {path}. Error: {err}"));
 
     let header = csv_reader
         .headers()
-        .expect_with(|| panic!("Cannot parse header of the CSV-file: {path}"));
+        .unwrap_or_else(|err| panic!("Cannot parse header of the CSV-file: {path}. Error: {err}"));
 
     let mut open_colname_idx = None;
     let mut close_colname_idx = None;
@@ -639,24 +637,24 @@ fn parse_exchange_sessions<ExchangeID: Id>(
             }
         }
     );
-    let open_colname_idx = open_colname_idx.expect_with(
+    let open_colname_idx = open_colname_idx.unwrap_or_else(
         || panic!("Cannot not find \"{open_colname}\" column in the CSV-file {path}")
     );
-    let close_colname_idx = close_colname_idx.expect_with(
+    let close_colname_idx = close_colname_idx.unwrap_or_else(
         || panic!("Cannot not find \"{close_colname}\" column in the CSV-file {path}")
     );
 
     let parse_record = |(record, i): (Result<StringRecord, _>, _)| {
-        let record = record.expect_with(
-            || panic!("Cannot parse {i} line of the CSV-file {path}")
+        let record = record.unwrap_or_else(
+            |err| panic!("Cannot parse {i} line of the CSV-file {path}. Error: {err}")
         );
-        let open_dt = record.get(open_colname_idx).expect_with(
+        let open_dt = record.get(open_colname_idx).unwrap_or_else(
             || panic!(
                 "{i} line of the CSV-file {path} does not have \
                 value at the {open_colname_idx} index",
             )
         );
-        let close_dt = record.get(close_colname_idx).expect_with(
+        let close_dt = record.get(close_colname_idx).unwrap_or_else(
             || panic!(
                 "{i} line of the CSV-file {path} does not have \
                 value at the {close_colname_idx} index",
@@ -665,16 +663,16 @@ fn parse_exchange_sessions<ExchangeID: Id>(
         if close_dt > open_dt {
             ExchangeSession {
                 exchange_id: name,
-                open_dt: DateTime::parse_from_str(open_dt, datetime_format).expect_with(
-                    || panic!(
+                open_dt: DateTime::parse_from_str(open_dt, datetime_format).unwrap_or_else(
+                    |err| panic!(
                         "{i} line of the CSV-file {path}. Cannot parse to DateTime: {open_dt}. \
-                        Datetime format used: {datetime_format}",
+                        Datetime format used: {datetime_format}. Error: {err}",
                     )
                 ),
-                close_dt: DateTime::parse_from_str(close_dt, datetime_format).expect_with(
-                    || panic!(
+                close_dt: DateTime::parse_from_str(close_dt, datetime_format).unwrap_or_else(
+                    |err| panic!(
                         "{i} line of the CSV-file {path}. Cannot parse to DateTime: {close_dt}. \
-                        Datetime format used: {datetime_format}"
+                        Datetime format used: {datetime_format}. Error: {err}"
                     )
                 ),
             }
@@ -686,7 +684,7 @@ fn parse_exchange_sessions<ExchangeID: Id>(
     };
     let mut record_iterator = csv_reader.records().zip(2..).map(parse_record);
 
-    let first_record = record_iterator.next().expect_with(
+    let first_record = record_iterator.next().unwrap_or_else(
         || panic!("CSV-file {path} does not have any entries")
     );
     let mut last_dt = first_record.close_dt;
@@ -755,9 +753,9 @@ fn parse_traded_pairs_section<
             let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let exchange = read_yaml_hashmap_field(map, field, path, full_section_path);
             let exchange = expect_yaml_string(exchange, path, full_section_path);
-            let exchange = FromStr::from_str(exchange).expect_with(
-                || panic!("Section \"{}\". Cannot parse \"{exchange}\" to ExchangeID",
-                          full_section_path())
+            let exchange = FromStr::from_str(exchange).unwrap_or_else(
+                |_| panic!("Section \"{}\". Cannot parse \"{exchange}\" to ExchangeID",
+                           full_section_path())
             );
 
             let field = KIND;
@@ -779,9 +777,9 @@ fn parse_traded_pairs_section<
             let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let price_step = read_yaml_hashmap_field(map, field, path, full_section_path);
             let price_step = expect_yaml_real(price_step, path, full_section_path);
-            let price_step: PriceStep = f64::from_str(price_step).expect_with(
-                || panic!("Section \"{}\". Cannot parse to f64: {}",
-                          full_section_path(), price_step)
+            let price_step: PriceStep = f64::from_str(price_step).unwrap_or_else(
+                |err| panic!("Section \"{}\". Cannot parse to f64: {}. Error: {err}",
+                             full_section_path(), price_step)
             ).into();
 
             let field = ERR_LOG_FILE;
@@ -792,7 +790,7 @@ fn parse_traded_pairs_section<
                 let err_log_file = Path::new(err_log_file);
                 let result = if err_log_file.is_relative() {
                     path.parent()
-                        .expect_with(
+                        .unwrap_or_else(
                             || unreachable!("Cannot get parent directory of the {path:?}")
                         )
                         .join(err_log_file)
@@ -855,7 +853,7 @@ fn parse_trade_start_stops<
     let field = DATETIME_FORMAT;
     let datetime_format = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || unreachable!(
                 "Section \"{}\" should contain \"{}\" value", full_section_path(), field
             )
@@ -872,7 +870,7 @@ fn parse_trade_start_stops<
     let field = CSV_SEP;
     let csv_sep = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || unreachable!(
                 "Section \"{}\" should contain \"{}\" value", full_section_path(), field
             )
@@ -893,7 +891,7 @@ fn parse_trade_start_stops<
     let field = START_COLNAME;
     let start_colname = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || panic!(
                 "Section \"{}\" should contain \"{field}\" value", full_section_path()
             )
@@ -903,48 +901,48 @@ fn parse_trade_start_stops<
     let start_colname = if let YamlValue::String(v) = start_colname {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), start_colname)
+        panic!("\"{}\" should be String. Got: {start_colname:?}", get_current_section())
     };
 
 
     let field = STOP_COLNAME;
     let stop_colname = env
         .get(field)
-        .expect_with(
-            || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
+        .unwrap_or_else(
+            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path())
         );
 
     let get_current_section = || format!("{} :: {field}", full_section_path());
     let stop_colname = if let YamlValue::String(v) = stop_colname {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), stop_colname)
+        panic!("\"{}\" should be String. Got: {stop_colname:?}", get_current_section())
     };
 
 
     let field = PATH;
     let path = env
         .get(field)
-        .expect_with(
-            || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
+        .unwrap_or_else(
+            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path())
         );
 
     let get_current_section = || format!("{} :: {field}", full_section_path());
     let path = if let YamlValue::String(v) = path {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), path)
+        panic!("\"{}\" should be String. Got: {path:?}", get_current_section())
     };
 
 
     let mut csv_reader = ReaderBuilder::new()
         .delimiter(csv_sep)
         .from_path(path)
-        .expect_with(|| panic!("Cannot read the following file: {}", path));
+        .unwrap_or_else(|err| panic!("Cannot read the following file: {path}. Error: {err}"));
 
     let header = csv_reader
         .headers()
-        .expect_with(|| panic!("Cannot parse header of the CSV-file: {}", path));
+        .unwrap_or_else(|err| panic!("Cannot parse header of the CSV-file: {path}. Error: {err}"));
 
     let mut start_colname_idx = None;
     let mut stop_colname_idx = None;
@@ -955,72 +953,66 @@ fn parse_trade_start_stops<
                 if start_colname_idx.is_none() {
                     start_colname_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the CSV-file {}", start_colname, path)
+                    panic!("Duplicate column {start_colname} in the CSV-file {path}")
                 }
             } else if col == stop_colname {
                 if stop_colname_idx.is_none() {
                     stop_colname_idx = Some(i)
                 } else {
-                    panic!("Duplicate column {} in the CSV-file {}", stop_colname, path)
+                    panic!("Duplicate column {stop_colname} in the CSV-file {path}")
                 }
             }
         }
     );
-    let start_colname_idx = start_colname_idx.expect_with(
-        || panic!("Cannot not find {} in the CSV-file {}", start_colname, path)
+    let start_colname_idx = start_colname_idx.unwrap_or_else(
+        || panic!("Cannot not find {start_colname} in the CSV-file {path}")
     );
-    let stop_colname_idx = stop_colname_idx.expect_with(
-        || panic!("Cannot not find {} in the CSV-file {}", stop_colname, path)
+    let stop_colname_idx = stop_colname_idx.unwrap_or_else(
+        || panic!("Cannot not find {stop_colname} in the CSV-file {path}")
     );
 
     let mut already_non_stoppable = false;
     let parse_record = |(record, i): (Result<StringRecord, _>, _)| {
         if already_non_stoppable {
             panic!(
-                "{} line of the CSV-file {}. Cannot have entries after entry without stop_dt",
-                i, path
+                "{i} line of the CSV-file {path}. Cannot have entries after entry without stop_dt"
             )
         }
-        let record = record.expect_with(
-            || panic!("Cannot parse {} line of the CSV-file {}", i, path)
+        let record = record.unwrap_or_else(
+            |err| panic!("Cannot parse {i} line of the CSV-file {path}. Error: {err}")
         );
-        let start_dt = record.get(start_colname_idx).expect_with(
+        let start_dt = record.get(start_colname_idx).unwrap_or_else(
             || panic!(
-                "{} line of the CSV-file {} does not have value at the {} index",
-                i, path, start_colname_idx
+                "{i} line of the CSV-file {path} does not have value \
+                at the {start_colname_idx} index",
             )
         );
-        let start_dt = DateTime::parse_from_str(start_dt, datetime_format).expect_with(
-            || panic!(
-                "{} line of the CSV-file {}. \
-                Cannot parse to DateTime: {}. Datetime format used: {}",
-                i, path,
-                start_dt,
-                datetime_format
+        let start_dt = DateTime::parse_from_str(start_dt, datetime_format).unwrap_or_else(
+            |err| panic!(
+                "{i} line of the CSV-file {path}. \
+                Cannot parse to DateTime: {start_dt}. \
+                Datetime format used: {datetime_format}. Error: {err}"
             )
         );
-        let stop_dt = record.get(stop_colname_idx).expect_with(
+        let stop_dt = record.get(stop_colname_idx).unwrap_or_else(
             || panic!(
-                "{} line of the CSV-file {} does not have value at the {} index",
-                i, path, stop_colname_idx
+                "{i} line of the CSV-file {path} does not have value \
+                at the {stop_colname_idx} index",
             )
         );
         let stop_dt = if !stop_dt.is_empty() {
-            let stop_dt = DateTime::parse_from_str(stop_dt, datetime_format).expect_with(
-                || panic!(
-                    "{} line of the CSV-file {}. \
-                    Cannot parse to DateTime: {}. Datetime format used: {}",
-                    i, path,
-                    stop_dt,
-                    datetime_format
+            let stop_dt = DateTime::parse_from_str(stop_dt, datetime_format).unwrap_or_else(
+                |err| panic!(
+                    "{i} line of the CSV-file {path}. \
+                    Cannot parse to DateTime: {stop_dt}. \
+                    Datetime format used: {datetime_format}. Error: {err}",
                 )
             );
             if stop_dt > start_dt {
                 Some(stop_dt)
             } else {
                 panic!(
-                    "{} line of the CSV-file {}. stop_dt should be greater than start_dt",
-                    i, path
+                    "{i} line of the CSV-file {path}. stop_dt should be greater than start_dt",
                 )
             }
         } else {
@@ -1038,7 +1030,7 @@ fn parse_trade_start_stops<
     let mut records_iterator = csv_reader.records().zip(2..).map(parse_record);
     let first_lifetime = records_iterator
         .next()
-        .expect_with(|| panic!("CSV-file {} does not have any entries", path));
+        .unwrap_or_else(|| panic!("CSV-file {path} does not have any entries"));
     let mut last_dt = if let Some(stop_dt) = first_lifetime.stop_dt {
         stop_dt
     } else {
@@ -1052,10 +1044,9 @@ fn parse_trade_start_stops<
                 }
             } else {
                 panic!(
-                    "All entries in the CSV-file {} should be sorted \
+                    "All entries in the CSV-file {path} should be sorted \
                     in ascending order by time. \
-                    I.e. each start_dt should be greater than the previous stop_dt",
-                    path
+                    I.e. each start_dt should be greater than the previous stop_dt"
                 )
             }
         )
@@ -1140,7 +1131,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     let field = DATETIME_FORMAT;
     let datetime_format = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || unreachable!(
                 "Section \"{}\" should contain \"{}\" value", full_section_path(), field
             )
@@ -1150,14 +1141,14 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     let datetime_format = if let YamlValue::String(v) = datetime_format {
         v.to_string()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), datetime_format)
+        panic!("\"{}\" should be String. Got: {datetime_format:?}", get_current_section())
     };
 
 
     let field = CSV_SEP;
     let csv_sep = env
         .get(field)
-        .expect_with(
+        .unwrap_or_else(
             || unreachable!(
                 "Section \"{}\" should contain \"{}\" value", full_section_path(), field
             )
@@ -1167,10 +1158,10 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     let csv_sep = if let YamlValue::String(v) = csv_sep {
         v.as_str()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), csv_sep)
+        panic!("\"{}\" should be String. Got: {csv_sep:?}", get_current_section())
     };
     if csv_sep.len() != 1 {
-        panic!("\"{}\" should contain 1 character. Got {}", get_current_section(), csv_sep)
+        panic!("\"{}\" should contain 1 character. Got {csv_sep}", get_current_section())
     }
     let csv_sep = *csv_sep.as_bytes().first().unwrap() as char;
 
@@ -1178,91 +1169,93 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     let field = DATETIME_COLNAME;
     let datetime_colname = env
         .get(field)
-        .expect_with(
-            || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
+        .unwrap_or_else(
+            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path())
         );
 
     let get_current_section = || format!("{} :: {field}", full_section_path());
     let datetime_colname = if let YamlValue::String(v) = datetime_colname {
         v.to_string()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), datetime_colname)
+        panic!("\"{}\" should be String. Got: {datetime_colname:?}", get_current_section())
     };
 
 
     let field = order_id_colname;
     let order_id_colname = env.get(field)
-        .expect_with(
-            || panic!("Section \"{}\" should contain \"{}\" value", get_current_section(), field)
+        .unwrap_or_else(
+            || panic!("Section \"{}\" should contain \"{field}\" value", get_current_section())
         );
     let order_id_colname = if let YamlValue::String(v) = order_id_colname {
         v.to_string()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", field, order_id_colname)
+        panic!("\"{field}\" should be String. Got: {order_id_colname:?}")
     };
 
 
     let field = PRICE_COLNAME;
     let price_colname = env
         .get(field)
-        .expect_with(
-            || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
+        .unwrap_or_else(
+            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path())
         );
 
     let get_current_section = || format!("{} :: {field}", full_section_path());
     let price_colname = if let YamlValue::String(v) = price_colname {
         v.to_string()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), price_colname)
+        panic!("\"{}\" should be String. Got: {price_colname:?}", get_current_section())
     };
 
 
     let field = SIZE_COLNAME;
     let size_colname = env
         .get(field)
-        .expect_with(
-            || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
+        .unwrap_or_else(
+            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path())
         );
 
     let get_current_section = || format!("{} :: {field}", full_section_path());
     let size_colname = if let YamlValue::String(v) = size_colname {
         v.to_string()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), size_colname)
+        panic!("\"{}\" should be String. Got: {size_colname:?}", get_current_section())
     };
 
 
     let field = BUY_SELL_FLAG_COLNAME;
     let buy_sell_flag_colname = env
         .get(field)
-        .expect_with(
-            || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
+        .unwrap_or_else(
+            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path(), )
         );
 
     let get_current_section = || format!("{} :: {field}", full_section_path());
     let buy_sell_flag_colname = if let YamlValue::String(v) = buy_sell_flag_colname {
         v.to_string()
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), buy_sell_flag_colname)
+        panic!("\"{}\" should be String. Got: {buy_sell_flag_colname:?}", get_current_section())
     };
 
 
     let field = PATH_LIST;
     let path_list = env
         .get(field)
-        .expect_with(
-            || panic!("Section \"{}\" should contain \"{}\" value", full_section_path(), field)
+        .unwrap_or_else(
+            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path())
         );
 
     let get_current_section = || format!("{} :: {field}", full_section_path());
     let path_list = if let YamlValue::String(v) = path_list {
         Path::new(v)
     } else {
-        panic!("\"{}\" should be String. Got: {:?}", get_current_section(), path_list)
+        panic!("\"{}\" should be String. Got: {path_list:?}", get_current_section())
     };
     let path_list = if path_list.is_relative() {
         path.parent()
-            .expect_with(|| unreachable!("Cannot get parent directory of the {path:?}"))
+            .unwrap_or_else(
+                || unreachable!("Cannot get parent directory of the {path:?}. Error: {err}")
+            )
             .join(path_list)
     } else {
         PathBuf::from(path_list)

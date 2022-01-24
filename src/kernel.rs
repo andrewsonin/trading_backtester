@@ -26,7 +26,6 @@ use {
         },
         types::{DateTime, Duration, Id},
         utils::{
-            ExpectWith,
             queue::{LessElementBinaryHeap, MessageReceiver},
             rand::{Rng, rngs::StdRng, SeedableRng},
         },
@@ -501,7 +500,7 @@ Kernel<
     fn handle_replay_to_exchange(&mut self, request: R2E)
     {
         let exchange_id = request.get_exchange_id();
-        let exchange = self.exchanges.get_mut(&exchange_id).expect_with(
+        let exchange = self.exchanges.get_mut(&exchange_id).unwrap_or_else(
             || panic!("Kernel does not know such an Exchange: {exchange_id}")
         );
         *exchange.current_datetime_mut() = self.current_dt;
@@ -523,7 +522,7 @@ Kernel<
 
     fn handle_exchange_wakeup(&mut self, exchange_id: ExchangeID, scheduled_action: E2E)
     {
-        let exchange = self.exchanges.get_mut(&exchange_id).expect_with(
+        let exchange = self.exchanges.get_mut(&exchange_id).unwrap_or_else(
             || panic!("Kernel does not know such an Exchange: {exchange_id}")
         );
         *exchange.current_datetime_mut() = self.current_dt;
@@ -559,7 +558,7 @@ Kernel<
     fn handle_exchange_to_broker(&mut self, exchange_id: ExchangeID, reply: E2B)
     {
         let broker_id = reply.get_broker_id();
-        let broker = self.brokers.get_mut(&broker_id).expect_with(
+        let broker = self.brokers.get_mut(&broker_id).unwrap_or_else(
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
@@ -583,7 +582,7 @@ Kernel<
 
     fn handle_broker_wakeup(&mut self, broker_id: BrokerID, scheduled_action: B2B)
     {
-        let broker = self.brokers.get_mut(&broker_id).expect_with(
+        let broker = self.brokers.get_mut(&broker_id).unwrap_or_else(
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
@@ -607,7 +606,7 @@ Kernel<
     fn handle_broker_to_exchange(&mut self, broker_id: BrokerID, request: B2E)
     {
         let exchange_id = request.get_exchange_id();
-        let exchange = self.exchanges.get_mut(&exchange_id).expect_with(
+        let exchange = self.exchanges.get_mut(&exchange_id).unwrap_or_else(
             || panic!("Kernel does not know such an Exchange: {exchange_id}")
         );
         *exchange.current_datetime_mut() = self.current_dt;
@@ -631,7 +630,7 @@ Kernel<
     fn handle_broker_to_trader(&mut self, broker_id: BrokerID, reply: B2T)
     {
         let trader_id = reply.get_trader_id();
-        let trader = self.traders.get_mut(&trader_id).expect_with(
+        let trader = self.traders.get_mut(&trader_id).unwrap_or_else(
             || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
@@ -654,7 +653,7 @@ Kernel<
 
     fn handle_trader_wakeup(&mut self, trader_id: TraderID, scheduled_action: T2T)
     {
-        let trader = self.traders.get_mut(&trader_id).expect_with(
+        let trader = self.traders.get_mut(&trader_id).unwrap_or_else(
             || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
@@ -677,7 +676,7 @@ Kernel<
     fn handle_trader_to_broker(&mut self, trader_id: TraderID, request: T2B)
     {
         let broker_id = request.get_broker_id();
-        let broker = self.brokers.get_mut(&broker_id).expect_with(
+        let broker = self.brokers.get_mut(&broker_id).unwrap_or_else(
             || panic!("Kernel does not know such an Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
@@ -737,7 +736,7 @@ Kernel<
         {
             ExchangeActionKind::ExchangeToBroker(reply) => {
                 let broker_id = reply.get_broker_id();
-                let broker = brokers.get_mut(&broker_id).expect_with(
+                let broker = brokers.get_mut(&broker_id).unwrap_or_else(
                     || panic!("Kernel does not know such a Broker: {broker_id}")
                 );
                 *broker.current_datetime_mut() = current_dt;
@@ -777,7 +776,7 @@ Kernel<
         {
             BrokerActionKind::BrokerToTrader(reply) => {
                 let trader_id = reply.get_trader_id();
-                let trader = traders.get_mut(&trader_id).expect_with(
+                let trader = traders.get_mut(&trader_id).unwrap_or_else(
                     || panic!("Kernel does not know such a Trader: {trader_id}")
                 );
                 *trader.current_datetime_mut() = current_dt;

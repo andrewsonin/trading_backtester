@@ -1,7 +1,7 @@
-pub use crate::{
+use crate::{
     settlement::GetSettlementLag,
     types::{DateTime, Identifier, Named, Price},
-    utils::enum_dispatch,
+    enum_def,
 };
 
 pub mod parser;
@@ -13,12 +13,13 @@ pub struct TradedPair<Name: Identifier, Settlement: GetSettlementLag> {
     pub settlement: Settlement,
 }
 
-#[enum_dispatch(Named<Name>)]
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub enum Asset<Name: Identifier> {
-    Base(Base<Name>),
-    Futures(Futures<Name>),
-    OptionContract(OptionContract<Name>),
+enum_def! {
+    #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
+    pub Asset<Name: Identifier> {
+        Base<Name>,
+        Futures<Name>,
+        OptionContract<Name>
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]

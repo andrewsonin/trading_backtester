@@ -3,12 +3,10 @@ use {
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::Identifier,
-        utils::enum_dispatch,
     },
     std::str::FromStr,
 };
 
-#[enum_dispatch]
 pub trait TradedPairParser<
     Symbol: Identifier + FromStr,
     Settlement: GetSettlementLag

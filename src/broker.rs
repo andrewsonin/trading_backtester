@@ -4,7 +4,7 @@ use crate::{
     settlement::GetSettlementLag,
     trader::{request::TraderRequest, subscriptions::SubscriptionConfig},
     types::{DateTime, Identifier, Named, TimeSync},
-    utils::{enum_dispatch, queue::MessagePusher, rand::Rng},
+    utils::{queue::MessageReceiver, rand::Rng},
 };
 
 pub mod reply;
@@ -32,7 +32,6 @@ pub enum BrokerActionKind<
     WakeUp,
 }
 
-#[enum_dispatch]
 pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>: TimeSync + Named<BrokerID>
     where BrokerID: Identifier,
           TraderID: Identifier,
@@ -42,7 +41,7 @@ pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>: TimeSync +
 {
     fn process_trader_request<KernelMessage: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KernelMessage>,
+        message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         request: TraderRequest<ExchangeID, Symbol, Settlement>,
         trader_id: TraderID,
@@ -50,7 +49,7 @@ pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>: TimeSync +
 
     fn process_exchange_reply<KernelMessage: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KernelMessage>,
+        message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         reply: ExchangeToBrokerReply<Symbol, Settlement>,
         exchange_id: ExchangeID,
@@ -59,7 +58,7 @@ pub trait Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>: TimeSync +
 
     fn wakeup<KernelMessage: Ord>(
         &mut self,
-        message_pusher: MessagePusher<KernelMessage>,
+        message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
     );
 

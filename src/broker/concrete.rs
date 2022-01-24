@@ -32,7 +32,7 @@ use {
             subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
         },
         types::{Date, DateTime, Identifier, Named, OrderID, TimeSync},
-        utils::{queue::MessagePusher, rand::Rng},
+        utils::{queue::MessageReceiver, rand::Rng},
     },
     std::collections::{HashMap, HashSet},
 };
@@ -110,7 +110,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
     fn process_trader_request<KernelMessage: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KernelMessage>,
+        mut message_receiver: MessageReceiver<KernelMessage>,
         mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         request: TraderRequest<ExchangeID, Symbol, Settlement>,
         trader_id: TraderID,
@@ -218,12 +218,12 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 }
             }
         };
-        message_pusher.push(process_action(action, &self))
+        message_receiver.push(process_action(action, &self))
     }
 
     fn process_exchange_reply<KernelMessage: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KernelMessage>,
+        mut message_receiver: MessageReceiver<KernelMessage>,
         mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         reply: ExchangeToBrokerReply<Symbol, Settlement>,
         exchange_id: ExchangeID,
@@ -404,7 +404,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
             }
             ExchangeToBrokerReply::ExchangeEventNotification(notification) => {
                 self.handle_exchange_notification(
-                    message_pusher,
+                    message_receiver,
                     process_action,
                     notification,
                     exchange_id,
@@ -413,12 +413,12 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 return;
             }
         };
-        message_pusher.push(process_action(message, &self))
+        message_receiver.push(process_action(message, &self))
     }
 
     fn wakeup<KernelMessage: Ord>(
         &mut self,
-        _: MessagePusher<KernelMessage>,
+        _: MessageReceiver<KernelMessage>,
         _: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
     ) {
         unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
@@ -483,7 +483,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 
     fn handle_exchange_notification<KernelMessage: Ord>(
         &mut self,
-        mut message_pusher: MessagePusher<KernelMessage>,
+        mut message_receiver: MessageReceiver<KernelMessage>,
         mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
         notification: ExchangeEventNotification<Symbol, Settlement>,
         exchange_id: ExchangeID,
@@ -502,7 +502,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         ),
                     )
                 );
-                message_pusher.extend(action_iterator.map(process_action))
+                message_receiver.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::TradesStarted(traded_pair, price_step) => {
                 let action_iterator = self.trader_configs.keys().map(
@@ -515,7 +515,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         ),
                     )
                 );
-                message_pusher.extend(action_iterator.map(process_action))
+                message_receiver.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::OrderCancelled(cancelled) => {
                 let action_iterator = self.trader_configs.iter().filter_map(
@@ -536,7 +536,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         None
                     }
                 );
-                message_pusher.extend(action_iterator.map(process_action))
+                message_receiver.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::OrderPlaced(placed) => {
                 let action_iterator = self.trader_configs.iter().filter_map(
@@ -557,7 +557,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         None
                     }
                 );
-                message_pusher.extend(action_iterator.map(process_action))
+                message_receiver.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::TradeExecuted(trade) => {
                 let action_iterator = self.trader_configs.iter().filter_map(
@@ -578,7 +578,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         None
                     }
                 );
-                message_pusher.extend(action_iterator.map(process_action))
+                message_receiver.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::ObSnapshot(ob_snapshot) => {
                 let action_iterator = self.trader_configs.iter().filter_map(
@@ -599,7 +599,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         None
                     }
                 );
-                message_pusher.extend(action_iterator.map(process_action))
+                message_receiver.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::TradesStopped(traded_pair) => {
                 let action_iterator = self.trader_configs.keys().map(
@@ -612,7 +612,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         ),
                     )
                 );
-                message_pusher.extend(action_iterator.map(process_action))
+                message_receiver.extend(action_iterator.map(process_action))
             }
             ExchangeEventNotification::ExchangeClosed => {
                 let action_iterator = self.trader_configs.keys().map(
@@ -625,7 +625,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         ),
                     )
                 );
-                message_pusher.extend(action_iterator.map(process_action))
+                message_receiver.extend(action_iterator.map(process_action))
             }
         }
     }

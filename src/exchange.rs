@@ -1,52 +1,75 @@
 use crate::{
-    broker::request::BrokerRequest,
-    exchange::reply::{ExchangeToBroker, ExchangeToReplay},
-    replay::request::ReplayRequest,
-    settlement::GetSettlementLag,
-    types::{Identifier, Named, TimeSync},
-    utils::queue::MessageReceiver,
+    broker::BrokerToExchange,
+    replay::ReplayToExchange,
+    types::{Id, Named, TimeSync},
+    utils::{queue::MessageReceiver, rand::Rng},
 };
 
 pub mod reply;
 pub mod concrete;
 
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub struct ExchangeAction<
-    BrokerID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker,
+    E2E: ExchangeToItself
 > {
     pub delay: u64,
-    pub content: ExchangeActionKind<BrokerID, Symbol, Settlement>,
+    pub content: ExchangeActionKind<E2R, E2B, E2E>,
 }
 
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub enum ExchangeActionKind<
-    BrokerID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker,
+    E2E: ExchangeToItself
 > {
-    ExchangeToBroker(ExchangeToBroker<BrokerID, Symbol, Settlement>),
-    ExchangeToReplay(ExchangeToReplay<Symbol, Settlement>),
+    ExchangeToItself(E2E),
+    ExchangeToReplay(E2R),
+    ExchangeToBroker(E2B),
 }
 
-pub trait Exchange<ExchangeID, BrokerID, Symbol, Settlement>: TimeSync + Named<ExchangeID>
-    where ExchangeID: Identifier,
-          BrokerID: Identifier,
-          Symbol: Identifier,
-          Settlement: GetSettlementLag
+pub trait ExchangeToItself: Ord {}
+
+pub trait ExchangeToReplay: Ord {}
+
+pub trait ExchangeToBroker: Ord {
+    type BrokerID: Id;
+    fn get_broker_id(&self) -> Self::BrokerID;
+}
+
+pub trait Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>: TimeSync + Named<ExchangeID>
+    where ExchangeID: Id,
+          BrokerID: Id,
+          R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+          E2R: ExchangeToReplay,
+          E2B: ExchangeToBroker<BrokerID=BrokerID>,
+          E2E: ExchangeToItself,
 {
-    fn process_broker_request<KernelMessage: Ord>(
+    fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        message_receiver: MessageReceiver<KernelMessage>,
-        process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KernelMessage,
-        request: BrokerRequest<Symbol, Settlement>,
-        broker_id: BrokerID,
+        message_receiver: MessageReceiver<KerMsg>,
+        process_action: impl FnMut(ExchangeAction<E2R, E2B, E2E>, &mut RNG) -> KerMsg,
+        scheduled_action: E2E,
+        rng: &mut RNG,
     );
 
-    fn process_replay_request<KernelMessage: Ord>(
+    fn process_broker_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        message_receiver: MessageReceiver<KernelMessage>,
-        process_action: impl FnMut(ExchangeAction<BrokerID, Symbol, Settlement>) -> KernelMessage,
-        request: ReplayRequest<Symbol, Settlement>,
+        message_receiver: MessageReceiver<KerMsg>,
+        process_action: impl FnMut(ExchangeAction<E2R, E2B, E2E>, &mut RNG) -> KerMsg,
+        request: B2E,
+        broker_id: BrokerID,
+        rng: &mut RNG,
+    );
+
+    fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+        &mut self,
+        message_receiver: MessageReceiver<KerMsg>,
+        process_action: impl FnMut(ExchangeAction<E2R, E2B, E2E>, &mut RNG) -> KerMsg,
+        request: R2E,
+        rng: &mut RNG,
     );
 
     fn connect_broker(&mut self, broker: BrokerID);

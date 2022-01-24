@@ -2,16 +2,16 @@ use {
     crate::{
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
-        types::Identifier,
+        types::Id,
     },
     std::str::FromStr,
 };
 
 pub trait TradedPairParser<
-    Symbol: Identifier + FromStr,
+    Symbol: Id + FromStr,
     Settlement: GetSettlementLag
 > {
-    fn parse<ExchangeID: Identifier>(
+    fn parse<ExchangeID: Id>(
         exchange_id: ExchangeID,
         kind: impl AsRef<str>,
         quoted_symbol: impl AsRef<str>,
@@ -23,7 +23,7 @@ pub mod concrete {
         crate::{
             settlement::concrete::SpotSettlement,
             traded_pair::{Asset, parser::TradedPairParser, TradedPair},
-            types::Identifier,
+            types::Id,
             utils::ExpectWith,
         },
         std::str::FromStr,
@@ -33,10 +33,10 @@ pub mod concrete {
 
     pub struct SpotBaseTradedPairParser;
 
-    impl<Symbol: Identifier + FromStr> TradedPairParser<Symbol, SpotSettlement>
+    impl<Symbol: Id + FromStr> TradedPairParser<Symbol, SpotSettlement>
     for SpotBaseTradedPairParser
     {
-        fn parse<ExchangeID: Identifier>(
+        fn parse<ExchangeID: Id>(
             _: ExchangeID,
             kind: impl AsRef<str>,
             quoted_symbol: impl AsRef<str>,

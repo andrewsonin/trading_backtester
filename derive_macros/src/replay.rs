@@ -1,11 +1,10 @@
-use syn::{parse::{ParseStream, Parse}, Ident, Token, DeriveInput, parse2, Error};
-
-const REPLAY_ATTRIBUTE: &str = "replay";
+use syn::{Error, parse::{Parse, ParseStream}, Path, Token};
 
 pub(crate) struct ReplayParameters {
-    pub exchange_id: Ident,
-    pub symbol: Ident,
-    pub settlement: Ident,
+    pub exchange_id: Path,
+    pub e2r: Path,
+    pub r2r: Path,
+    pub r2e: Path,
 }
 
 impl Parse for ReplayParameters {
@@ -14,24 +13,11 @@ impl Parse for ReplayParameters {
         syn::parenthesized!(content in input);
         let exchange_id = content.parse()?;
         content.parse::<Token![,]>()?;
-        let symbol = content.parse()?;
+        let e2r = content.parse()?;
         content.parse::<Token![,]>()?;
-        let settlement = content.parse()?;
-        Ok(ReplayParameters { exchange_id, symbol, settlement })
+        let r2r = content.parse()?;
+        content.parse::<Token![,]>()?;
+        let r2e = content.parse()?;
+        Ok(ReplayParameters { exchange_id, e2r, r2r, r2e })
     }
-}
-
-pub(crate) fn parse_replay_attrs(ast: &DeriveInput) -> ReplayParameters
-{
-    let mut attr_iter = ast.attrs.iter()
-        .filter(|a| a.path.segments.len() == 1 && a.path.segments[0].ident == REPLAY_ATTRIBUTE);
-    let attr = attr_iter.next().unwrap_or_else(
-        || panic!("{REPLAY_ATTRIBUTE} attribute required for deriving Replay")
-    );
-    if attr_iter.next().is_some() {
-        panic!("{REPLAY_ATTRIBUTE} attribute cannot appear more than once")
-    }
-    parse2(attr.tokens.clone()).unwrap_or_else(
-        |attrs| panic!("Invalid {REPLAY_ATTRIBUTE} attributes: {attrs}")
-    )
 }

@@ -1,4 +1,4 @@
-pub use {derive_more, rand};
+pub use {derive_macros, derive_more, rand};
 
 use crate::types::DateTime;
 

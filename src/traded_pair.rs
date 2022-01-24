@@ -1,13 +1,13 @@
 use crate::{
-    settlement::GetSettlementLag,
-    types::{DateTime, Identifier, Named, Price},
     enum_def,
+    settlement::GetSettlementLag,
+    types::{DateTime, Id, Named, Price},
 };
 
 pub mod parser;
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash)]
-pub struct TradedPair<Name: Identifier, Settlement: GetSettlementLag> {
+pub struct TradedPair<Name: Id, Settlement: GetSettlementLag> {
     pub quoted_asset: Asset<Name>,
     pub base_asset: Base<Name>,
     pub settlement: Settlement,
@@ -15,7 +15,7 @@ pub struct TradedPair<Name: Identifier, Settlement: GetSettlementLag> {
 
 enum_def! {
     #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-    pub Asset<Name: Identifier> {
+    pub Asset<Name: Id> {
         Base<Name>,
         Futures<Name>,
         OptionContract<Name>
@@ -23,12 +23,12 @@ enum_def! {
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct Base<Name: Identifier> {
+pub struct Base<Name: Id> {
     pub symbol: Name,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct Futures<Name: Identifier> {
+pub struct Futures<Name: Id> {
     pub symbol: Name,
     pub underlying_symbol: Name,
     pub settlement_symbol: Name,
@@ -37,7 +37,7 @@ pub struct Futures<Name: Identifier> {
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-pub struct OptionContract<Name: Identifier> {
+pub struct OptionContract<Name: Id> {
     pub symbol: Name,
     pub underlying_symbol: Name,
     pub settlement_symbol: Name,
@@ -52,13 +52,13 @@ pub enum OptionKind {
     EuroCall,
 }
 
-impl<Name: Identifier> Base<Name> {
+impl<Name: Id> Base<Name> {
     pub fn new(symbol: Name) -> Self {
         Self { symbol }
     }
 }
 
-impl<Name: Identifier> Futures<Name> {
+impl<Name: Id> Futures<Name> {
     pub fn new(
         symbol: Name,
         underlying_symbol: Name,
@@ -70,7 +70,7 @@ impl<Name: Identifier> Futures<Name> {
     }
 }
 
-impl<Name: Identifier> OptionContract<Name> {
+impl<Name: Id> OptionContract<Name> {
     pub fn new(
         symbol: Name,
         underlying_symbol: Name,
@@ -83,19 +83,19 @@ impl<Name: Identifier> OptionContract<Name> {
     }
 }
 
-impl<Name: Identifier> Named<Name> for Base<Name> {
+impl<Name: Id> Named<Name> for Base<Name> {
     fn get_name(&self) -> Name {
         self.symbol
     }
 }
 
-impl<Name: Identifier> Named<Name> for Futures<Name> {
+impl<Name: Id> Named<Name> for Futures<Name> {
     fn get_name(&self) -> Name {
         self.symbol
     }
 }
 
-impl<Name: Identifier> Named<Name> for OptionContract<Name> {
+impl<Name: Id> Named<Name> for OptionContract<Name> {
     fn get_name(&self) -> Name {
         self.symbol
     }

@@ -12,22 +12,27 @@ pub mod types;
 pub mod utils;
 
 pub mod prelude {
-    pub use derive_macros;
     pub use crate::{
-        enum_def,
         broker::{
             Broker,
             BrokerAction,
             BrokerActionKind,
+            BrokerToExchange,
+            BrokerToItself,
+            BrokerToTrader,
             concrete as broker_examples,
             reply as broker_reply,
             request as broker_request,
         },
+        enum_def,
         exchange::{
             concrete as exchange_example,
             Exchange,
             ExchangeAction,
             ExchangeActionKind,
+            ExchangeToBroker,
+            ExchangeToItself,
+            ExchangeToReplay,
             reply as exchange_reply,
         },
         kernel::{Kernel, KernelBuilder},
@@ -38,6 +43,8 @@ pub mod prelude {
             concrete as replay_examples,
             Replay,
             ReplayAction,
+            ReplayToExchange,
+            ReplayToItself,
             request as replay_request,
         },
         settlement::{concrete as settlement_examples, GetSettlementLag},
@@ -57,10 +64,13 @@ pub mod prelude {
             Trader,
             TraderAction,
             TraderActionKind,
+            TraderToBroker,
+            TraderToItself,
         },
         types::*,
         utils::{
             constants,
+            derive_macros,
             derive_more,
             ExpectWith,
             input::{
@@ -77,15 +87,14 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use {
-        std::{num::NonZeroU64, path::Path, str::FromStr},
+        broker_examples::BasicBroker,
         crate::prelude::*,
         rand::{Rng, rngs::StdRng},
-        replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
+        replay_examples::GetNextObSnapshotDelay,
         settlement_examples::SpotSettlement,
-        broker_examples::BasicBroker,
+        std::{num::NonZeroU64, path::Path, str::FromStr},
         traded_pair_parser_examples::SpotBaseTradedPairParser,
         trader_examples::SpreadWriter,
-        exchange_reply::ExchangeToReplay,
     };
 
     #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
@@ -136,7 +145,7 @@ mod tests {
     #[derive(Copy, Clone)]
     struct DelayScheduler;
 
-    impl<ExchangeID: Identifier, Symbol: Identifier, Settlement: GetSettlementLag>
+    impl<ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
     GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement> for DelayScheduler
     {
         fn get_ob_snapshot_delay(
@@ -289,14 +298,28 @@ mod tests {
 
     #[allow(dead_code)]
     mod test_enum_def {
-        use super::*;
+        use {
+            crate::{
+                exchange::reply::BasicExchangeToReplay,
+                prelude::*,
+                replay::request::BasicReplayToExchange,
+            },
+            derive_macros::Replay,
+            rand::Rng,
+            replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
+        };
 
         enum_def! {
-            #[derive(derive_macros::Replay)]
-            #[replay(ExchangeID, Symbol, Settlement)]
+            #[derive(Replay)]
+            #[replay(
+                ExchangeID,
+                BasicExchangeToReplay<Symbol, Settlement>,
+                Nothing,
+                BasicReplayToExchange<ExchangeID, Symbol, Settlement>
+            )]
             ReplayEnum<
-                ExchangeID: Identifier,
-                Symbol: Identifier,
+                ExchangeID: Id,
+                Symbol: Id,
                 Settlement: GetSettlementLag,
                 ObSnapshotDelay: Sized + Copy
             > where

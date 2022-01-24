@@ -1,8 +1,6 @@
 use crate::{
-    broker::reply::BrokerReply,
-    settlement::GetSettlementLag,
-    trader::request::TraderToBroker,
-    types::{DateTime, Identifier, Named, TimeSync},
+    broker::BrokerToTrader,
+    types::{DateTime, Id, Named, TimeSync},
     utils::{queue::MessageReceiver, rand::Rng},
 };
 
@@ -10,60 +8,60 @@ pub mod request;
 pub mod concrete;
 pub mod subscriptions;
 
-pub struct TraderAction<
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
-> {
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
+pub struct TraderAction<T2B: TraderToBroker, T2T: TraderToItself> {
     pub delay: u64,
-    pub content: TraderActionKind<BrokerID, ExchangeID, Symbol, Settlement>,
+    pub content: TraderActionKind<T2B, T2T>,
 }
 
-pub enum TraderActionKind<
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
-> {
-    TraderToBroker(TraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>),
-    WakeUp,
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
+pub enum TraderActionKind<T2B: TraderToBroker, T2T: TraderToItself> {
+    TraderToItself(T2T),
+    TraderToBroker(T2B),
 }
 
-pub trait Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>: TimeSync + Named<TraderID>
-    where TraderID: Identifier,
-          BrokerID: Identifier,
-          ExchangeID: Identifier,
-          Symbol: Identifier,
-          Settlement: GetSettlementLag
+pub trait TraderToItself: Ord {}
+
+pub trait TraderToBroker: Ord {
+    type BrokerID: Id;
+    fn get_broker_id(&self) -> Self::BrokerID;
+}
+
+pub trait Trader<TraderID, BrokerID, B2T, T2B, T2T>: TimeSync + Named<TraderID>
+    where TraderID: Id,
+          BrokerID: Id,
+          B2T: BrokerToTrader<TraderID=TraderID>,
+          T2T: TraderToItself,
+          T2B: TraderToBroker<BrokerID=BrokerID>
 {
-    fn process_broker_reply<KernelMessage: Ord>(
+    fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        message_receiver: MessageReceiver<KernelMessage>,
-        process_action: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
-        reply: BrokerReply<Symbol, Settlement>,
-        broker_id: BrokerID,
-        exchange_id: ExchangeID,
-        event_dt: DateTime,
+        message_receiver: MessageReceiver<KerMsg>,
+        process_action: impl FnMut(&Self, TraderAction<T2B, T2T>, &mut RNG) -> KerMsg,
+        scheduled_action: T2T,
+        rng: &mut RNG,
     );
 
-    fn wakeup<KernelMessage: Ord>(
+    fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        message_receiver: MessageReceiver<KernelMessage>,
-        process_action: impl FnMut(TraderAction<BrokerID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
+        message_receiver: MessageReceiver<KerMsg>,
+        process_action: impl FnMut(&Self, TraderAction<T2B, T2T>, &mut RNG) -> KerMsg,
+        reply: B2T,
+        broker_id: BrokerID,
+        rng: &mut RNG,
     );
 
     fn broker_to_trader_latency(
         &self,
         broker_id: BrokerID,
-        rng: &mut impl Rng,
-        event_dt: DateTime) -> u64;
+        event_dt: DateTime,
+        rng: &mut impl Rng) -> u64;
 
     fn trader_to_broker_latency(
         &self,
         broker_id: BrokerID,
-        rng: &mut impl Rng,
-        event_dt: DateTime) -> u64;
+        event_dt: DateTime,
+        rng: &mut impl Rng) -> u64;
 
     fn upon_register_at_broker(&mut self, broker_id: BrokerID);
 }

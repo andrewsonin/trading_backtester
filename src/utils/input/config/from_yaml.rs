@@ -9,7 +9,7 @@ use {
         traded_pair::{parser::TradedPairParser, TradedPair},
         types::{
             DateTime,
-            Identifier,
+            Id,
             PriceStep,
         },
         utils::{
@@ -244,8 +244,8 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
     DateTime,
     DateTime
 )
-    where ExchangeID: Identifier + FromStr,
-          Symbol: Identifier + FromStr,
+    where ExchangeID: Id + FromStr,
+          Symbol: Id + FromStr,
           TPP: TradedPairParser<Symbol, Settlement>,
           ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
           Settlement: GetSettlementLag
@@ -452,7 +452,7 @@ fn parse_simulation_time_section(
     (start, end)
 }
 
-fn parse_exchanges_section<'a, ExchangeID: Identifier + FromStr>(
+fn parse_exchanges_section<'a, ExchangeID: Id + FromStr>(
     yaml: &'a Yaml,
     path: &'a Path,
     env: &'a Env) -> impl 'a + IntoIterator<Item=(ExchangeID, Vec<ExchangeSession<ExchangeID>>)>
@@ -504,7 +504,7 @@ fn parse_exchanges_section<'a, ExchangeID: Identifier + FromStr>(
     )
 }
 
-fn parse_exchange_sessions<ExchangeID: Identifier>(
+fn parse_exchange_sessions<ExchangeID: Id>(
     yaml: &Hash,
     name: ExchangeID,
     path: &Path,
@@ -708,8 +708,8 @@ fn parse_exchange_sessions<ExchangeID: Identifier>(
 
 fn parse_traded_pairs_section<
     'a,
-    ExchangeID: Identifier + FromStr,
-    Symbol: Identifier + FromStr,
+    ExchangeID: Id + FromStr,
+    Symbol: Id + FromStr,
     Settlement: GetSettlementLag,
     TPParser: TradedPairParser<Symbol, Settlement>
 >(
@@ -826,8 +826,8 @@ fn parse_traded_pairs_section<
 }
 
 fn parse_trade_start_stops<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 >(
     map: &Hash,
@@ -1063,8 +1063,8 @@ fn parse_trade_start_stops<
 }
 
 fn gen_traded_pair_reader<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 >(
     map: &Hash,

@@ -5,8 +5,8 @@ use {
             BrokerAction,
             BrokerActionKind,
             reply::{
-                BrokerReply,
-                BrokerToTrader,
+                BasicBrokerReply,
+                BasicBrokerToTrader,
                 CancellationReason,
                 CannotCancelOrder,
                 InabilityToCancelReason,
@@ -14,12 +14,13 @@ use {
                 OrderPlacementDiscarded,
                 PlacementDiscardingReason,
             },
-            request::{BrokerRequest, BrokerToExchange},
+            request::{BasicBrokerRequest, BasicBrokerToExchange},
         },
         exchange::reply::{
+            BasicExchangeToBroker,
+            BasicExchangeToBrokerReply,
             CancellationReason as ExchangeCancellationReason,
             ExchangeEventNotification,
-            ExchangeToBrokerReply,
             MarketOrderNotFullyExecuted,
             OrderAccepted,
             OrderExecuted,
@@ -28,20 +29,20 @@ use {
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         trader::{
-            request::TraderRequest,
+            request::{BasicTraderRequest, BasicTraderToBroker},
             subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
         },
-        types::{Date, DateTime, Identifier, Named, OrderID, TimeSync},
+        types::{Date, DateTime, Id, Named, Nothing, OrderID, TimeSync},
         utils::{queue::MessageReceiver, rand::Rng},
     },
     std::collections::{HashMap, HashSet},
 };
 
 pub struct BasicBroker<
-    BrokerID: Identifier,
-    TraderID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    BrokerID: Id,
+    TraderID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 > {
     current_dt: DateTime,
@@ -68,13 +69,7 @@ pub struct BasicBroker<
     next_internal_order_id: OrderID,
 }
 
-impl<
-    BrokerID: Identifier,
-    TraderID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
->
+impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 TimeSync
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
@@ -83,13 +78,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     }
 }
 
-impl<
-    BrokerID: Identifier,
-    TraderID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
->
+impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 Named<BrokerID>
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
@@ -98,25 +87,52 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     }
 }
 
-impl<
-    BrokerID: Identifier,
-    TraderID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+Broker<
+    BrokerID, TraderID, ExchangeID,
+    BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+    BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+    Nothing,
+    SubscriptionConfig<ExchangeID, Symbol, Settlement>
 >
-Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
-    fn process_trader_request<KernelMessage: Ord>(
+    fn wakeup<KernelMessage: Ord, RNG: Rng>(
+        &mut self,
+        _: MessageReceiver<KernelMessage>,
+        _: impl FnMut(
+            &Self,
+            BrokerAction<
+                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+                Nothing
+            >,
+            &mut RNG) -> KernelMessage,
+        _: Nothing,
+        _: &mut RNG,
+    ) {
+        unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
+    }
+
+    fn process_trader_request<KernelMessage: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
-        request: TraderRequest<ExchangeID, Symbol, Settlement>,
+        mut process_action: impl FnMut(
+            &Self,
+            BrokerAction<
+                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+                Nothing
+            >,
+            &mut RNG) -> KernelMessage,
+        request: BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
         trader_id: TraderID,
+        rng: &mut RNG,
     ) {
-        let action = match request {
-            TraderRequest::CancelLimitOrder(mut request, exchange_id) => {
+        let action = match request.content {
+            BasicTraderRequest::CancelLimitOrder(mut request, exchange_id) => {
                 if self.registered_exchanges.contains(&exchange_id) {
                     if let Some(order_id) = self.submitted_to_internal.get(
                         &(trader_id, request.order_id)
@@ -124,14 +140,14 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         request.order_id = *order_id;
                         Self::create_broker_request(
                             exchange_id,
-                            BrokerRequest::CancelLimitOrder(request),
+                            BasicBrokerRequest::CancelLimitOrder(request),
                         )
                     } else {
                         Self::create_broker_reply(
                             trader_id,
                             exchange_id,
                             self.current_dt,
-                            BrokerReply::CannotCancelOrder(
+                            BasicBrokerReply::CannotCancelOrder(
                                 CannotCancelOrder {
                                     traded_pair: request.traded_pair,
                                     order_id: request.order_id,
@@ -145,7 +161,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         trader_id,
                         exchange_id,
                         self.current_dt,
-                        BrokerReply::CannotCancelOrder(
+                        BasicBrokerReply::CannotCancelOrder(
                             CannotCancelOrder {
                                 traded_pair: request.traded_pair,
                                 order_id: request.order_id,
@@ -155,7 +171,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            TraderRequest::PlaceLimitOrder(mut request, exchange_id) => {
+            BasicTraderRequest::PlaceLimitOrder(mut request, exchange_id) => {
                 if self.registered_exchanges.contains(&exchange_id) {
                     self.internal_to_submitted.insert(
                         self.next_internal_order_id,
@@ -169,14 +185,14 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     self.next_internal_order_id += OrderID(1);
                     Self::create_broker_request(
                         exchange_id,
-                        BrokerRequest::PlaceLimitOrder(request),
+                        BasicBrokerRequest::PlaceLimitOrder(request),
                     )
                 } else {
                     Self::create_broker_reply(
                         trader_id,
                         exchange_id,
                         self.current_dt,
-                        BrokerReply::OrderPlacementDiscarded(
+                        BasicBrokerReply::OrderPlacementDiscarded(
                             OrderPlacementDiscarded {
                                 traded_pair: request.traded_pair,
                                 order_id: request.order_id,
@@ -186,7 +202,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            TraderRequest::PlaceMarketOrder(mut request, exchange_id) => {
+            BasicTraderRequest::PlaceMarketOrder(mut request, exchange_id) => {
                 if self.registered_exchanges.contains(&exchange_id) {
                     self.internal_to_submitted.insert(
                         self.next_internal_order_id,
@@ -200,14 +216,14 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     self.next_internal_order_id += OrderID(1);
                     Self::create_broker_request(
                         exchange_id,
-                        BrokerRequest::PlaceMarketOrder(request),
+                        BasicBrokerRequest::PlaceMarketOrder(request),
                     )
                 } else {
                     Self::create_broker_reply(
                         trader_id,
                         exchange_id,
                         self.current_dt,
-                        BrokerReply::OrderPlacementDiscarded(
+                        BasicBrokerReply::OrderPlacementDiscarded(
                             OrderPlacementDiscarded {
                                 traded_pair: request.traded_pair,
                                 order_id: request.order_id,
@@ -218,27 +234,34 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 }
             }
         };
-        message_receiver.push(process_action(action, &self))
+        message_receiver.push(process_action(&self, action, rng))
     }
 
-    fn process_exchange_reply<KernelMessage: Ord>(
+    fn process_exchange_reply<KernelMessage: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
-        reply: ExchangeToBrokerReply<Symbol, Settlement>,
+        mut process_action: impl FnMut(
+            &Self,
+            BrokerAction<
+                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+                Nothing
+            >,
+            &mut RNG) -> KernelMessage,
+        reply: BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
         exchange_id: ExchangeID,
-        exchange_dt: DateTime,
+        rng: &mut RNG,
     ) {
-        let message = match reply {
-            ExchangeToBrokerReply::OrderAccepted(accepted) => {
+        let message = match reply.content {
+            BasicExchangeToBrokerReply::OrderAccepted(accepted) => {
                 if let Some((trader_id, order_id)) = self.internal_to_submitted.get(
                     &accepted.order_id
                 ) {
                     Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
-                        exchange_dt,
-                        BrokerReply::OrderAccepted(
+                        reply.exchange_dt,
+                        BasicBrokerReply::OrderAccepted(
                             OrderAccepted {
                                 traded_pair: accepted.traded_pair,
                                 order_id: *order_id,
@@ -252,15 +275,15 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            ExchangeToBrokerReply::OrderPlacementDiscarded(discarded) => {
+            BasicExchangeToBrokerReply::OrderPlacementDiscarded(discarded) => {
                 if let Some((trader_id, order_id)) = self.internal_to_submitted.get(
                     &discarded.order_id
                 ) {
                     Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
-                        exchange_dt,
-                        BrokerReply::OrderPlacementDiscarded(
+                        reply.exchange_dt,
+                        BasicBrokerReply::OrderPlacementDiscarded(
                             OrderPlacementDiscarded {
                                 traded_pair: discarded.traded_pair,
                                 order_id: *order_id,
@@ -275,15 +298,15 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            ExchangeToBrokerReply::OrderPartiallyExecuted(executed) => {
+            BasicExchangeToBrokerReply::OrderPartiallyExecuted(executed) => {
                 if let Some((trader_id, order_id)) = self.internal_to_submitted.get(
                     &executed.order_id
                 ) {
                     Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
-                        exchange_dt,
-                        BrokerReply::OrderPartiallyExecuted(
+                        reply.exchange_dt,
+                        BasicBrokerReply::OrderPartiallyExecuted(
                             OrderPartiallyExecuted {
                                 traded_pair: executed.traded_pair,
                                 order_id: *order_id,
@@ -299,15 +322,15 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            ExchangeToBrokerReply::OrderExecuted(executed) => {
+            BasicExchangeToBrokerReply::OrderExecuted(executed) => {
                 if let Some((trader_id, order_id)) = self.internal_to_submitted.get(
                     &executed.order_id
                 ) {
                     Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
-                        exchange_dt,
-                        BrokerReply::OrderExecuted(
+                        reply.exchange_dt,
+                        BasicBrokerReply::OrderExecuted(
                             OrderExecuted {
                                 traded_pair: executed.traded_pair,
                                 order_id: *order_id,
@@ -323,15 +346,15 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            ExchangeToBrokerReply::MarketOrderNotFullyExecuted(not_fully_exec) => {
+            BasicExchangeToBrokerReply::MarketOrderNotFullyExecuted(not_fully_exec) => {
                 if let Some((trader_id, order_id)) = self.internal_to_submitted.get(
                     &not_fully_exec.order_id
                 ) {
                     Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
-                        exchange_dt,
-                        BrokerReply::MarketOrderNotFullyExecuted(
+                        reply.exchange_dt,
+                        BasicBrokerReply::MarketOrderNotFullyExecuted(
                             MarketOrderNotFullyExecuted {
                                 traded_pair: not_fully_exec.traded_pair,
                                 order_id: *order_id,
@@ -346,15 +369,15 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            ExchangeToBrokerReply::OrderCancelled(order_cancelled) => {
+            BasicExchangeToBrokerReply::OrderCancelled(order_cancelled) => {
                 if let Some((trader_id, order_id)) = self.internal_to_submitted.get(
                     &order_cancelled.order_id
                 ) {
                     Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
-                        exchange_dt,
-                        BrokerReply::OrderCancelled(
+                        reply.exchange_dt,
+                        BasicBrokerReply::OrderCancelled(
                             OrderCancelled {
                                 traded_pair: order_cancelled.traded_pair,
                                 order_id: *order_id,
@@ -379,15 +402,15 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            ExchangeToBrokerReply::CannotCancelOrder(cannot_cancel) => {
+            BasicExchangeToBrokerReply::CannotCancelOrder(cannot_cancel) => {
                 if let Some((trader_id, order_id)) = self.internal_to_submitted.get(
                     &cannot_cancel.order_id
                 ) {
                     Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
-                        exchange_dt,
-                        BrokerReply::CannotCancelOrder(
+                        reply.exchange_dt,
+                        BasicBrokerReply::CannotCancelOrder(
                             CannotCancelOrder {
                                 traded_pair: cannot_cancel.traded_pair,
                                 order_id: *order_id,
@@ -402,31 +425,24 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                     )
                 }
             }
-            ExchangeToBrokerReply::ExchangeEventNotification(notification) => {
+            BasicExchangeToBrokerReply::ExchangeEventNotification(notification) => {
                 self.handle_exchange_notification(
                     message_receiver,
                     process_action,
                     notification,
                     exchange_id,
-                    exchange_dt,
+                    reply.exchange_dt,
+                    rng,
                 );
                 return;
             }
         };
-        message_receiver.push(process_action(message, &self))
+        message_receiver.push(process_action(&self, message, rng))
     }
 
-    fn wakeup<KernelMessage: Ord>(
-        &mut self,
-        _: MessageReceiver<KernelMessage>,
-        _: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
-    ) {
-        unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
-    }
+    fn broker_to_exchange_latency(&self, _: ExchangeID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
 
-    fn broker_to_exchange_latency(&self, _: ExchangeID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
-
-    fn exchange_to_broker_latency(&self, _: ExchangeID, _: &mut impl Rng, _: DateTime) -> u64 { 0 }
+    fn exchange_to_broker_latency(&self, _: ExchangeID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
 
     fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID) {
         self.registered_exchanges.insert(exchange_id);
@@ -460,10 +476,10 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 }
 
 impl<
-    BrokerID: Identifier,
-    TraderID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    BrokerID: Id,
+    TraderID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 >
 BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
@@ -481,15 +497,23 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         }
     }
 
-    fn handle_exchange_notification<KernelMessage: Ord>(
+    fn handle_exchange_notification<KernelMessage: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(BrokerAction<TraderID, ExchangeID, Symbol, Settlement>, &Self) -> KernelMessage,
+        mut process_action: impl FnMut(
+            &Self,
+            BrokerAction<
+                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+                Nothing
+            >,
+            &mut RNG) -> KernelMessage,
         notification: ExchangeEventNotification<Symbol, Settlement>,
         exchange_id: ExchangeID,
         exchange_dt: DateTime,
+        rng: &mut RNG,
     ) {
-        let process_action = |action| process_action(action, &self);
+        let process_action = |action| process_action(&self, action, rng);
         match notification {
             ExchangeEventNotification::ExchangeOpen => {
                 let action_iterator = self.trader_configs.keys().map(
@@ -497,7 +521,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         *trader_id,
                         exchange_id,
                         exchange_dt,
-                        BrokerReply::ExchangeEventNotification(
+                        BasicBrokerReply::ExchangeEventNotification(
                             ExchangeEventNotification::ExchangeOpen
                         ),
                     )
@@ -510,7 +534,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         *trader_id,
                         exchange_id,
                         exchange_dt,
-                        BrokerReply::ExchangeEventNotification(
+                        BasicBrokerReply::ExchangeEventNotification(
                             ExchangeEventNotification::TradesStarted(traded_pair, price_step)
                         ),
                     )
@@ -526,7 +550,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                                     *trader_id,
                                     exchange_id,
                                     exchange_dt,
-                                    BrokerReply::ExchangeEventNotification(
+                                    BasicBrokerReply::ExchangeEventNotification(
                                         ExchangeEventNotification::OrderCancelled(cancelled)
                                     ),
                                 );
@@ -547,7 +571,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                                     *trader_id,
                                     exchange_id,
                                     exchange_dt,
-                                    BrokerReply::ExchangeEventNotification(
+                                    BasicBrokerReply::ExchangeEventNotification(
                                         ExchangeEventNotification::OrderPlaced(placed)
                                     ),
                                 );
@@ -568,7 +592,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                                     *trader_id,
                                     exchange_id,
                                     exchange_dt,
-                                    BrokerReply::ExchangeEventNotification(
+                                    BasicBrokerReply::ExchangeEventNotification(
                                         ExchangeEventNotification::TradeExecuted(trade)
                                     ),
                                 );
@@ -589,7 +613,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                                     *trader_id,
                                     exchange_id,
                                     exchange_dt,
-                                    BrokerReply::ExchangeEventNotification(
+                                    BasicBrokerReply::ExchangeEventNotification(
                                         ExchangeEventNotification::ObSnapshot(ob_snapshot.clone())
                                     ),
                                 );
@@ -607,7 +631,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         *trader_id,
                         exchange_id,
                         exchange_dt,
-                        BrokerReply::ExchangeEventNotification(
+                        BasicBrokerReply::ExchangeEventNotification(
                             ExchangeEventNotification::TradesStopped(traded_pair)
                         ),
                     )
@@ -620,7 +644,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                         *trader_id,
                         exchange_id,
                         exchange_dt,
-                        BrokerReply::ExchangeEventNotification(
+                        BasicBrokerReply::ExchangeEventNotification(
                             ExchangeEventNotification::ExchangeClosed
                         ),
                     )
@@ -634,13 +658,15 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         trader_id: TraderID,
         exchange_id: ExchangeID,
         event_dt: DateTime,
-        content: BrokerReply<Symbol, Settlement>) -> BrokerAction<
-        TraderID, ExchangeID, Symbol, Settlement
+        content: BasicBrokerReply<Symbol, Settlement>) -> BrokerAction<
+        BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+        BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+        Nothing
     > {
         BrokerAction {
             delay: 0,
             content: BrokerActionKind::BrokerToTrader(
-                BrokerToTrader {
+                BasicBrokerToTrader {
                     trader_id,
                     exchange_id,
                     event_dt,
@@ -652,13 +678,15 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 
     fn create_broker_request(
         exchange_id: ExchangeID,
-        content: BrokerRequest<Symbol, Settlement>) -> BrokerAction<
-        TraderID, ExchangeID, Symbol, Settlement
+        content: BasicBrokerRequest<Symbol, Settlement>) -> BrokerAction<
+        BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+        BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+        Nothing
     > {
         BrokerAction {
             delay: 0,
             content: BrokerActionKind::BrokerToExchange(
-                BrokerToExchange {
+                BasicBrokerToExchange {
                     exchange_id,
                     content,
                 }

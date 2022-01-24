@@ -1,4 +1,5 @@
 use crate::{
+    broker::BrokerToTrader,
     exchange::reply::{
         ExchangeEventNotification,
         MarketOrderNotFullyExecuted,
@@ -8,24 +9,40 @@ use crate::{
     },
     settlement::GetSettlementLag,
     traded_pair::TradedPair,
-    types::{DateTime, Identifier, OrderID},
+    types::{DateTime, Id, OrderID},
 };
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct BrokerToTrader<
-    TraderID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct BasicBrokerToTrader<
+    TraderID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 > {
     pub trader_id: TraderID,
     pub exchange_id: ExchangeID,
     pub event_dt: DateTime,
-    pub content: BrokerReply<Symbol, Settlement>,
+    pub content: BasicBrokerReply<Symbol, Settlement>,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum BrokerReply<Symbol: Identifier, Settlement: GetSettlementLag>
+impl<
+    TraderID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
+    Settlement: GetSettlementLag
+>
+BrokerToTrader
+for BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>
+{
+    type TraderID = TraderID;
+
+    fn get_trader_id(&self) -> Self::TraderID {
+        self.trader_id
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum BasicBrokerReply<Symbol: Id, Settlement: GetSettlementLag>
 {
     OrderAccepted(OrderAccepted<Symbol, Settlement>),
 
@@ -44,14 +61,14 @@ pub enum BrokerReply<Symbol: Identifier, Settlement: GetSettlementLag>
     ExchangeEventNotification(ExchangeEventNotification<Symbol, Settlement>),
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct OrderPlacementDiscarded<Symbol: Identifier, Settlement: GetSettlementLag> {
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct OrderPlacementDiscarded<Symbol: Id, Settlement: GetSettlementLag> {
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub reason: PlacementDiscardingReason,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum PlacementDiscardingReason
 {
     OrderWithSuchIDAlreadySubmitted,
@@ -91,14 +108,14 @@ impl From<ExchangePlacementDiscardingReason> for PlacementDiscardingReason {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct OrderCancelled<Symbol: Identifier, Settlement: GetSettlementLag> {
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct OrderCancelled<Symbol: Id, Settlement: GetSettlementLag> {
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub reason: CancellationReason,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum CancellationReason {
     TraderRequested,
     BrokerRequested,
@@ -106,14 +123,14 @@ pub enum CancellationReason {
     ExchangeClosed,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct CannotCancelOrder<Symbol: Identifier, Settlement: GetSettlementLag> {
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct CannotCancelOrder<Symbol: Id, Settlement: GetSettlementLag> {
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub reason: InabilityToCancelReason,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum InabilityToCancelReason
 {
     OrderHasNotBeenSubmitted,

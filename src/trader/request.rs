@@ -1,24 +1,40 @@
 use crate::{
     order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
     settlement::GetSettlementLag,
-    types::Identifier,
+    trader::TraderToBroker,
+    types::Id,
 };
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct TraderToBroker<
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct BasicTraderToBroker<
+    BrokerID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 > {
     pub broker_id: BrokerID,
-    pub content: TraderRequest<ExchangeID, Symbol, Settlement>,
+    pub content: BasicTraderRequest<ExchangeID, Symbol, Settlement>,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum TraderRequest<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+impl<
+    BrokerID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
+    Settlement: GetSettlementLag
+> TraderToBroker
+for BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>
+{
+    type BrokerID = BrokerID;
+
+    fn get_broker_id(&self) -> Self::BrokerID {
+        self.broker_id
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum BasicTraderRequest<
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 > {
     CancelLimitOrder(LimitOrderCancelRequest<Symbol, Settlement>, ExchangeID),

@@ -4,25 +4,27 @@ use {
             Broker,
             BrokerAction,
             BrokerActionKind,
-            reply::BrokerToTrader,
-            request::BrokerToExchange,
+            BrokerToExchange,
+            BrokerToItself,
+            BrokerToTrader,
         },
         exchange::{
             Exchange,
             ExchangeAction,
             ExchangeActionKind,
-            reply::{ExchangeToBroker, ExchangeToReplay},
+            ExchangeToBroker,
+            ExchangeToItself,
+            ExchangeToReplay,
         },
-        replay::{Replay, ReplayAction, request::ReplayToExchange},
-        settlement::GetSettlementLag,
+        replay::{Replay, ReplayAction, ReplayActionKind, ReplayToExchange, ReplayToItself},
         trader::{
-            request::TraderToBroker,
-            subscriptions::SubscriptionConfig,
             Trader,
             TraderAction,
             TraderActionKind,
+            TraderToBroker,
+            TraderToItself,
         },
-        types::{DateTime, Duration, Identifier},
+        types::{DateTime, Duration, Id},
         utils::{
             ExpectWith,
             queue::{LessElementBinaryHeap, MessageReceiver},
@@ -33,81 +35,134 @@ use {
 };
 
 pub struct Kernel<
-    TraderID: Identifier,
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
-    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
-    R: Replay<ExchangeID, Symbol, Settlement>,
+    TraderID,
+    BrokerID,
+    ExchangeID,
+    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+    T, B, E, R,
+    SubCfg, RNG
+> where
+    TraderID: Id,
+    BrokerID: Id,
+    ExchangeID: Id,
+    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
+    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
+    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
+    R: Replay<ExchangeID, E2R, R2R, R2E>,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2B: BrokerToItself,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself,
     RNG: SeedableRng + Rng
-> {
+{
     traders: HashMap<TraderID, T>,
     brokers: HashMap<BrokerID, B>,
     exchanges: HashMap<ExchangeID, E>,
     replay: R,
 
     message_queue: LessElementBinaryHeap<
-        Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
+        Message<ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E>
     >,
 
     end_dt: DateTime,
     current_dt: DateTime,
 
     rng: RNG,
+    phantom_data: PhantomData<SubCfg>,
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub struct Message<
-    ExchangeID: Identifier,
-    BrokerID: Identifier,
-    TraderID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+    ExchangeID: Id,
+    BrokerID: Id,
+    TraderID: Id,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2B: BrokerToItself,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself
 > {
     datetime: DateTime,
-    body: MessageContent<ExchangeID, BrokerID, TraderID, Symbol, Settlement>,
+    body: MessageContent<
+        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
+    >,
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 enum MessageContent<
-    ExchangeID: Identifier,
-    BrokerID: Identifier,
-    TraderID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+    ExchangeID: Id,
+    BrokerID: Id,
+    TraderID: Id,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2B: BrokerToItself,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself
 > {
-    ReplayToExchange(ReplayToExchange<ExchangeID, Symbol, Settlement>),
+    ReplayWakeUp(R2R),
 
-    ExchangeToReplay(ExchangeToReplay<Symbol, Settlement>, ExchangeID),
+    ReplayToExchange(R2E),
 
-    BrokerToExchange(BrokerToExchange<ExchangeID, Symbol, Settlement>, BrokerID),
+    ExchangeWakeUp(ExchangeID, E2E),
 
-    ExchangeToBroker(ExchangeToBroker<BrokerID, Symbol, Settlement>, ExchangeID),
+    ExchangeToReplay(ExchangeID, E2R),
 
-    BrokerWakeUp(BrokerID),
+    ExchangeToBroker(ExchangeID, E2B),
 
-    BrokerToTrader(BrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>, BrokerID),
+    BrokerWakeUp(BrokerID, B2B),
 
-    TraderWakeUp(TraderID),
+    BrokerToExchange(BrokerID, B2E),
 
-    TraderToBroker(TraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>, TraderID),
+    BrokerToTrader(BrokerID, B2T),
+
+    TraderWakeUp(TraderID, T2T),
+
+    TraderToBroker(TraderID, T2B),
 }
 
 pub struct KernelBuilder<
-    TraderID: Identifier,
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
-    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
-    R: Replay<ExchangeID, Symbol, Settlement>,
+    TraderID,
+    BrokerID,
+    ExchangeID,
+    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+    T, B, E, R,
+    SubCfg, RNG
+> where
+    TraderID: Id,
+    BrokerID: Id,
+    ExchangeID: Id,
+    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
+    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
+    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
+    R: Replay<ExchangeID, E2R, R2R, R2E>,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2B: BrokerToItself,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself,
     RNG: SeedableRng + Rng
-> {
+{
     traders: HashMap<TraderID, T>,
     brokers: HashMap<BrokerID, B>,
     exchanges: HashMap<ExchangeID, E>,
@@ -118,23 +173,40 @@ pub struct KernelBuilder<
 
     seed: Option<u64>,
 
-    rng: PhantomData<RNG>,
-    symbol: PhantomData<Symbol>,
-    settlement: PhantomData<Settlement>,
+    phantoms: PhantomData<(T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E, SubCfg, RNG)>,
 }
 
 impl<
-    TraderID: Identifier,
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
-    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
-    R: Replay<ExchangeID, Symbol, Settlement>
+    TraderID,
+    BrokerID,
+    ExchangeID,
+    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+    T, B, E, R,
+    SubCfg
 >
-KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, StdRng>
+KernelBuilder<
+    TraderID, BrokerID, ExchangeID,
+    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+    T, B, E, R,
+    SubCfg, StdRng
+> where
+    TraderID: Id,
+    BrokerID: Id,
+    ExchangeID: Id,
+    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
+    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
+    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
+    R: Replay<ExchangeID, E2R, R2R, R2E>,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2B: BrokerToItself,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself
 {
     pub fn new<CE, CB, SC>(exchanges: impl IntoIterator<Item=E>,
                            brokers: impl IntoIterator<Item=(B, CE)>,
@@ -144,7 +216,7 @@ KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, St
         where
             CE: IntoIterator<Item=ExchangeID>,      // Connected Exchanges
             CB: IntoIterator<Item=(BrokerID, SC)>,  // Connected Brokers
-            SC: IntoIterator<Item=SubscriptionConfig<ExchangeID, Symbol, Settlement>>
+            SC: IntoIterator<Item=SubCfg>
     {
         let (start_dt, end_dt) = date_range;
         if end_dt < start_dt {
@@ -220,14 +292,15 @@ KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, St
             end_dt,
             start_dt,
             seed: None,
-            rng: Default::default(),
-            symbol: Default::default(),
-            settlement: Default::default(),
+            phantoms: Default::default(),
         }
     }
 
     pub fn with_rng<RNG: Rng + SeedableRng>(self) -> KernelBuilder<
-        TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG
+        TraderID, BrokerID, ExchangeID,
+        T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+        T, B, E, R,
+        SubCfg, RNG
     > {
         let KernelBuilder {
             traders, brokers, exchanges, replay, end_dt, start_dt, seed, ..
@@ -240,26 +313,43 @@ KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, St
             end_dt,
             start_dt,
             seed,
-            rng: Default::default(),
-            symbol: Default::default(),
-            settlement: Default::default(),
+            phantoms: Default::default(),
         }
     }
 }
 
 impl<
-    TraderID: Identifier,
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
-    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
-    R: Replay<ExchangeID, Symbol, Settlement>,
-    RNG: Rng + SeedableRng
+    TraderID,
+    BrokerID,
+    ExchangeID,
+    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+    T, B, E, R,
+    SubCfg, RNG
 >
-KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
+KernelBuilder<
+    TraderID, BrokerID, ExchangeID,
+    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+    T, B, E, R,
+    SubCfg, RNG
+> where
+    TraderID: Id,
+    BrokerID: Id,
+    ExchangeID: Id,
+    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
+    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
+    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
+    R: Replay<ExchangeID, E2R, R2R, R2E>,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2B: BrokerToItself,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself,
+    RNG: Rng + SeedableRng
 {
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = Some(seed);
@@ -267,7 +357,10 @@ KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RN
     }
 
     pub fn build(self) -> Kernel<
-        TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG
+        TraderID, BrokerID, ExchangeID,
+        T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+        T, B, E, R,
+        SubCfg, RNG
     > {
         let KernelBuilder {
             traders, brokers, exchanges, mut replay, end_dt, start_dt, seed, ..
@@ -275,8 +368,14 @@ KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RN
 
         *replay.current_datetime_mut() = start_dt;
         let first_message = Kernel::<
-            TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG
-        >::process_replay_action(replay.next().expect("Replay does not contain any entries"));
+            TraderID, BrokerID, ExchangeID,
+            T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+            T, B, E, R,
+            SubCfg, RNG
+        >::process_replay_action(
+            start_dt,
+            replay.next().expect("Replay does not contain any entries"),
+        );
         if first_message.datetime < start_dt {
             panic!("First message datetime is less than the simulation start datetime")
         }
@@ -293,23 +392,43 @@ KernelBuilder<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RN
             } else {
                 RNG::from_entropy()
             },
+            phantom_data: Default::default(),
         }
     }
 }
 
 impl<
-    TraderID: Identifier,
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag,
-    T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
-    B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
-    E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>,
-    R: Replay<ExchangeID, Symbol, Settlement>,
-    RNG: SeedableRng + Rng
+    TraderID,
+    BrokerID,
+    ExchangeID,
+    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+    T, B, E, R,
+    SubCfg, RNG
 >
-Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
+Kernel<
+    TraderID, BrokerID, ExchangeID,
+    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
+    T, B, E, R,
+    SubCfg, RNG
+> where
+    TraderID: Id,
+    BrokerID: Id,
+    ExchangeID: Id,
+    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
+    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
+    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
+    R: Replay<ExchangeID, E2R, R2R, R2E>,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2B: BrokerToItself,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself,
+    RNG: SeedableRng + Rng
 {
     pub fn run_simulation(&mut self)
     {
@@ -325,149 +444,154 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
 
     fn handle_message(
         &mut self,
-        message: MessageContent<ExchangeID, BrokerID, TraderID, Symbol, Settlement>,
+        message: MessageContent<
+            ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
+        >,
     ) {
         match message
         {
+            MessageContent::ReplayWakeUp(scheduled_action) => {
+                self.handle_replay_wakeup(scheduled_action)
+            }
             MessageContent::ReplayToExchange(replay_request) => {
                 if let Some(action) = self.replay.next() {
-                    if action.datetime < self.current_dt {
-                        panic!(
-                            "Replay yielded action {action:?} which DateTime ({}) \
-                            is less than the Kernel current DateTime ({})",
-                            action.datetime,
-                            self.current_dt
-                        )
-                    }
-                    self.message_queue.push(Self::process_replay_action(action))
+                    self.message_queue.push(Self::process_replay_action(self.current_dt, action))
                 }
                 self.handle_replay_to_exchange(replay_request)
             }
-            MessageContent::ExchangeToReplay(reply, exchange_id) => {
-                self.handle_exchange_to_replay(reply, exchange_id)
+            MessageContent::ExchangeWakeUp(exchange_id, scheduled_action) => {
+                self.handle_exchange_wakeup(exchange_id, scheduled_action)
             }
-            MessageContent::BrokerToExchange(request, broker_id) => {
-                self.handle_broker_to_exchange(request, broker_id)
+            MessageContent::ExchangeToReplay(exchange_id, reply) => {
+                self.handle_exchange_to_replay(exchange_id, reply)
             }
-            MessageContent::ExchangeToBroker(reply, exchange_id) => {
-                self.handle_exchange_to_broker(reply, exchange_id)
+            MessageContent::ExchangeToBroker(exchange_id, reply) => {
+                self.handle_exchange_to_broker(exchange_id, reply)
             }
-            MessageContent::BrokerWakeUp(broker_id) => {
-                self.handle_broker_wakeup(broker_id)
+            MessageContent::BrokerWakeUp(broker_id, scheduled_action) => {
+                self.handle_broker_wakeup(broker_id, scheduled_action)
             }
-            MessageContent::BrokerToTrader(reply, broker_id) => {
-                self.handle_broker_to_trader(reply, broker_id)
+            MessageContent::BrokerToExchange(broker_id, request) => {
+                self.handle_broker_to_exchange(broker_id, request)
             }
-            MessageContent::TraderWakeUp(trader_id) => {
-                self.handle_trader_wakeup(trader_id)
+            MessageContent::BrokerToTrader(broker_id, reply) => {
+                self.handle_broker_to_trader(broker_id, reply)
             }
-            MessageContent::TraderToBroker(request, trader_id) => {
-                self.handle_trader_to_broker(request, trader_id)
+            MessageContent::TraderWakeUp(trader_id, scheduled_action) => {
+                self.handle_trader_wakeup(trader_id, scheduled_action)
+            }
+            MessageContent::TraderToBroker(trader_id, request) => {
+                self.handle_trader_to_broker(trader_id, request)
             }
         }
     }
 
-    fn handle_replay_to_exchange(
-        &mut self,
-        request: ReplayToExchange<ExchangeID, Symbol, Settlement>,
-    ) {
-        let exchange = self.exchanges.get_mut(&request.exchange_id).expect_with(
-            || panic!("Kernel does not know such an Exchange: {}", request.exchange_id)
+    fn handle_replay_wakeup(&mut self, scheduled_action: R2R)
+    {
+        *self.replay.current_datetime_mut() = self.current_dt;
+        let process_replay_action = |action| Self::process_replay_action(self.current_dt, action);
+        self.replay.wakeup(
+            MessageReceiver::new(&mut self.message_queue),
+            process_replay_action,
+            scheduled_action,
+            &mut self.rng,
+        )
+    }
+
+    fn handle_replay_to_exchange(&mut self, request: R2E)
+    {
+        let exchange_id = request.get_exchange_id();
+        let exchange = self.exchanges.get_mut(&exchange_id).expect_with(
+            || panic!("Kernel does not know such an Exchange: {exchange_id}")
         );
         *exchange.current_datetime_mut() = self.current_dt;
-        let process_exchange_action = |action|
+        let process_exchange_action = |action, rng: &mut RNG|
             Self::process_exchange_action(
                 self.current_dt,
                 &mut self.brokers,
-                &mut self.rng,
+                rng,
                 action,
-                request.exchange_id,
+                exchange_id,
             );
         exchange.process_replay_request(
             MessageReceiver::new(&mut self.message_queue),
             process_exchange_action,
-            request.content,
+            request,
+            &mut self.rng,
         )
     }
 
-    fn handle_exchange_to_replay(
-        &mut self,
-        reply: ExchangeToReplay<Symbol, Settlement>,
-        exchange_id: ExchangeID,
-    ) {
+    fn handle_exchange_wakeup(&mut self, exchange_id: ExchangeID, scheduled_action: E2E)
+    {
+        let exchange = self.exchanges.get_mut(&exchange_id).expect_with(
+            || panic!("Kernel does not know such an Exchange: {exchange_id}")
+        );
+        *exchange.current_datetime_mut() = self.current_dt;
+        let process_exchange_action = |action, rng: &mut RNG|
+            Self::process_exchange_action(
+                self.current_dt,
+                &mut self.brokers,
+                rng,
+                action,
+                exchange_id,
+            );
+        exchange.wakeup(
+            MessageReceiver::new(&mut self.message_queue),
+            process_exchange_action,
+            scheduled_action,
+            &mut self.rng,
+        )
+    }
+
+    fn handle_exchange_to_replay(&mut self, exchange_id: ExchangeID, reply: E2R)
+    {
         *self.replay.current_datetime_mut() = self.current_dt;
+        let process_replay_action = |action| Self::process_replay_action(self.current_dt, action);
         self.replay.handle_exchange_reply(
             MessageReceiver::new(&mut self.message_queue),
-            Self::process_replay_action,
+            process_replay_action,
             reply,
             exchange_id,
             &mut self.rng,
         )
     }
 
-    fn handle_broker_to_exchange(
-        &mut self,
-        request: BrokerToExchange<ExchangeID, Symbol, Settlement>,
-        broker_id: BrokerID,
-    ) {
-        let exchange = self.exchanges.get_mut(&request.exchange_id).expect_with(
-            || panic!("Kernel does not know such an Exchange: {}", request.exchange_id)
-        );
-        *exchange.current_datetime_mut() = self.current_dt;
-        let process_exchange_action = |action|
-            Self::process_exchange_action(
-                self.current_dt,
-                &mut self.brokers,
-                &mut self.rng,
-                action,
-                request.exchange_id,
-            );
-        exchange.process_broker_request(
-            MessageReceiver::new(&mut self.message_queue),
-            process_exchange_action,
-            request.content,
-            broker_id,
-        )
-    }
-
-    fn handle_exchange_to_broker(
-        &mut self,
-        reply: ExchangeToBroker<BrokerID, Symbol, Settlement>,
-        exchange_id: ExchangeID,
-    ) {
-        let broker = self.brokers.get_mut(&reply.broker_id).expect_with(
-            || panic!("Kernel does not know such a Broker: {}", reply.broker_id)
+    fn handle_exchange_to_broker(&mut self, exchange_id: ExchangeID, reply: E2B)
+    {
+        let broker_id = reply.get_broker_id();
+        let broker = self.brokers.get_mut(&broker_id).expect_with(
+            || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |action, broker: &B|
+        let process_broker_action = |broker: &B, action, rng: &mut RNG|
             Self::process_broker_action(
                 self.current_dt,
                 &mut self.traders,
-                &mut self.rng,
+                rng,
                 broker,
                 action,
-                reply.broker_id,
+                broker_id,
             );
         broker.process_exchange_reply(
             MessageReceiver::new(&mut self.message_queue),
             process_broker_action,
-            reply.content,
+            reply,
             exchange_id,
-            reply.exchange_dt,
+            &mut self.rng,
         )
     }
 
-    fn handle_broker_wakeup(&mut self, broker_id: BrokerID)
+    fn handle_broker_wakeup(&mut self, broker_id: BrokerID, scheduled_action: B2B)
     {
         let broker = self.brokers.get_mut(&broker_id).expect_with(
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |action, broker: &B|
+        let process_broker_action = |broker: &B, action, rng: &mut RNG|
             Self::process_broker_action(
                 self.current_dt,
                 &mut self.traders,
-                &mut self.rng,
+                rng,
                 broker,
                 action,
                 broker_id,
@@ -475,46 +599,69 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
         broker.wakeup(
             MessageReceiver::new(&mut self.message_queue),
             process_broker_action,
+            scheduled_action,
+            &mut self.rng,
         )
     }
 
-    fn handle_broker_to_trader(
-        &mut self,
-        reply: BrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-        broker_id: BrokerID,
-    ) {
-        let trader = self.traders.get_mut(&reply.trader_id).expect_with(
-            || panic!("Kernel does not know such a Trader: {}", reply.trader_id)
+    fn handle_broker_to_exchange(&mut self, broker_id: BrokerID, request: B2E)
+    {
+        let exchange_id = request.get_exchange_id();
+        let exchange = self.exchanges.get_mut(&exchange_id).expect_with(
+            || panic!("Kernel does not know such an Exchange: {exchange_id}")
+        );
+        *exchange.current_datetime_mut() = self.current_dt;
+        let process_exchange_action = |action, rng: &mut RNG|
+            Self::process_exchange_action(
+                self.current_dt,
+                &mut self.brokers,
+                rng,
+                action,
+                exchange_id,
+            );
+        exchange.process_broker_request(
+            MessageReceiver::new(&mut self.message_queue),
+            process_exchange_action,
+            request,
+            broker_id,
+            &mut self.rng,
+        )
+    }
+
+    fn handle_broker_to_trader(&mut self, broker_id: BrokerID, reply: B2T)
+    {
+        let trader_id = reply.get_trader_id();
+        let trader = self.traders.get_mut(&trader_id).expect_with(
+            || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
-        let process_trader_action = |action, trader: &T|
+        let process_trader_action = |trader: &T, action, rng: &mut RNG|
             Self::process_trader_action(
                 self.current_dt,
-                &mut self.rng,
+                rng,
                 trader,
                 action,
-                reply.trader_id,
+                trader_id,
             );
         trader.process_broker_reply(
             MessageReceiver::new(&mut self.message_queue),
             process_trader_action,
-            reply.content,
+            reply,
             broker_id,
-            reply.exchange_id,
-            reply.event_dt,
+            &mut self.rng,
         )
     }
 
-    fn handle_trader_wakeup(&mut self, trader_id: TraderID)
+    fn handle_trader_wakeup(&mut self, trader_id: TraderID, scheduled_action: T2T)
     {
         let trader = self.traders.get_mut(&trader_id).expect_with(
             || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
-        let process_trader_action = |action, trader: &T|
+        let process_trader_action = |trader: &T, action, rng: &mut RNG|
             Self::process_trader_action(
                 self.current_dt,
-                &mut self.rng,
+                rng,
                 trader,
                 action,
                 trader_id,
@@ -522,74 +669,98 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
         trader.wakeup(
             MessageReceiver::new(&mut self.message_queue),
             process_trader_action,
+            scheduled_action,
+            &mut self.rng,
         )
     }
 
-    fn handle_trader_to_broker(
-        &mut self,
-        request: TraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-        trader_id: TraderID,
-    ) {
-        let broker = self.brokers.get_mut(&request.broker_id).expect_with(
-            || panic!("Kernel does not know such an Broker: {}", request.broker_id)
+    fn handle_trader_to_broker(&mut self, trader_id: TraderID, request: T2B)
+    {
+        let broker_id = request.get_broker_id();
+        let broker = self.brokers.get_mut(&broker_id).expect_with(
+            || panic!("Kernel does not know such an Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |action, broker: &B|
+        let process_broker_action = |broker: &B, action, rng: &mut RNG|
             Self::process_broker_action(
                 self.current_dt,
                 &mut self.traders,
-                &mut self.rng,
+                rng,
                 broker,
                 action,
-                request.broker_id,
+                broker_id,
             );
         broker.process_trader_request(
             MessageReceiver::new(&mut self.message_queue),
             process_broker_action,
-            request.content,
+            request,
             trader_id,
+            &mut self.rng,
         )
+    }
+
+    fn process_replay_action(
+        current_dt: DateTime,
+        action: ReplayAction<R2R, R2E>) -> Message<
+        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
+    > {
+        if action.datetime < current_dt {
+            panic!(
+                "Replay yielded action {action:?} which DateTime ({}) \
+                is less than the Kernel current DateTime ({current_dt})",
+                action.datetime
+            )
+        };
+        Message {
+            datetime: action.datetime,
+            body: match action.content {
+                ReplayActionKind::ReplayToExchange(action) => {
+                    MessageContent::ReplayToExchange(action)
+                }
+                ReplayActionKind::ReplayToItself(action) => {
+                    MessageContent::ReplayWakeUp(action)
+                }
+            },
+        }
     }
 
     fn process_exchange_action(
         current_dt: DateTime,
         brokers: &mut HashMap<BrokerID, B>,
         rng: &mut RNG,
-        action: ExchangeAction<BrokerID, Symbol, Settlement>,
-        exchange_id: ExchangeID) -> Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
-    {
+        action: ExchangeAction<E2R, E2B, E2E>,
+        exchange_id: ExchangeID) -> Message<
+        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
+    > {
         let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
         let (datetime, body) = match action.content
         {
             ExchangeActionKind::ExchangeToBroker(reply) => {
-                let broker = brokers.get_mut(&reply.broker_id).expect_with(
-                    || panic!("Kernel does not know such a Broker: {}", reply.broker_id)
+                let broker_id = reply.get_broker_id();
+                let broker = brokers.get_mut(&broker_id).expect_with(
+                    || panic!("Kernel does not know such a Broker: {broker_id}")
                 );
                 *broker.current_datetime_mut() = current_dt;
-                let latency = broker.exchange_to_broker_latency(exchange_id, rng, delayed_dt);
+                let latency = broker.exchange_to_broker_latency(exchange_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::ExchangeToBroker(reply, exchange_id)
+                    MessageContent::ExchangeToBroker(exchange_id, reply)
                 )
             }
             ExchangeActionKind::ExchangeToReplay(reply) => {
                 (
                     delayed_dt,
-                    MessageContent::ExchangeToReplay(reply, exchange_id)
+                    MessageContent::ExchangeToReplay(exchange_id, reply)
+                )
+            }
+            ExchangeActionKind::ExchangeToItself(wakeup) => {
+                (
+                    delayed_dt,
+                    MessageContent::ExchangeWakeUp(exchange_id, wakeup)
                 )
             }
         };
         Message { datetime, body }
-    }
-
-    fn process_replay_action(
-        action: ReplayAction<ExchangeID, Symbol, Settlement>) -> Message<
-        ExchangeID, BrokerID, TraderID, Symbol, Settlement
-    > {
-        Message {
-            datetime: action.datetime,
-            body: MessageContent::ReplayToExchange(action.content),
-        }
     }
 
     fn process_broker_action(
@@ -597,36 +768,37 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
         traders: &mut HashMap<TraderID, T>,
         rng: &mut RNG,
         broker: &B,
-        action: BrokerAction<TraderID, ExchangeID, Symbol, Settlement>,
-        broker_id: BrokerID) -> Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
-    {
+        action: BrokerAction<B2E, B2T, B2B>,
+        broker_id: BrokerID) -> Message<
+        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
+    > {
         let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
         let (datetime, body) = match action.content
         {
             BrokerActionKind::BrokerToTrader(reply) => {
-                let trader = traders.get_mut(&reply.trader_id).expect_with(
-                    || panic!("Kernel does not know such a Trader: {}", reply.trader_id)
+                let trader_id = reply.get_trader_id();
+                let trader = traders.get_mut(&trader_id).expect_with(
+                    || panic!("Kernel does not know such a Trader: {trader_id}")
                 );
                 *trader.current_datetime_mut() = current_dt;
-                let latency = trader.broker_to_trader_latency(broker_id, rng, delayed_dt);
+                let latency = trader.broker_to_trader_latency(broker_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::BrokerToTrader(reply, broker_id)
+                    MessageContent::BrokerToTrader(broker_id, reply)
                 )
             }
             BrokerActionKind::BrokerToExchange(request) => {
-                let latency = broker.broker_to_exchange_latency(
-                    request.exchange_id, rng, delayed_dt,
-                );
+                let exchange_id = request.get_exchange_id();
+                let latency = broker.broker_to_exchange_latency(exchange_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::BrokerToExchange(request, broker_id)
+                    MessageContent::BrokerToExchange(broker_id, request)
                 )
             }
-            BrokerActionKind::WakeUp => {
+            BrokerActionKind::BrokerToItself(wakeup) => {
                 (
                     delayed_dt,
-                    MessageContent::BrokerWakeUp(broker_id)
+                    MessageContent::BrokerWakeUp(broker_id, wakeup)
                 )
             }
         };
@@ -637,23 +809,25 @@ Kernel<TraderID, BrokerID, ExchangeID, Symbol, Settlement, T, B, E, R, RNG>
         current_dt: DateTime,
         rng: &mut RNG,
         trader: &T,
-        action: TraderAction<BrokerID, ExchangeID, Symbol, Settlement>,
-        trader_id: TraderID) -> Message<ExchangeID, BrokerID, TraderID, Symbol, Settlement>
-    {
+        action: TraderAction<T2B, T2T>,
+        trader_id: TraderID) -> Message<
+        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
+    > {
         let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
         let (datetime, body) = match action.content
         {
             TraderActionKind::TraderToBroker(request) => {
-                let latency = trader.trader_to_broker_latency(request.broker_id, rng, delayed_dt);
+                let broker_id = request.get_broker_id();
+                let latency = trader.trader_to_broker_latency(broker_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::TraderToBroker(request, trader_id)
+                    MessageContent::TraderToBroker(trader_id, request)
                 )
             }
-            TraderActionKind::WakeUp => {
+            TraderActionKind::TraderToItself(wakeup) => {
                 (
                     delayed_dt,
-                    MessageContent::TraderWakeUp(trader_id)
+                    MessageContent::TraderWakeUp(trader_id, wakeup)
                 )
             }
         };

@@ -3,7 +3,7 @@ use {
     crate::{
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
-        types::Identifier,
+        types::Id,
     },
 };
 
@@ -19,8 +19,8 @@ bitmask! {
 
 #[derive(Debug, Clone, Copy)]
 pub struct SubscriptionConfig<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 > {
     pub exchange: ExchangeID,
@@ -57,7 +57,7 @@ impl SubscriptionList {
     }
 }
 
-impl<ExchangeID: Identifier, Symbol: Identifier, Settlement: GetSettlementLag>
+impl<ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 SubscriptionConfig<ExchangeID, Symbol, Settlement>
 {
     pub fn new(

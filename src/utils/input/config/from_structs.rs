@@ -2,74 +2,101 @@ use {
     crate::{
         broker::{
             Broker,
+            BrokerToExchange,
+            BrokerToItself,
+            BrokerToTrader,
             concrete::BasicBroker,
+            reply::BasicBrokerToTrader,
+            request::BasicBrokerToExchange,
         },
         exchange::{
             concrete::BasicExchange,
             Exchange,
+            ExchangeToBroker,
+            ExchangeToItself,
+            ExchangeToReplay,
+            reply::{BasicExchangeToBroker, BasicExchangeToReplay},
         },
         replay::{
             concrete::{ExchangeSession, GetNextObSnapshotDelay, OneTickReplay, TradedPairLifetime},
             Replay,
+            ReplayToExchange,
+            ReplayToItself,
+            request::BasicReplayToExchange,
         },
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
-        trader::{concrete::SpreadWriter, Trader},
-        types::{DateTime, Identifier, PriceStep},
+        trader::{
+            concrete::SpreadWriter,
+            request::BasicTraderToBroker,
+            subscriptions::SubscriptionConfig,
+            Trader,
+            TraderToBroker,
+            TraderToItself,
+        },
+        types::{DateTime, Id, Nothing, PriceStep},
         utils::input::one_tick::{OneTickTradedPairReader, OneTickTrdPrlConfig},
     },
     std::path::{Path, PathBuf},
 };
 
 pub trait BuildExchange<
-    ExchangeID: Identifier,
-    BrokerID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+    ExchangeID: Id,
+    BrokerID: Id,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself
 > {
-    type E: Exchange<ExchangeID, BrokerID, Symbol, Settlement>;
+    type E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>;
 
     fn build(&self) -> Self::E;
 }
 
 pub trait BuildReplay<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+    ExchangeID: Id,
+    E2R: ExchangeToReplay,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>
 > {
-    type R: Replay<ExchangeID, Symbol, Settlement>;
+    type R: Replay<ExchangeID, E2R, R2R, R2E>;
 
     fn build(&self) -> Self::R;
 }
 
 pub trait BuildBroker<
-    BrokerID: Identifier,
-    TraderID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+    BrokerID: Id,
+    TraderID: Id,
+    ExchangeID: Id,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2B: BrokerToItself,
+    SubCfg
 > {
-    type B: Broker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>;
+    type B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>;
 
     fn build(&self) -> Self::B;
 }
 
 pub trait BuildTrader<
-    TraderID: Identifier,
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
-    Settlement: GetSettlementLag
+    TraderID: Id,
+    BrokerID: Id,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself
 > {
-    type T: Trader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>;
+    type T: Trader<TraderID, BrokerID, B2T, T2B, T2T>;
 
     fn build(&self) -> Self::T;
 }
 
 #[derive(Clone)]
 pub struct OneTickTradedPairReaderConfig<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 > {
     pub exchange_id: ExchangeID,
@@ -81,7 +108,7 @@ pub struct OneTickTradedPairReaderConfig<
     pub err_log_file: Option<PathBuf>,
 }
 
-impl<ExchangeID: Identifier, Symbol: Identifier, Settlement: GetSettlementLag>
+impl<ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 From<&OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>>
 for OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
 {
@@ -100,8 +127,8 @@ for OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
 
 #[derive(Clone)]
 pub struct OneTickReplayConfig<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 > {
@@ -113,12 +140,17 @@ pub struct OneTickReplayConfig<
 }
 
 impl<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 >
-BuildReplay<ExchangeID, Symbol, Settlement>
+BuildReplay<
+    ExchangeID,
+    BasicExchangeToReplay<Symbol, Settlement>,
+    Nothing,
+    BasicReplayToExchange<ExchangeID, Symbol, Settlement>
+>
 for OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
     type R = OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>;
@@ -137,12 +169,20 @@ for OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 pub trait InitBasicExchange {}
 
 impl<
-    ExchangeID: Identifier + InitBasicExchange,
-    BrokerID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id + InitBasicExchange,
+    BrokerID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 >
-BuildExchange<ExchangeID, BrokerID, Symbol, Settlement>
+BuildExchange<
+    ExchangeID,
+    BrokerID,
+    BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
+    BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+    BasicExchangeToReplay<Symbol, Settlement>,
+    BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+    Nothing
+>
 for ExchangeID
 {
     type E = BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>;
@@ -155,13 +195,23 @@ for ExchangeID
 pub trait InitBasicBroker {}
 
 impl<
-    BrokerID: Identifier + InitBasicBroker,
-    TraderID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    BrokerID: Id + InitBasicBroker,
+    TraderID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 >
-BuildBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+BuildBroker<
+    BrokerID,
+    TraderID,
+    ExchangeID,
+    BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+    BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+    Nothing,
+    SubscriptionConfig<ExchangeID, Symbol, Settlement>
+>
 for BrokerID
 {
     type B = BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>;
@@ -172,13 +222,13 @@ for BrokerID
 }
 
 #[derive(Clone, Copy)]
-pub struct SpreadWriterConfig<TraderID: Identifier, PS: Into<PriceStep> + Copy, F: AsRef<Path>> {
+pub struct SpreadWriterConfig<TraderID: Id, PS: Into<PriceStep> + Copy, F: AsRef<Path>> {
     pub name: TraderID,
     pub file: F,
     pub price_step: PS,
 }
 
-impl<TraderID: Identifier, PS: Into<PriceStep> + Copy, F: AsRef<Path>>
+impl<TraderID: Id, PS: Into<PriceStep> + Copy, F: AsRef<Path>>
 SpreadWriterConfig<TraderID, PS, F>
 {
     pub fn new(name: TraderID, file: F, price_step: PS) -> Self {
@@ -191,15 +241,21 @@ SpreadWriterConfig<TraderID, PS, F>
 }
 
 impl<
-    TraderID: Identifier,
-    BrokerID: Identifier,
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    TraderID: Id,
+    BrokerID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag,
     PS: Into<PriceStep> + Copy,
     F: AsRef<Path>
 >
-BuildTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+BuildTrader<
+    TraderID,
+    BrokerID,
+    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+    Nothing
+>
 for SpreadWriterConfig<TraderID, PS, F>
 {
     type T = SpreadWriter<TraderID>;

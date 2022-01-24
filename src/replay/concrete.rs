@@ -1,17 +1,23 @@
 use {
     crate::{
         exchange::reply::{
+            BasicExchangeToReplay,
+            BasicExchangeToReplayReply,
             ExchangeEventNotification,
-            ExchangeToReplay,
-            ExchangeToReplayReply,
         },
-        replay::{Replay, ReplayAction, request::{ReplayRequest, ReplayToExchange}},
+        replay::{
+            Replay,
+            ReplayAction,
+            ReplayActionKind,
+            request::{BasicReplayRequest, BasicReplayToExchange},
+        },
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{
             DateTime,
             Duration,
-            Identifier,
+            Id,
+            Nothing,
             OrderID,
             PriceStep,
             TimeSync,
@@ -32,8 +38,8 @@ use {
 };
 
 pub trait GetNextObSnapshotDelay<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 > {
     fn get_ob_snapshot_delay(
@@ -45,14 +51,19 @@ pub trait GetNextObSnapshotDelay<
 }
 
 pub struct OneTickReplay<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 > {
     current_dt: DateTime,
     traded_pair_readers: Vec<OneTickTradedPairReader<ExchangeID, Symbol, Settlement>>,
-    action_queue: LessElementBinaryHeap<(ReplayAction<ExchangeID, Symbol, Settlement>, i64)>,
+    action_queue: LessElementBinaryHeap<
+        (
+            ReplayAction<Nothing, BasicReplayToExchange<ExchangeID, Symbol, Settlement>>,
+            i64
+        )
+    >,
 
     active_traded_pairs: HashSet<(ExchangeID, TradedPair<Symbol, Settlement>)>,
 
@@ -62,7 +73,7 @@ pub struct OneTickReplay<
 }
 
 #[derive(Copy, Clone)]
-pub struct ExchangeSession<ExchangeID: Identifier> {
+pub struct ExchangeSession<ExchangeID: Id> {
     pub exchange_id: ExchangeID,
     pub open_dt: DateTime,
     pub close_dt: DateTime,
@@ -70,8 +81,8 @@ pub struct ExchangeSession<ExchangeID: Identifier> {
 
 #[derive(Copy, Clone)]
 pub struct TradedPairLifetime<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag>
 {
     pub exchange_id: ExchangeID,
@@ -82,8 +93,8 @@ pub struct TradedPairLifetime<
 }
 
 impl<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 >
@@ -128,17 +139,21 @@ OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                 *prev_dt = close_dt;
                 let open_event = ReplayAction {
                     datetime: open_dt,
-                    content: ReplayToExchange {
-                        exchange_id,
-                        content: ReplayRequest::ExchangeOpen,
-                    },
+                    content: ReplayActionKind::ReplayToExchange(
+                        BasicReplayToExchange {
+                            exchange_id,
+                            content: BasicReplayRequest::ExchangeOpen,
+                        }
+                    ),
                 };
                 let close_event = ReplayAction {
                     datetime: close_dt,
-                    content: ReplayToExchange {
-                        exchange_id,
-                        content: ReplayRequest::ExchangeClosed,
-                    },
+                    content: ReplayActionKind::ReplayToExchange(
+                        BasicReplayToExchange {
+                            exchange_id,
+                            content: BasicReplayRequest::ExchangeClosed,
+                        }
+                    ),
                 };
                 [open_event, close_event].into_iter()
             }
@@ -148,18 +163,22 @@ OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                 {
                     let start_trades = ReplayAction {
                         datetime: start_dt,
-                        content: ReplayToExchange {
-                            exchange_id,
-                            content: ReplayRequest::StartTrades(traded_pair, price_step),
-                        },
+                        content: ReplayActionKind::ReplayToExchange(
+                            BasicReplayToExchange {
+                                exchange_id,
+                                content: BasicReplayRequest::StartTrades(traded_pair, price_step),
+                            }
+                        ),
                     };
                     if let Some(stop_dt) = stop_dt {
                         let stop_trades = ReplayAction {
                             datetime: stop_dt,
-                            content: ReplayToExchange {
-                                exchange_id,
-                                content: ReplayRequest::StopTrades(traded_pair),
-                            },
+                            content: ReplayActionKind::ReplayToExchange(
+                                BasicReplayToExchange {
+                                    exchange_id,
+                                    content: BasicReplayRequest::StopTrades(traded_pair),
+                                }
+                            ),
                         };
                         vec![start_trades, stop_trades]
                     } else {
@@ -198,8 +217,8 @@ OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 }
 
 impl<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 >
@@ -211,14 +230,14 @@ TimeSync for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 }
 
 impl<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 >
 Iterator for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
-    type Item = ReplayAction<ExchangeID, Symbol, Settlement>;
+    type Item = ReplayAction<Nothing, BasicReplayToExchange<ExchangeID, Symbol, Settlement>>;
 
     fn next(&mut self) -> Option<Self::Item>
     {
@@ -240,19 +259,34 @@ Iterator for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 }
 
 impl<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+    ExchangeID: Id,
+    Symbol: Id,
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 >
-Replay<ExchangeID, Symbol, Settlement>
+Replay<
+    ExchangeID,
+    BasicExchangeToReplay<Symbol, Settlement>,
+    Nothing,
+    BasicReplayToExchange<ExchangeID, Symbol, Settlement>
+>
 for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
+    fn wakeup<KernelMessage: Ord>(
+        &mut self,
+        _: MessageReceiver<KernelMessage>,
+        _: impl Fn(Self::Item) -> KernelMessage,
+        _: Nothing,
+        _: &mut impl Rng)
+    {
+        unreachable!("{} :: Replay wakeups are not planned", self.current_dt)
+    }
+
     fn handle_exchange_reply<KernelMessage: Ord>(
         &mut self,
         mut message_receiver: MessageReceiver<KernelMessage>,
         process_action: impl Fn(Self::Item) -> KernelMessage,
-        reply: ExchangeToReplay<Symbol, Settlement>,
+        reply: BasicExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID,
         rng: &mut impl Rng,
     ) {
@@ -262,10 +296,12 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             ) {
                 let action = ReplayAction {
                     datetime: self.current_dt + Duration::nanoseconds(delay.get() as i64),
-                    content: ReplayToExchange {
-                        exchange_id,
-                        content: ReplayRequest::BroadcastObStateToBrokers(traded_pair),
-                    },
+                    content: ReplayActionKind::ReplayToExchange(
+                        BasicReplayToExchange {
+                            exchange_id,
+                            content: BasicReplayRequest::BroadcastObStateToBrokers(traded_pair),
+                        }
+                    ),
                 };
                 Some(action)
             } else {
@@ -273,7 +309,7 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             }
         };
         match reply.content {
-            ExchangeToReplayReply::ExchangeEventNotification(notification) => {
+            BasicExchangeToReplayReply::ExchangeEventNotification(notification) => {
                 match notification
                 {
                     ExchangeEventNotification::ExchangeOpen => {
@@ -317,7 +353,7 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                     _ => {}
                 }
             }
-            ExchangeToReplayReply::CannotCancelOrder(cannot_cancel) => {
+            BasicExchangeToReplayReply::CannotCancelOrder(cannot_cancel) => {
                 let reader = self.traded_pair_readers.iter_mut()
                     .skip_while(|reader| reader.exchange_id != exchange_id
                         || reader.traded_pair != cannot_cancel.traded_pair)
@@ -348,11 +384,11 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                     }.expect_with(|| panic!("Cannot write to file {err_log_file:?}"))
                 }
             }
-            ExchangeToReplayReply::OrderPlacementDiscarded(_) |
-            ExchangeToReplayReply::CannotOpenExchange(_) |
-            ExchangeToReplayReply::CannotStartTrades(_) |
-            ExchangeToReplayReply::CannotCloseExchange(_) |
-            ExchangeToReplayReply::CannotStopTrades(_) => {
+            BasicExchangeToReplayReply::OrderPlacementDiscarded(_) |
+            BasicExchangeToReplayReply::CannotOpenExchange(_) |
+            BasicExchangeToReplayReply::CannotStartTrades(_) |
+            BasicExchangeToReplayReply::CannotCloseExchange(_) |
+            BasicExchangeToReplayReply::CannotStopTrades(_) => {
                 panic!("{} :: {reply:?}. Exchange {exchange_id}", self.current_dt)
             }
             _ => {}

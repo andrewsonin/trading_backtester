@@ -8,6 +8,10 @@ pub use chrono::{
 
 use {
     crate::{
+        broker::{BrokerToExchange, BrokerToItself, BrokerToTrader},
+        exchange::{ExchangeToBroker, ExchangeToItself, ExchangeToReplay},
+        replay::{ReplayToExchange, ReplayToItself},
+        trader::{TraderToBroker, TraderToItself},
         utils::{
             derive_more,
             derive_more::{Add, AddAssign, From, FromStr, Into, Sub, SubAssign, Sum},
@@ -16,17 +20,19 @@ use {
     },
     std::{
         cmp::Ordering,
+        convert::Infallible,
         fmt::{Debug, Display},
         hash::Hash,
+        marker::PhantomData,
         str::FromStr,
     },
 };
 
-pub trait Identifier: Hash + Ord + Copy + Send + Sync + Display + Debug {}
+pub trait Id: Hash + Ord + Copy + Send + Sync + Display + Debug {}
 
-impl<T: Hash + Ord + Copy + Send + Sync + Display + Debug> Identifier for T {}
+impl<T: Hash + Ord + Copy + Send + Sync + Display + Debug> Id for T {}
 
-pub trait Named<Name: Identifier> {
+pub trait Named<Name: Id> {
     fn get_name(&self) -> Name;
 }
 
@@ -107,5 +113,60 @@ impl Ord for PriceStep {
         } else {
             Ordering::Greater
         }
+    }
+}
+
+pub type Nothing = Infallible;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct NeverType<K>((Infallible, PhantomData<K>));
+
+impl BrokerToItself for Nothing {}
+
+impl<ExchangeID: Id> BrokerToExchange for NeverType<ExchangeID> {
+    type ExchangeID = ExchangeID;
+
+    fn get_exchange_id(&self) -> Self::ExchangeID {
+        unreachable!("Does not contain ExchangeID")
+    }
+}
+
+impl<TraderID: Id> BrokerToTrader for NeverType<TraderID> {
+    type TraderID = TraderID;
+
+    fn get_trader_id(&self) -> Self::TraderID {
+        unreachable!("Does not contain TraderID")
+    }
+}
+
+impl ExchangeToItself for Nothing {}
+
+impl ExchangeToReplay for Nothing {}
+
+impl<BrokerID: Id> ExchangeToBroker for NeverType<BrokerID> {
+    type BrokerID = BrokerID;
+
+    fn get_broker_id(&self) -> Self::BrokerID {
+        unreachable!("Does not contain BrokerID")
+    }
+}
+
+impl ReplayToItself for Nothing {}
+
+impl<ExchangeID: Id> ReplayToExchange for NeverType<ExchangeID> {
+    type ExchangeID = ExchangeID;
+
+    fn get_exchange_id(&self) -> ExchangeID {
+        unreachable!("Does not contain ExchangeID")
+    }
+}
+
+impl TraderToItself for Nothing {}
+
+impl<BrokerID: Id> TraderToBroker for NeverType<BrokerID> {
+    type BrokerID = BrokerID;
+
+    fn get_broker_id(&self) -> BrokerID {
+        unreachable!("Does not contain BrokerID")
     }
 }

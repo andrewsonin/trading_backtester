@@ -1,22 +1,37 @@
 use crate::{
     order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
+    replay::ReplayToExchange,
     settlement::GetSettlementLag,
     traded_pair::TradedPair,
-    types::{Identifier, PriceStep},
+    types::{Id, PriceStep},
 };
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct ReplayToExchange<
-    ExchangeID: Identifier,
-    Symbol: Identifier,
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct BasicReplayToExchange<
+    ExchangeID: Id,
+    Symbol: Id,
     Settlement: GetSettlementLag
 > {
     pub exchange_id: ExchangeID,
-    pub content: ReplayRequest<Symbol, Settlement>,
+    pub content: BasicReplayRequest<Symbol, Settlement>,
 }
 
-#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum ReplayRequest<Symbol: Identifier, Settlement: GetSettlementLag>
+impl<
+    ExchangeID: Id,
+    Symbol: Id,
+    Settlement: GetSettlementLag
+>
+ReplayToExchange
+for BasicReplayToExchange<ExchangeID, Symbol, Settlement>
+{
+    type ExchangeID = ExchangeID;
+    fn get_exchange_id(&self) -> Self::ExchangeID {
+        self.exchange_id
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum BasicReplayRequest<Symbol: Id, Settlement: GetSettlementLag>
 {
     ExchangeOpen,
 

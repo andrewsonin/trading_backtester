@@ -67,20 +67,20 @@ pub fn derive(input: TokenStream) -> TokenStream
         for #name #ty_generics
         #where_clause
         {
-            fn wakeup<KernelMessage: Ord>(
+            fn wakeup<KerMsg: Ord>(
                 &mut self,
-                message_receiver: MessageReceiver<KernelMessage>,
-                process_action: impl Fn(Self::Item) -> KernelMessage,
+                message_receiver: MessageReceiver<KerMsg>,
+                process_action: impl Fn(Self::Item) -> KerMsg,
                 scheduled_action: #r2r,
                 rng: &mut impl Rng,
             ) {
                 match self { #wakeup }
             }
 
-            fn handle_exchange_reply<KernelMessage: Ord>(
+            fn handle_exchange_reply<KerMsg: Ord>(
                 &mut self,
-                message_receiver: MessageReceiver<KernelMessage>,
-                process_action: impl Fn(Self::Item) -> KernelMessage,
+                message_receiver: MessageReceiver<KerMsg>,
+                process_action: impl Fn(Self::Item) -> KerMsg,
                 reply: #e2r,
                 exchange_id: ExchangeID,
                 rng: &mut impl Rng,

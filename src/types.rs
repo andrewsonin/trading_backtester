@@ -39,6 +39,15 @@ pub trait TimeSync {
     fn current_datetime_mut(&mut self) -> &mut DateTime;
 }
 
+pub trait Agent {
+    type Action;
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct NeverType<K>((Infallible, PhantomData<K>));
+
+pub type Nothing = NeverType<()>;
+
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Clone, Copy)]
 #[derive(derive_more::Display, FromStr, Add, Sub, AddAssign, SubAssign, From, Into)]
 pub struct OrderID(pub u64);
@@ -115,16 +124,32 @@ impl Ord for PriceStep {
     }
 }
 
-pub type Nothing = Infallible;
+impl ReplayToItself for Nothing {}
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct NeverType<K>((Infallible, PhantomData<K>));
+impl ExchangeToItself for Nothing {}
+
+impl ExchangeToReplay for Nothing {}
 
 impl BrokerToItself for Nothing {}
 
+impl TraderToItself for Nothing {}
+
+impl<ExchangeID: Id> ReplayToExchange for NeverType<ExchangeID> {
+    type ExchangeID = ExchangeID;
+    fn get_exchange_id(&self) -> ExchangeID {
+        unreachable!("Does not contain ExchangeID")
+    }
+}
+
+impl<BrokerID: Id> ExchangeToBroker for NeverType<BrokerID> {
+    type BrokerID = BrokerID;
+    fn get_broker_id(&self) -> Self::BrokerID {
+        unreachable!("Does not contain BrokerID")
+    }
+}
+
 impl<ExchangeID: Id> BrokerToExchange for NeverType<ExchangeID> {
     type ExchangeID = ExchangeID;
-
     fn get_exchange_id(&self) -> Self::ExchangeID {
         unreachable!("Does not contain ExchangeID")
     }
@@ -132,39 +157,13 @@ impl<ExchangeID: Id> BrokerToExchange for NeverType<ExchangeID> {
 
 impl<TraderID: Id> BrokerToTrader for NeverType<TraderID> {
     type TraderID = TraderID;
-
     fn get_trader_id(&self) -> Self::TraderID {
         unreachable!("Does not contain TraderID")
     }
 }
 
-impl ExchangeToItself for Nothing {}
-
-impl ExchangeToReplay for Nothing {}
-
-impl<BrokerID: Id> ExchangeToBroker for NeverType<BrokerID> {
-    type BrokerID = BrokerID;
-
-    fn get_broker_id(&self) -> Self::BrokerID {
-        unreachable!("Does not contain BrokerID")
-    }
-}
-
-impl ReplayToItself for Nothing {}
-
-impl<ExchangeID: Id> ReplayToExchange for NeverType<ExchangeID> {
-    type ExchangeID = ExchangeID;
-
-    fn get_exchange_id(&self) -> ExchangeID {
-        unreachable!("Does not contain ExchangeID")
-    }
-}
-
-impl TraderToItself for Nothing {}
-
 impl<BrokerID: Id> TraderToBroker for NeverType<BrokerID> {
     type BrokerID = BrokerID;
-
     fn get_broker_id(&self) -> BrokerID {
         unreachable!("Does not contain BrokerID")
     }

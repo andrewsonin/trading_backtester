@@ -271,20 +271,20 @@ Replay<
 >
 for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
-    fn wakeup<KernelMessage: Ord>(
+    fn wakeup<KerMsg: Ord>(
         &mut self,
-        _: MessageReceiver<KernelMessage>,
-        _: impl Fn(Self::Item) -> KernelMessage,
+        _: MessageReceiver<KerMsg>,
+        _: impl Fn(Self::Item) -> KerMsg,
         _: Nothing,
-        _: &mut impl Rng)
-    {
+        _: &mut impl Rng,
+    ) {
         unreachable!("{} :: Replay wakeups are not planned", self.current_dt)
     }
 
-    fn handle_exchange_reply<KernelMessage: Ord>(
+    fn handle_exchange_reply<KerMsg: Ord>(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        process_action: impl Fn(Self::Item) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        process_action: impl Fn(Self::Item) -> KerMsg,
         reply: BasicExchangeToReplay<Symbol, Settlement>,
         exchange_id: ExchangeID,
         rng: &mut impl Rng,

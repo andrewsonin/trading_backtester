@@ -15,21 +15,15 @@ pub struct BasicBrokerToExchange<
     pub content: BasicBrokerRequest<Symbol, Settlement>,
 }
 
-impl<
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 BrokerToExchange
 for BasicBrokerToExchange<ExchangeID, Symbol, Settlement>
 {
     type ExchangeID = ExchangeID;
-
     fn get_exchange_id(&self) -> Self::ExchangeID {
         self.exchange_id
     }
 }
-
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum BasicBrokerRequest<Symbol: Id, Settlement: GetSettlementLag>

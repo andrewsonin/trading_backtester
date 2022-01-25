@@ -1,7 +1,7 @@
 use crate::{
     broker::BrokerToExchange,
     replay::ReplayToExchange,
-    types::{Id, Named, TimeSync},
+    types::{Agent, Id, Named, TimeSync},
     utils::{queue::MessageReceiver, rand::Rng},
 };
 
@@ -38,7 +38,8 @@ pub trait ExchangeToBroker: Ord {
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
-pub trait Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>: TimeSync + Named<ExchangeID>
+pub trait Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>:
+TimeSync + Named<ExchangeID> + Agent<Action=ExchangeAction<E2R, E2B, E2E>>
     where ExchangeID: Id,
           BrokerID: Id,
           R2E: ReplayToExchange<ExchangeID=ExchangeID>,
@@ -50,7 +51,7 @@ pub trait Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>: TimeSync + Na
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(ExchangeAction<E2R, E2B, E2E>, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
         scheduled_action: E2E,
         rng: &mut RNG,
     );
@@ -58,7 +59,7 @@ pub trait Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>: TimeSync + Na
     fn process_broker_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(ExchangeAction<E2R, E2B, E2E>, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
         request: B2E,
         broker_id: BrokerID,
         rng: &mut RNG,
@@ -67,7 +68,7 @@ pub trait Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>: TimeSync + Na
     fn process_replay_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(ExchangeAction<E2R, E2B, E2E>, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
         request: R2E,
         rng: &mut RNG,
     );

@@ -1,6 +1,6 @@
 use crate::{
     broker::BrokerToTrader,
-    types::{DateTime, Id, Named, TimeSync},
+    types::{Agent, DateTime, Id, Named, TimeSync},
     utils::{queue::MessageReceiver, rand::Rng},
 };
 
@@ -27,7 +27,8 @@ pub trait TraderToBroker: Ord {
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
-pub trait Trader<TraderID, BrokerID, B2T, T2B, T2T>: TimeSync + Named<TraderID>
+pub trait Trader<TraderID, BrokerID, B2T, T2B, T2T>:
+TimeSync + Named<TraderID> + Agent<Action=TraderAction<T2B, T2T>>
     where TraderID: Id,
           BrokerID: Id,
           B2T: BrokerToTrader<TraderID=TraderID>,
@@ -37,7 +38,7 @@ pub trait Trader<TraderID, BrokerID, B2T, T2B, T2T>: TimeSync + Named<TraderID>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, TraderAction<T2B, T2T>, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         scheduled_action: T2T,
         rng: &mut RNG,
     );
@@ -45,7 +46,7 @@ pub trait Trader<TraderID, BrokerID, B2T, T2B, T2T>: TimeSync + Named<TraderID>
     fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, TraderAction<T2B, T2T>, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         reply: B2T,
         broker_id: BrokerID,
         rng: &mut RNG,

@@ -40,6 +40,7 @@ use {
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{
+            Agent,
             Date,
             DateTime,
             Direction,
@@ -86,12 +87,7 @@ pub struct BasicExchange<
     is_open: bool,
 }
 
-impl<
-    ExchangeID: Id,
-    BrokerID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
 TimeSync
 for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
@@ -100,18 +96,23 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     }
 }
 
-impl<
-    ExchangeID: Id,
-    BrokerID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
 Named<ExchangeID>
 for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
     fn get_name(&self) -> ExchangeID {
         self.name
     }
+}
+
+impl<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
+Agent for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
+{
+    type Action = ExchangeAction<
+        BasicExchangeToReplay<Symbol, Settlement>,
+        BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+        Nothing
+    >;
 }
 
 impl<
@@ -134,12 +135,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl FnMut(
-            ExchangeAction<
-                BasicExchangeToReplay<Symbol, Settlement>,
-                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-                Nothing>,
-            &mut RNG) -> KerMsg,
+        _: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
         _: Nothing,
         _: &mut RNG,
     ) {
@@ -149,13 +145,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     fn process_broker_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        mut process_action: impl FnMut(
-            ExchangeAction<
-                BasicExchangeToReplay<Symbol, Settlement>,
-                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-                Nothing
-            >,
-            &mut RNG) -> KerMsg,
+        mut process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
         request: BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
         broker_id: BrokerID,
         rng: &mut RNG,
@@ -185,13 +175,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     fn process_replay_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        mut process_action: impl FnMut(
-            ExchangeAction<
-                BasicExchangeToReplay<Symbol, Settlement>,
-                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-                Nothing
-            >,
-            &mut RNG) -> KerMsg,
+        mut process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
         request: BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
         rng: &mut RNG,
     ) {
@@ -240,12 +224,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     }
 }
 
-impl<
-    ExchangeID: Id,
-    BrokerID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
 BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
     pub fn new(name: ExchangeID) -> Self
@@ -262,15 +241,10 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         }
     }
 
-    fn try_broadcast_ob_state<KernelMessage: Ord>(
+    fn try_broadcast_ob_state<KerMsg: Ord>(
         &self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(
-            ExchangeAction<
-                BasicExchangeToReplay<Symbol, Settlement>,
-                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-                Nothing
-            >) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        mut process_action: impl FnMut(<Self as Agent>::Action) -> KerMsg,
         traded_pair: TradedPair<Symbol, Settlement>,
     ) {
         if !self.is_open {
@@ -316,18 +290,13 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     }
 
     fn try_cancel_limit_order<
-        KernelMessage: Ord,
-        ProcessAction: FnMut(
-            ExchangeAction<
-                BasicExchangeToReplay<Symbol, Settlement>,
-                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-                Nothing
-            >) -> KernelMessage,
+        KerMsg: Ord,
+        ProcessAction: FnMut(<Self as Agent>::Action) -> KerMsg,
         GetBrokerID: Fn() -> BrokerID,
         const REPLAY: bool
     >(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
+        mut message_receiver: MessageReceiver<KerMsg>,
         mut process_action: ProcessAction,
         request: LimitOrderCancelRequest<Symbol, Settlement>,
         get_broker_id: GetBrokerID,
@@ -453,15 +422,10 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         message_receiver.push(process_action(reply))
     }
 
-    fn try_stop_trades<KernelMessage: Ord>(
+    fn try_stop_trades<KerMsg: Ord>(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(
-            ExchangeAction<
-                BasicExchangeToReplay<Symbol, Settlement>,
-                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-                Nothing
-            >) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        mut process_action: impl FnMut(<Self as Agent>::Action) -> KerMsg,
         traded_pair: TradedPair<Symbol, Settlement>,
     ) {
         if !self.is_open {
@@ -532,11 +496,8 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     }
 
     fn create_replay_reply(
-        content: BasicExchangeToReplayReply<Symbol, Settlement>) -> ExchangeAction<
-        BasicExchangeToReplay<Symbol, Settlement>,
-        BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-        Nothing
-    > {
+        content: BasicExchangeToReplayReply<Symbol, Settlement>) -> <Self as Agent>::Action
+    {
         ExchangeAction {
             delay: 0,
             content: ExchangeActionKind::ExchangeToReplay(BasicExchangeToReplay { content }),
@@ -546,11 +507,8 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     fn create_broker_reply(
         &self,
         broker_id: BrokerID,
-        content: BasicExchangeToBrokerReply<Symbol, Settlement>) -> ExchangeAction<
-        BasicExchangeToReplay<Symbol, Settlement>,
-        BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-        Nothing
-    > {
+        content: BasicExchangeToBrokerReply<Symbol, Settlement>) -> <Self as Agent>::Action
+    {
         ExchangeAction {
             delay: 0,
             content: ExchangeActionKind::ExchangeToBroker(
@@ -563,14 +521,10 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         }
     }
 
-    fn try_open<KernelMessage: Ord>(
+    fn try_open<KerMsg: Ord>(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(ExchangeAction<
-            BasicExchangeToReplay<Symbol, Settlement>,
-            BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-            Nothing
-        >) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        mut process_action: impl FnMut(<Self as Agent>::Action) -> KerMsg,
     ) {
         if self.is_open {
             let reply = Self::create_replay_reply(
@@ -603,14 +557,10 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         }
     }
 
-    fn try_close<KernelMessage: Ord>(
+    fn try_close<KerMsg: Ord>(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(ExchangeAction<
-            BasicExchangeToReplay<Symbol, Settlement>,
-            BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-            Nothing
-        >) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        mut process_action: impl FnMut(<Self as Agent>::Action) -> KerMsg,
     ) {
         if self.is_open
         {
@@ -678,14 +628,10 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         }
     }
 
-    fn try_start_trades<KernelMessage: Ord>(
+    fn try_start_trades<KerMsg: Ord>(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(ExchangeAction<
-            BasicExchangeToReplay<Symbol, Settlement>,
-            BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-            Nothing
-        >) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        mut process_action: impl FnMut(<Self as Agent>::Action) -> KerMsg,
         traded_pair: TradedPair<Symbol, Settlement>,
         price_step: PriceStep,
     ) {
@@ -732,17 +678,13 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     }
 
     fn try_place_market_order<
-        KernelMessage: Ord,
-        ProcessAction: FnMut(ExchangeAction<
-            BasicExchangeToReplay<Symbol, Settlement>,
-            BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-            Nothing
-        >) -> KernelMessage,
+        KerMsg: Ord,
+        ProcessAction: FnMut(<Self as Agent>::Action) -> KerMsg,
         GetBrokerID: Fn() -> BrokerID,
         const REPLAY: bool
     >(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
+        mut message_receiver: MessageReceiver<KerMsg>,
         mut process_action: ProcessAction,
         order: MarketOrderPlacingRequest<Symbol, Settlement>,
         get_broker_id: GetBrokerID,
@@ -949,17 +891,13 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     }
 
     fn try_place_limit_order<
-        KernelMessage: Ord,
-        ProcessAction: FnMut(ExchangeAction<
-            BasicExchangeToReplay<Symbol, Settlement>,
-            BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-            Nothing
-        >) -> KernelMessage,
+        KerMsg: Ord,
+        ProcessAction: FnMut(<Self as Agent>::Action) -> KerMsg,
         GetBrokerID: Fn() -> BrokerID,
         const REPLAY: bool
     >(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
+        mut message_receiver: MessageReceiver<KerMsg>,
         mut process_action: ProcessAction,
         order: LimitOrderPlacingRequest<Symbol, Settlement>,
         get_broker_id: GetBrokerID,
@@ -1159,19 +1097,15 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     }
 
     fn interpret_ob_event<
-        KernelMessage: Ord,
-        ProcessAction: FnMut(ExchangeAction<
-            BasicExchangeToReplay<Symbol, Settlement>,
-            BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-            Nothing
-        >) -> KernelMessage,
+        KerMsg: Ord,
+        ProcessAction: FnMut(<Self as Agent>::Action) -> KerMsg,
         GetBrokerID: Fn() -> BrokerID,
         const DUMMY: bool,
         const BUY: bool,
         const REPLAY: bool
     >(
         &self,
-        message_receiver: &mut MessageReceiver<KernelMessage>,
+        message_receiver: &mut MessageReceiver<KerMsg>,
         mut process_action: ProcessAction,
         remaining_size: &mut Size,
         event: OrderBookEvent,

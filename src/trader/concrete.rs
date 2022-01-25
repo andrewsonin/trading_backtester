@@ -13,35 +13,51 @@ use {
             TraderToBroker,
             TraderToItself,
         },
-        types::{Date, DateTime, Id, Named, Nothing, ObState, PriceStep, Size, TimeSync},
+        types::{Agent, Date, DateTime, Id, Named, Nothing, ObState, PriceStep, Size, TimeSync},
         utils::{queue::MessageReceiver, rand::Rng},
     },
-    std::{fs::File, io::Write, path::Path},
+    std::{fs::File, io::Write, marker::PhantomData, path::Path},
 };
 
-pub struct VoidTrader<TraderID: Id> {
+pub struct VoidTrader<
+    TraderID: Id,
+    BrokerID: Id,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself
+> {
     name: TraderID,
     current_dt: DateTime,
+    phantom: PhantomData<(BrokerID, T2B, T2T)>,
 }
 
-impl<TraderID: Id> VoidTrader<TraderID>
+impl<TraderID: Id, BrokerID: Id, T2B: TraderToBroker<BrokerID=BrokerID>, T2T: TraderToItself>
+VoidTrader<TraderID, BrokerID, T2B, T2T>
 {
     pub fn new(name: TraderID) -> Self {
         VoidTrader {
             name,
             current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
+            phantom: Default::default(),
         }
     }
 }
 
-impl<TraderID: Id> TimeSync for VoidTrader<TraderID>
+impl<TraderID: Id, BrokerID: Id, T2B: TraderToBroker<BrokerID=BrokerID>, T2T: TraderToItself>
+TimeSync for VoidTrader<TraderID, BrokerID, T2B, T2T>
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime { &mut self.current_dt }
 }
 
-impl<TraderID: Id> Named<TraderID> for VoidTrader<TraderID>
+impl<TraderID: Id, BrokerID: Id, T2B: TraderToBroker<BrokerID=BrokerID>, T2T: TraderToItself>
+Named<TraderID> for VoidTrader<TraderID, BrokerID, T2B, T2T>
 {
     fn get_name(&self) -> TraderID { self.name }
+}
+
+impl<TraderID: Id, BrokerID: Id, T2B: TraderToBroker<BrokerID=BrokerID>, T2T: TraderToItself>
+Agent for VoidTrader<TraderID, BrokerID, T2B, T2T>
+{
+    type Action = TraderAction<T2B, T2T>;
 }
 
 impl<
@@ -52,20 +68,20 @@ impl<
     T2T: TraderToItself
 >
 Trader<TraderID, BrokerID, B2T, T2B, T2T>
-for VoidTrader<TraderID>
+for VoidTrader<TraderID, BrokerID, T2B, T2T>
 {
-    fn wakeup<KernelMessage: Ord, RNG: Rng>(
+    fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        _: MessageReceiver<KernelMessage>,
-        _: impl FnMut(&Self, TraderAction<T2B, T2T>, &mut RNG) -> KernelMessage,
+        _: MessageReceiver<KerMsg>,
+        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         _: T2T,
         _: &mut RNG,
     ) {}
 
-    fn process_broker_reply<KernelMessage: Ord, RNG: Rng>(
+    fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        _: MessageReceiver<KernelMessage>,
-        _: impl FnMut(&Self, TraderAction<T2B, T2T>, &mut RNG) -> KernelMessage,
+        _: MessageReceiver<KerMsg>,
+        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         _: B2T,
         _: BrokerID,
         _: &mut RNG,
@@ -76,14 +92,22 @@ for VoidTrader<TraderID>
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }
 
-pub struct SpreadWriter<TraderID: Id> {
+pub struct SpreadWriter<
+    TraderID: Id,
+    BrokerID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
+    Settlement: GetSettlementLag
+> {
     name: TraderID,
     current_dt: DateTime,
     price_step: PriceStep,
     file: File,
+    phantom: PhantomData<(BrokerID, ExchangeID, Symbol, Settlement)>,
 }
 
-impl<TraderID: Id> SpreadWriter<TraderID>
+impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 {
     pub fn new(name: TraderID, price_step: impl Into<PriceStep>, file: impl AsRef<Path>) -> Self {
         let file = file.as_ref();
@@ -97,25 +121,33 @@ impl<TraderID: Id> SpreadWriter<TraderID>
             current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
             price_step: price_step.into(),
             file,
+            phantom: Default::default(),
         }
     }
 }
 
-impl<TraderID: Id> TimeSync for SpreadWriter<TraderID> {
+impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+TimeSync for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+{
     fn current_datetime_mut(&mut self) -> &mut DateTime { &mut self.current_dt }
 }
 
-impl<TraderID: Id> Named<TraderID> for SpreadWriter<TraderID> {
+impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+Named<TraderID> for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+{
     fn get_name(&self) -> TraderID { self.name }
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+Agent for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+{
+    type Action = TraderAction<
+        BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+        Nothing
+    >;
+}
+
+impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 Trader<
     TraderID,
     BrokerID,
@@ -123,34 +155,22 @@ Trader<
     BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
     Nothing
 >
-for SpreadWriter<TraderID>
+for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 {
-    fn wakeup<KernelMessage: Ord, RNG: Rng>(
+    fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        _: MessageReceiver<KernelMessage>,
-        _: impl FnMut(
-            &Self,
-            TraderAction<
-                BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-                Nothing
-            >,
-            &mut RNG) -> KernelMessage,
+        _: MessageReceiver<KerMsg>,
+        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         _: Nothing,
         _: &mut RNG,
     ) {
         unreachable!("Trader {} did not schedule any wakeups", self.get_name())
     }
 
-    fn process_broker_reply<KernelMessage: Ord, RNG: Rng>(
+    fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        _: MessageReceiver<KernelMessage>,
-        _: impl FnMut(
-            &Self,
-            TraderAction<
-                BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-                Nothing
-            >,
-            &mut RNG) -> KernelMessage,
+        _: MessageReceiver<KerMsg>,
+        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         reply: BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
         _: BrokerID,
         _: &mut RNG,

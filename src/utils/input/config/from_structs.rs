@@ -258,7 +258,7 @@ BuildTrader<
 >
 for SpreadWriterConfig<TraderID, PS, F>
 {
-    type T = SpreadWriter<TraderID>;
+    type T = SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>;
 
     fn build(&self) -> Self::T {
         Self::T::new(self.name, self.price_step, &self.file)

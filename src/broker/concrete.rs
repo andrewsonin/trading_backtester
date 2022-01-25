@@ -32,7 +32,7 @@ use {
             request::{BasicTraderRequest, BasicTraderToBroker},
             subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
         },
-        types::{Date, DateTime, Id, Named, Nothing, OrderID, TimeSync},
+        types::{Agent, Date, DateTime, Id, Named, Nothing, OrderID, TimeSync},
         utils::{queue::MessageReceiver, rand::Rng},
     },
     std::collections::{HashMap, HashSet},
@@ -88,6 +88,16 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 }
 
 impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+Agent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+{
+    type Action = BrokerAction<
+        BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+        BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+        Nothing
+    >;
+}
+
+impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 Broker<
     BrokerID, TraderID, ExchangeID,
     BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
@@ -99,34 +109,20 @@ Broker<
 >
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
-    fn wakeup<KernelMessage: Ord, RNG: Rng>(
+    fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        _: MessageReceiver<KernelMessage>,
-        _: impl FnMut(
-            &Self,
-            BrokerAction<
-                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-                Nothing
-            >,
-            &mut RNG) -> KernelMessage,
+        _: MessageReceiver<KerMsg>,
+        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         _: Nothing,
         _: &mut RNG,
     ) {
         unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
     }
 
-    fn process_trader_request<KernelMessage: Ord, RNG: Rng>(
+    fn process_trader_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(
-            &Self,
-            BrokerAction<
-                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-                Nothing
-            >,
-            &mut RNG) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        mut process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         request: BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
         trader_id: TraderID,
         rng: &mut RNG,
@@ -237,17 +233,10 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         message_receiver.push(process_action(&self, action, rng))
     }
 
-    fn process_exchange_reply<KernelMessage: Ord, RNG: Rng>(
+    fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(
-            &Self,
-            BrokerAction<
-                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-                Nothing
-            >,
-            &mut RNG) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        mut process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         reply: BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
         exchange_id: ExchangeID,
         rng: &mut RNG,
@@ -475,13 +464,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     }
 }
 
-impl<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
     pub fn new(name: BrokerID) -> Self {
@@ -497,17 +480,10 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         }
     }
 
-    fn handle_exchange_notification<KernelMessage: Ord, RNG: Rng>(
+    fn handle_exchange_notification<KerMsg: Ord, RNG: Rng>(
         &mut self,
-        mut message_receiver: MessageReceiver<KernelMessage>,
-        mut process_action: impl FnMut(
-            &Self,
-            BrokerAction<
-                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-                Nothing
-            >,
-            &mut RNG) -> KernelMessage,
+        mut message_receiver: MessageReceiver<KerMsg>,
+        mut process_action: impl FnMut(&Self, <Self as Agent>::Action, &mut RNG) -> KerMsg,
         notification: ExchangeEventNotification<Symbol, Settlement>,
         exchange_id: ExchangeID,
         exchange_dt: DateTime,
@@ -658,11 +634,8 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         trader_id: TraderID,
         exchange_id: ExchangeID,
         event_dt: DateTime,
-        content: BasicBrokerReply<Symbol, Settlement>) -> BrokerAction<
-        BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-        BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-        Nothing
-    > {
+        content: BasicBrokerReply<Symbol, Settlement>) -> <Self as Agent>::Action
+    {
         BrokerAction {
             delay: 0,
             content: BrokerActionKind::BrokerToTrader(
@@ -678,11 +651,8 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 
     fn create_broker_request(
         exchange_id: ExchangeID,
-        content: BasicBrokerRequest<Symbol, Settlement>) -> BrokerAction<
-        BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-        BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-        Nothing
-    > {
+        content: BasicBrokerRequest<Symbol, Settlement>) -> <Self as Agent>::Action
+    {
         BrokerAction {
             delay: 0,
             content: BrokerActionKind::BrokerToExchange(

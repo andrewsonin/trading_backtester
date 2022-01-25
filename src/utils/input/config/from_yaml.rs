@@ -1227,7 +1227,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     let buy_sell_flag_colname = env
         .get(field)
         .unwrap_or_else(
-            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path(), )
+            || panic!("Section \"{}\" should contain \"{field}\" value", full_section_path())
         );
 
     let get_current_section = || format!("{} :: {field}", full_section_path());

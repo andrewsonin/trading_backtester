@@ -1,7 +1,7 @@
 use crate::{
     exchange::ExchangeToBroker,
     trader::TraderToBroker,
-    types::{DateTime, Id, Named, TimeSync},
+    types::{Agent, DateTime, Id, Named, TimeSync},
     utils::{queue::MessageReceiver, rand::Rng},
 };
 
@@ -42,8 +42,8 @@ pub trait BrokerToTrader: Ord {
     fn get_trader_id(&self) -> Self::TraderID;
 }
 
-pub trait
-Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>: TimeSync + Named<BrokerID>
+pub trait Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>:
+TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>>
     where BrokerID: Id,
           TraderID: Id,
           ExchangeID: Id,
@@ -56,7 +56,7 @@ Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>: TimeSyn
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, BrokerAction<B2E, B2T, B2B>, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         scheduled_action: B2B,
         rng: &mut RNG,
     );
@@ -64,7 +64,7 @@ Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>: TimeSyn
     fn process_trader_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, BrokerAction<B2E, B2T, B2B>, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         request: T2B,
         trader_id: TraderID,
         rng: &mut RNG,
@@ -73,7 +73,7 @@ Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>: TimeSyn
     fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, BrokerAction<B2E, B2T, B2B>, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
         reply: E2B,
         exchange_id: ExchangeID,
         rng: &mut RNG,

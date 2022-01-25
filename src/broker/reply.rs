@@ -25,17 +25,11 @@ pub struct BasicBrokerToTrader<
     pub content: BasicBrokerReply<Symbol, Settlement>,
 }
 
-impl<
-    TraderID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 BrokerToTrader
 for BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>
 {
     type TraderID = TraderID;
-
     fn get_trader_id(&self) -> Self::TraderID {
         self.trader_id
     }

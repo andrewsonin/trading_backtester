@@ -26,6 +26,7 @@ use {
             OrderExecuted,
             OrderPartiallyExecuted,
         },
+        latency::{concrete::ConstantLatency, Latent},
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         trader::{
@@ -98,6 +99,17 @@ Agent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 }
 
 impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+Latent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+{
+    type OuterID = ExchangeID;
+    type LatencyGenerator = ConstantLatency<0, 0>;
+
+    fn latency_generator<RNG: Rng>(&self) -> Self::LatencyGenerator {
+        ConstantLatency::<0, 0>
+    }
+}
+
+impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 Broker<
     BrokerID, TraderID, ExchangeID,
     BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
@@ -112,7 +124,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        _: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
         _: Nothing,
         _: &mut RNG,
     ) {
@@ -122,7 +134,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn process_trader_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        mut process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
         request: BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
         trader_id: TraderID,
         rng: &mut RNG,
@@ -230,13 +242,13 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 }
             }
         };
-        message_receiver.push(process_action(&self, action, rng))
+        message_receiver.push(process_action(self.latency_generator::<RNG>(), action, rng))
     }
 
     fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        mut process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
         reply: BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
         exchange_id: ExchangeID,
         rng: &mut RNG,
@@ -426,12 +438,8 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 return;
             }
         };
-        message_receiver.push(process_action(&self, message, rng))
+        message_receiver.push(process_action(self.latency_generator::<RNG>(), message, rng))
     }
-
-    fn broker_to_exchange_latency(&self, _: ExchangeID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
-
-    fn exchange_to_broker_latency(&self, _: ExchangeID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
 
     fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID) {
         self.registered_exchanges.insert(exchange_id);
@@ -483,13 +491,13 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn handle_exchange_notification<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut process_action: impl FnMut(&Self, <Self as Agent>::Action, &mut RNG) -> KerMsg,
+        mut process_action: impl FnMut(<Self as Latent>::LatencyGenerator, <Self as Agent>::Action, &mut RNG) -> KerMsg,
         notification: ExchangeEventNotification<Symbol, Settlement>,
         exchange_id: ExchangeID,
         exchange_dt: DateTime,
         rng: &mut RNG,
     ) {
-        let process_action = |action| process_action(&self, action, rng);
+        let process_action = |action| process_action(self.latency_generator::<RNG>(), action, rng);
         match notification {
             ExchangeEventNotification::ExchangeOpen => {
                 let action_iterator = self.trader_configs.keys().map(

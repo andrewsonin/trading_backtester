@@ -16,6 +16,7 @@ use {
             ExchangeToItself,
             ExchangeToReplay,
         },
+        latency::LatencyGenerator,
         replay::{Replay, ReplayAction, ReplayActionKind, ReplayToExchange, ReplayToItself},
         trader::{
             Trader,
@@ -562,12 +563,12 @@ Kernel<
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |broker: &B, action, rng: &mut RNG|
+        let process_broker_action = |latency_generator, action, rng: &mut RNG|
             Self::process_broker_action(
                 self.current_dt,
                 &mut self.traders,
                 rng,
-                broker,
+                latency_generator,
                 action,
                 broker_id,
             );
@@ -586,12 +587,12 @@ Kernel<
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |broker: &B, action, rng: &mut RNG|
+        let process_broker_action = |latency_generator, action, rng: &mut RNG|
             Self::process_broker_action(
                 self.current_dt,
                 &mut self.traders,
                 rng,
-                broker,
+                latency_generator,
                 action,
                 broker_id,
             );
@@ -680,12 +681,12 @@ Kernel<
             || panic!("Kernel does not know such an Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |broker: &B, action, rng: &mut RNG|
+        let process_broker_action = |latency_generator, action, rng: &mut RNG|
             Self::process_broker_action(
                 self.current_dt,
                 &mut self.traders,
                 rng,
-                broker,
+                latency_generator,
                 action,
                 broker_id,
             );
@@ -740,7 +741,9 @@ Kernel<
                     || panic!("Kernel does not know such a Broker: {broker_id}")
                 );
                 *broker.current_datetime_mut() = current_dt;
-                let latency = broker.exchange_to_broker_latency(exchange_id, delayed_dt, rng);
+                let latency = broker
+                    .latency_generator::<RNG>()
+                    .incoming_latency(exchange_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
                     MessageContent::ExchangeToBroker(exchange_id, reply)
@@ -766,7 +769,7 @@ Kernel<
         current_dt: DateTime,
         traders: &mut HashMap<TraderID, T>,
         rng: &mut RNG,
-        broker: &B,
+        mut latency_generator: impl LatencyGenerator<ExchangeID>,
         action: BrokerAction<B2E, B2T, B2B>,
         broker_id: BrokerID) -> Message<
         ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
@@ -788,7 +791,7 @@ Kernel<
             }
             BrokerActionKind::BrokerToExchange(request) => {
                 let exchange_id = request.get_exchange_id();
-                let latency = broker.broker_to_exchange_latency(exchange_id, delayed_dt, rng);
+                let latency = latency_generator.outgoing_latency(exchange_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
                     MessageContent::BrokerToExchange(broker_id, request)

@@ -1,6 +1,7 @@
 pub mod broker;
 pub mod exchange;
 pub mod kernel;
+pub mod latency;
 pub mod order;
 pub mod order_book;
 pub mod parallel;
@@ -36,6 +37,7 @@ pub mod prelude {
             reply as exchange_reply,
         },
         kernel::{Kernel, KernelBuilder},
+        latency::{concrete as latency_examples, LatencyGenerator, Latent},
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
         order_book::{LimitOrder, OrderBook, OrderBookEvent, OrderBookEventKind},
         parallel::{ParallelBacktester, ThreadConfig},
@@ -69,6 +71,7 @@ pub mod prelude {
         },
         types::*,
         utils::{
+            chrono,
             constants,
             derive_macros,
             derive_more,
@@ -298,12 +301,16 @@ mod tests {
     #[allow(dead_code)]
     mod test_enum_def {
         use {
+            broker_examples::BasicBroker,
             crate::{
-                exchange::reply::BasicExchangeToReplay,
+                broker::{reply::BasicBrokerToTrader, request::BasicBrokerToExchange},
+                exchange::reply::{BasicExchangeToBroker, BasicExchangeToReplay},
                 prelude::*,
                 replay::request::BasicReplayToExchange,
+                trader::request::BasicTraderToBroker,
             },
-            derive_macros::Replay,
+            derive_macros::{Broker, Exchange, Replay},
+            exchange_example::BasicExchange,
             rand::Rng,
             replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
         };
@@ -328,5 +335,42 @@ mod tests {
                 OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             }
         }
+
+        enum_def! {
+            #[derive(Exchange)]
+            #[exchange(
+                ExchangeID,
+                BrokerID,
+                BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
+                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+                BasicExchangeToReplay<Symbol, Settlement>,
+                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+                Nothing
+            )]
+            ExchangeEnum<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
+            {
+                BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
+            }
+        }
+
+        enum_def! {
+            #[derive(Broker)]
+            #[broker(
+                BrokerID, TraderID, ExchangeID,
+                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+                BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+                Nothing,
+                SubscriptionConfig<ExchangeID, Symbol, Settlement>
+            )]
+            BrokerEnum<
+                BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id,
+                Settlement: GetSettlementLag
+            > {
+                BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+            }
+        }
     }
 }
+

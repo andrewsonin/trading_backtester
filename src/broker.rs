@@ -1,7 +1,8 @@
 use crate::{
     exchange::ExchangeToBroker,
+    latency::Latent,
     trader::TraderToBroker,
-    types::{Agent, DateTime, Id, Named, TimeSync},
+    types::{Agent, Id, Named, TimeSync},
     utils::{queue::MessageReceiver, rand::Rng},
 };
 
@@ -43,7 +44,7 @@ pub trait BrokerToTrader: Ord {
 }
 
 pub trait Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>:
-TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>>
+TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>> + Latent<OuterID=ExchangeID>
     where BrokerID: Id,
           TraderID: Id,
           ExchangeID: Id,
@@ -56,7 +57,7 @@ TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
         scheduled_action: B2B,
         rng: &mut RNG,
     );
@@ -64,7 +65,7 @@ TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>>
     fn process_trader_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
         request: T2B,
         trader_id: TraderID,
         rng: &mut RNG,
@@ -73,23 +74,11 @@ TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>>
     fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
         reply: E2B,
         exchange_id: ExchangeID,
         rng: &mut RNG,
     );
-
-    fn broker_to_exchange_latency(
-        &self,
-        exchange_id: ExchangeID,
-        event_dt: DateTime,
-        rng: &mut impl Rng) -> u64;
-
-    fn exchange_to_broker_latency(
-        &self,
-        exchange_id: ExchangeID,
-        event_dt: DateTime,
-        rng: &mut impl Rng) -> u64;
 
     fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID);
 

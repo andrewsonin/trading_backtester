@@ -230,9 +230,6 @@ mod tests {
             DelayScheduler,
         );
 
-        let exchange_name_type_hint = |_: &Vec<ExchangeName>| {};
-        exchange_name_type_hint(&exchange_names);
-
         let broker_configs = [
             (
                 BrokerName::Broker1,

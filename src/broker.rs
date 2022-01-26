@@ -43,22 +43,28 @@ pub trait BrokerToTrader: Ord {
     fn get_trader_id(&self) -> Self::TraderID;
 }
 
-pub trait Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>:
-TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>> + Latent<OuterID=ExchangeID>
-    where BrokerID: Id,
-          TraderID: Id,
-          ExchangeID: Id,
-          E2B: ExchangeToBroker<BrokerID=BrokerID>,
-          T2B: TraderToBroker<BrokerID=BrokerID>,
-          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-          B2T: BrokerToTrader<TraderID=TraderID>,
-          B2B: BrokerToItself
+pub trait Broker:
+TimeSync
++ Named<Self::BrokerID>
++ Agent<Action=BrokerAction<Self::B2E, Self::B2T, Self::B2B>>
++ Latent<OuterID=Self::ExchangeID>
 {
+    type BrokerID: Id;
+    type TraderID: Id;
+    type ExchangeID: Id;
+
+    type E2B: ExchangeToBroker<BrokerID=Self::BrokerID>;
+    type T2B: TraderToBroker<BrokerID=Self::BrokerID>;
+    type B2E: BrokerToExchange<ExchangeID=Self::ExchangeID>;
+    type B2T: BrokerToTrader<TraderID=Self::TraderID>;
+    type B2B: BrokerToItself;
+    type SubCfg;
+
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
-        scheduled_action: B2B,
+        scheduled_action: Self::B2B,
         rng: &mut RNG,
     );
 
@@ -66,8 +72,8 @@ TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>> + Latent<
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
-        request: T2B,
-        trader_id: TraderID,
+        request: Self::T2B,
+        trader_id: Self::TraderID,
         rng: &mut RNG,
     );
 
@@ -75,12 +81,15 @@ TimeSync + Named<BrokerID> + Agent<Action=BrokerAction<B2E, B2T, B2B>> + Latent<
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
-        reply: E2B,
-        exchange_id: ExchangeID,
+        reply: Self::E2B,
+        exchange_id: Self::ExchangeID,
         rng: &mut RNG,
     );
 
-    fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID);
+    fn upon_connection_to_exchange(&mut self, exchange_id: Self::ExchangeID);
 
-    fn register_trader(&mut self, trader_id: TraderID, sub_cfgs: impl IntoIterator<Item=SubCfg>);
+    fn register_trader(
+        &mut self,
+        trader_id: Self::TraderID,
+        sub_cfgs: impl IntoIterator<Item=Self::SubCfg>);
 }

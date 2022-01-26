@@ -27,19 +27,20 @@ pub trait TraderToBroker: Ord {
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
-pub trait Trader<TraderID, BrokerID, B2T, T2B, T2T>:
-TimeSync + Named<TraderID> + Agent<Action=TraderAction<T2B, T2T>>
-    where TraderID: Id,
-          BrokerID: Id,
-          B2T: BrokerToTrader<TraderID=TraderID>,
-          T2T: TraderToItself,
-          T2B: TraderToBroker<BrokerID=BrokerID>
+pub trait Trader:
+TimeSync + Named<Self::TraderID> + Agent<Action=TraderAction<Self::T2B, Self::T2T>>
 {
+    type TraderID: Id;
+    type BrokerID: Id;
+    type B2T: BrokerToTrader<TraderID=Self::TraderID>;
+    type T2T: TraderToItself;
+    type T2B: TraderToBroker<BrokerID=Self::BrokerID>;
+
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
-        scheduled_action: T2T,
+        scheduled_action: Self::T2T,
         rng: &mut RNG,
     );
 
@@ -47,22 +48,22 @@ TimeSync + Named<TraderID> + Agent<Action=TraderAction<T2B, T2T>>
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
-        reply: B2T,
-        broker_id: BrokerID,
+        reply: Self::B2T,
+        broker_id: Self::BrokerID,
         rng: &mut RNG,
     );
 
     fn broker_to_trader_latency(
         &self,
-        broker_id: BrokerID,
+        broker_id: Self::BrokerID,
         event_dt: DateTime,
         rng: &mut impl Rng) -> u64;
 
     fn trader_to_broker_latency(
         &self,
-        broker_id: BrokerID,
+        broker_id: Self::BrokerID,
         event_dt: DateTime,
         rng: &mut impl Rng) -> u64;
 
-    fn upon_register_at_broker(&mut self, broker_id: BrokerID);
+    fn upon_register_at_broker(&mut self, broker_id: Self::BrokerID);
 }

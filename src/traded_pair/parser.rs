@@ -23,12 +23,11 @@ pub mod concrete {
         crate::{
             settlement::concrete::SpotSettlement,
             traded_pair::{Asset, parser::TradedPairParser, TradedPair},
+            traded_pair::Base,
             types::Id,
         },
         std::str::FromStr,
     };
-
-    use crate::prelude::Base;
 
     pub struct SpotBaseTradedPairParser;
 

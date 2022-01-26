@@ -10,20 +10,20 @@ pub trait Latent
     type OuterID: Id;
     type LatencyGenerator: LatencyGenerator<Self::OuterID>;
 
-    fn latency_generator<RNG: Rng>(&self) -> Self::LatencyGenerator;
+    fn get_latency_generator(&self) -> Self::LatencyGenerator;
 }
 
 pub trait LatencyGenerator<OuterID: Id>
 {
-    fn outgoing_latency<RNG: Rng>(
+    fn outgoing_latency(
         &mut self,
         outer_id: OuterID,
         event_dt: DateTime,
-        rng: &mut RNG) -> u64;
+        rng: &mut impl Rng) -> u64;
 
-    fn incoming_latency<RNG: Rng>(
+    fn incoming_latency(
         &mut self,
         outer_id: OuterID,
         event_dt: DateTime,
-        rng: &mut RNG) -> u64;
+        rng: &mut impl Rng) -> u64;
 }

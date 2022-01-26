@@ -401,31 +401,6 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
             }
         }
 
-        enum #latency_generator_name {
-            #latency_generator_types
-        }
-
-        impl trait LatencyGenerator<#exchange_id>
-        {
-            fn outgoing_latency<RNG: Rng>(
-                &mut self,
-                outer_id: #exchange_id,
-                event_dt: DateTime,
-                rng: &mut RNG) -> u64
-            {
-                match self { #outgoing_latency }
-            }
-
-            fn incoming_latency<RNG: Rng>(
-                &mut self,
-                outer_id: #exchange_id,
-                event_dt: DateTime,
-                rng: &mut RNG) -> u64
-            {
-                match self { #incoming_latency }
-            }
-        }
-
         impl #impl_generics TimeSync for #name #ty_generics
         #where_clause
         {
@@ -450,10 +425,10 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         impl #impl_generics Latent for #name #ty_generics
         #where_clause {
             type OuterID = #exchange_id;
-            type LatencyGenerator = #latency_generator_name;
+            type LatencyGenerator = Nothing;
 
             fn latency_generator<RNG: Rng>(&self) -> Self::LatencyGenerator {
-                //match self { #latency_generator }
+                unimplemented!("latency_generator is called for the Broker enum")
             }
         }
     };

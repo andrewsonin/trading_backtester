@@ -29,17 +29,18 @@ pub trait ReplayToExchange: Debug + Ord {
     fn get_exchange_id(&self) -> Self::ExchangeID;
 }
 
-pub trait Replay<ExchangeID, E2R, R2R, R2E>: TimeSync + Iterator<Item=ReplayAction<R2R, R2E>>
-    where ExchangeID: Id,
-          E2R: ExchangeToReplay,
-          R2R: ReplayToItself,
-          R2E: ReplayToExchange<ExchangeID=ExchangeID>
+pub trait Replay: TimeSync + Iterator<Item=ReplayAction<Self::R2R, Self::R2E>>
 {
+    type ExchangeID: Id;
+    type E2R: ExchangeToReplay;
+    type R2R: ReplayToItself;
+    type R2E: ReplayToExchange<ExchangeID=Self::ExchangeID>;
+
     fn wakeup<KerMsg: Ord>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl Fn(Self::Item) -> KerMsg,
-        scheduled_action: R2R,
+        scheduled_action: Self::R2R,
         rng: &mut impl Rng,
     );
 
@@ -47,8 +48,8 @@ pub trait Replay<ExchangeID, E2R, R2R, R2E>: TimeSync + Iterator<Item=ReplayActi
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl Fn(Self::Item) -> KerMsg,
-        reply: E2R,
-        exchange_id: ExchangeID,
+        reply: Self::E2R,
+        exchange_id: Self::ExchangeID,
         rng: &mut impl Rng,
     );
 }

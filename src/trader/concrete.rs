@@ -22,16 +22,23 @@ use {
 pub struct VoidTrader<
     TraderID: Id,
     BrokerID: Id,
+    B2T: BrokerToTrader<TraderID=TraderID>,
     T2B: TraderToBroker<BrokerID=BrokerID>,
     T2T: TraderToItself
 > {
     name: TraderID,
     current_dt: DateTime,
-    phantom: PhantomData<(BrokerID, T2B, T2T)>,
+    phantom: PhantomData<(BrokerID, B2T, T2B, T2T)>,
 }
 
-impl<TraderID: Id, BrokerID: Id, T2B: TraderToBroker<BrokerID=BrokerID>, T2T: TraderToItself>
-VoidTrader<TraderID, BrokerID, T2B, T2T>
+impl<
+    TraderID: Id,
+    BrokerID: Id,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself
+>
+VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
 {
     pub fn new(name: TraderID) -> Self {
         VoidTrader {
@@ -42,20 +49,38 @@ VoidTrader<TraderID, BrokerID, T2B, T2T>
     }
 }
 
-impl<TraderID: Id, BrokerID: Id, T2B: TraderToBroker<BrokerID=BrokerID>, T2T: TraderToItself>
-TimeSync for VoidTrader<TraderID, BrokerID, T2B, T2T>
+impl<
+    TraderID: Id,
+    BrokerID: Id,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself
+>
+TimeSync for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime { &mut self.current_dt }
 }
 
-impl<TraderID: Id, BrokerID: Id, T2B: TraderToBroker<BrokerID=BrokerID>, T2T: TraderToItself>
-Named<TraderID> for VoidTrader<TraderID, BrokerID, T2B, T2T>
+impl<
+    TraderID: Id,
+    BrokerID: Id,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself
+>
+Named<TraderID> for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
 {
     fn get_name(&self) -> TraderID { self.name }
 }
 
-impl<TraderID: Id, BrokerID: Id, T2B: TraderToBroker<BrokerID=BrokerID>, T2T: TraderToItself>
-Agent for VoidTrader<TraderID, BrokerID, T2B, T2T>
+impl<
+    TraderID: Id,
+    BrokerID: Id,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself
+>
+Agent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
 {
     type Action = TraderAction<T2B, T2T>;
 }
@@ -67,9 +92,15 @@ impl<
     T2B: TraderToBroker<BrokerID=BrokerID>,
     T2T: TraderToItself
 >
-Trader<TraderID, BrokerID, B2T, T2B, T2T>
-for VoidTrader<TraderID, BrokerID, T2B, T2T>
+Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
 {
+    type TraderID = TraderID;
+    type BrokerID = BrokerID;
+
+    type B2T = B2T;
+    type T2T = T2T;
+    type T2B = T2B;
+
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
@@ -148,20 +179,21 @@ Agent for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 }
 
 impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
-Trader<
-    TraderID,
-    BrokerID,
-    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-    Nothing
->
+Trader
 for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 {
+    type TraderID = TraderID;
+    type BrokerID = BrokerID;
+
+    type B2T = BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>;
+    type T2T = Nothing;
+    type T2B = BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>;
+
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
-        _: Nothing,
+        _: Self::T2T,
         _: &mut RNG,
     ) {
         unreachable!("Trader {} did not schedule any wakeups", self.get_name())
@@ -171,7 +203,7 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
-        reply: BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+        reply: Self::B2T,
         _: BrokerID,
         _: &mut RNG,
     ) {

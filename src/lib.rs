@@ -99,6 +99,9 @@ mod tests {
         trader_examples::SpreadWriter,
     };
 
+    use crate::exchange::concrete::BasicExchange;
+    use crate::replay::concrete::OneTickReplay;
+
     #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
     enum ExchangeName {
         MOEX,
@@ -148,7 +151,8 @@ mod tests {
     struct DelayScheduler;
 
     impl<ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
-    GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement> for DelayScheduler
+    GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>
+    for DelayScheduler
     {
         fn get_ob_snapshot_delay(
             &mut self,
@@ -181,8 +185,8 @@ mod tests {
             DelayScheduler,
         );
 
-        let exchanges = exchange_names.iter().map(BuildExchange::build);
-        let replay = replay_config.build();
+        let exchanges = exchange_names.iter().map(BasicExchange::from);
+        let replay = OneTickReplay::from(&replay_config);
         let brokers = [
             (
                 BasicBroker::new(BrokerName::Broker1),
@@ -225,6 +229,10 @@ mod tests {
             SpotBaseTradedPairParser,
             DelayScheduler,
         );
+
+        let exchange_name_type_hint = |_: &Vec<ExchangeName>| {};
+        exchange_name_type_hint(&exchange_names);
+
         let broker_configs = [
             (
                 BrokerName::Broker1,
@@ -273,13 +281,18 @@ mod tests {
             second_thread_config.clone()
         ];
 
+        type Trader = SpreadWriter<u8, BrokerName, ExchangeName, SymbolName, SpotSettlement>;
+        type Broker = BasicBroker<BrokerName, u8, ExchangeName, SymbolName, SpotSettlement>;
+        type Exchange = BasicExchange<ExchangeName, BrokerName, SymbolName, SpotSettlement>;
+        type Replay = OneTickReplay<ExchangeName, SymbolName, DelayScheduler, SpotSettlement>;
+
         ParallelBacktester::new(
             exchange_names.clone(),
             broker_configs,
             per_thread_configs,
             (start_dt, end_dt),
         )
-            .run_simulation();
+            .run_simulation::<Trader, Broker, Exchange, Replay>();
 
         let per_thread_configs = [
             first_thread_config.clone(),
@@ -295,7 +308,7 @@ mod tests {
         )
             .with_rng::<StdRng>()
             .with_num_threads(2)
-            .run_simulation()
+            .run_simulation::<Trader, Broker, Exchange, Replay>()
     }
 
     #[allow(dead_code)]
@@ -315,62 +328,62 @@ mod tests {
             replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
         };
 
-        enum_def! {
-            #[derive(Replay)]
-            #[replay(
-                ExchangeID,
-                BasicExchangeToReplay<Symbol, Settlement>,
-                Nothing,
-                BasicReplayToExchange<ExchangeID, Symbol, Settlement>
-            )]
-            ReplayEnum<
-                ExchangeID: Id,
-                Symbol: Id,
-                Settlement: GetSettlementLag,
-                ObSnapshotDelay: Sized + Copy
-            > where
-                ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-                ObSnapshotDelay: Clone
-            {
-                OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
-            }
-        }
+// enum_def! {
+        //     #[derive(Replay)]
+        //     #[replay(
+        //         ExchangeID,
+        //         BasicExchangeToReplay<Symbol, Settlement>,
+        //         Nothing,
+        //         BasicReplayToExchange<ExchangeID, Symbol, Settlement>
+        //     )]
+        //     ReplayEnum<
+        //         ExchangeID: Id,
+        //         Symbol: Id,
+        //         Settlement: GetSettlementLag,
+        //         ObSnapshotDelay: Sized + Copy
+        //     > where
+        //         ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+        //         ObSnapshotDelay: Clone
+        //     {
+        //         OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+        //     }
+        // }
+        //
+        // enum_def! {
+        //     #[derive(Exchange)]
+        //     #[exchange(
+        //         ExchangeID,
+        //         BrokerID,
+        //         BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
+        //         BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+        //         BasicExchangeToReplay<Symbol, Settlement>,
+        //         BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+        //         Nothing
+        //     )]
+        //     ExchangeEnum<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
+        //     {
+        //         BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
+        //     }
+        // }
 
-        enum_def! {
-            #[derive(Exchange)]
-            #[exchange(
-                ExchangeID,
-                BrokerID,
-                BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
-                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-                BasicExchangeToReplay<Symbol, Settlement>,
-                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-                Nothing
-            )]
-            ExchangeEnum<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
-            {
-                BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
-            }
-        }
-
-        enum_def! {
-            #[derive(Broker)]
-            #[broker(
-                BrokerID, TraderID, ExchangeID,
-                BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-                BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-                BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-                BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-                Nothing,
-                SubscriptionConfig<ExchangeID, Symbol, Settlement>
-            )]
-            BrokerEnum<
-                BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id,
-                Settlement: GetSettlementLag
-            > {
-                BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
-            }
-        }
+        // enum_def! {
+        //     #[derive(Broker)]
+        //     #[broker(
+        //         BrokerID, TraderID, ExchangeID,
+        //         BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+        //         BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+        //         BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+        //         BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+        //         Nothing,
+        //         SubscriptionConfig<ExchangeID, Symbol, Settlement>
+        //     )]
+        //     BrokerEnum<
+        //         BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id,
+        //         Settlement: GetSettlementLag
+        //     > {
+        //         BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+        //     }
+        // }
     }
 }
 

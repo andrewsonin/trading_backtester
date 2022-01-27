@@ -1,11 +1,16 @@
-use crate::{
-    broker::BrokerToTrader,
-    types::{Agent, DateTime, Id, Named, TimeSync},
-    utils::{queue::MessageReceiver, rand::Rng},
+use {
+    crate::{
+        broker::BrokerToTrader,
+        kernel::ActionProcessor,
+        latency::Latent,
+        types::{Agent, Id, Named, TimeSync},
+        utils::queue::MessageReceiver,
+    },
+    rand::Rng,
 };
 
-pub mod request;
 pub mod concrete;
+pub mod request;
 pub mod subscriptions;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
@@ -28,8 +33,9 @@ pub trait TraderToBroker: Ord {
 }
 
 pub trait Trader:
-TimeSync + Named<Self::TraderID> + Agent<Action=TraderAction<Self::T2B, Self::T2T>>
-{
+TimeSync + Latent<OuterID=Self::BrokerID> + Named<Self::TraderID> + Agent<
+    Action=TraderAction<Self::T2B, Self::T2T>
+> {
     type TraderID: Id;
     type BrokerID: Id;
     type B2T: BrokerToTrader<TraderID=Self::TraderID>;
@@ -39,7 +45,7 @@ TimeSync + Named<Self::TraderID> + Agent<Action=TraderAction<Self::T2B, Self::T2
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        action_processor: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         scheduled_action: Self::T2T,
         rng: &mut RNG,
     );
@@ -47,23 +53,11 @@ TimeSync + Named<Self::TraderID> + Agent<Action=TraderAction<Self::T2B, Self::T2
     fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        action_processor: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         reply: Self::B2T,
         broker_id: Self::BrokerID,
         rng: &mut RNG,
     );
-
-    fn broker_to_trader_latency(
-        &self,
-        broker_id: Self::BrokerID,
-        event_dt: DateTime,
-        rng: &mut impl Rng) -> u64;
-
-    fn trader_to_broker_latency(
-        &self,
-        broker_id: Self::BrokerID,
-        event_dt: DateTime,
-        rng: &mut impl Rng) -> u64;
 
     fn upon_register_at_broker(&mut self, broker_id: Self::BrokerID);
 }

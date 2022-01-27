@@ -1,14 +1,18 @@
-use crate::{
-    exchange::ExchangeToBroker,
-    latency::Latent,
-    trader::TraderToBroker,
-    types::{Agent, Id, Named, TimeSync},
-    utils::{queue::MessageReceiver, rand::Rng},
+use {
+    crate::{
+        exchange::ExchangeToBroker,
+        kernel::ActionProcessor,
+        latency::Latent,
+        trader::TraderToBroker,
+        types::{Agent, Id, Named, TimeSync},
+        utils::queue::MessageReceiver,
+    },
+    rand::Rng,
 };
 
+pub mod concrete;
 pub mod reply;
 pub mod request;
-pub mod concrete;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub struct BrokerAction<
@@ -44,11 +48,9 @@ pub trait BrokerToTrader: Ord {
 }
 
 pub trait Broker:
-TimeSync
-+ Named<Self::BrokerID>
-+ Agent<Action=BrokerAction<Self::B2E, Self::B2T, Self::B2B>>
-+ Latent<OuterID=Self::ExchangeID>
-{
+TimeSync + Latent<OuterID=Self::ExchangeID> + Named<Self::BrokerID> + Agent<
+    Action=BrokerAction<Self::B2E, Self::B2T, Self::B2B>
+> {
     type BrokerID: Id;
     type TraderID: Id;
     type ExchangeID: Id;
@@ -63,7 +65,7 @@ TimeSync
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
+        action_processor: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         scheduled_action: Self::B2B,
         rng: &mut RNG,
     );
@@ -71,7 +73,7 @@ TimeSync
     fn process_trader_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
+        action_processor: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         request: Self::T2B,
         trader_id: Self::TraderID,
         rng: &mut RNG,
@@ -80,7 +82,7 @@ TimeSync
     fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl FnMut(Self::LatencyGenerator, Self::Action, &mut RNG) -> KerMsg,
+        action_processor: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         reply: Self::E2B,
         exchange_id: Self::ExchangeID,
         rng: &mut RNG,

@@ -1,23 +1,16 @@
 use {
     crate::{
-        broker::{BrokerToExchange, BrokerToItself, BrokerToTrader},
-        exchange::{ExchangeToBroker, ExchangeToItself, ExchangeToReplay},
+        broker::Broker,
+        exchange::Exchange,
         kernel::KernelBuilder,
-        replay::{ReplayToExchange, ReplayToItself},
-        trader::{TraderToBroker, TraderToItself},
+        replay::Replay,
+        trader::Trader,
         types::{DateTime, Id},
-        utils::{
-            rand::{Rng, rngs::StdRng, SeedableRng},
-        },
     },
+    rand::{Rng, rngs::StdRng, SeedableRng},
     rayon::{iter::{IntoParallelIterator, ParallelIterator}, ThreadPoolBuilder},
     std::marker::PhantomData,
 };
-
-use crate::broker::Broker;
-use crate::exchange::Exchange;
-use crate::replay::Replay;
-use crate::trader::Trader;
 
 #[derive(Clone)]
 pub struct ThreadConfig<ReplayConfig, TraderConfigs: IntoIterator> {

@@ -1,10 +1,10 @@
-pub use {chrono, derive_macros, derive_more, rand};
+pub use {chrono, derive_macros, rand};
 
 use crate::types::DateTime;
 
-pub mod queue;
-pub mod input;
 pub mod constants;
+pub mod input;
+pub mod queue;
 
 pub fn parse_datetime(string: &str, format: &str) -> DateTime {
     DateTime::parse_from_str(string, format).unwrap_or_else(

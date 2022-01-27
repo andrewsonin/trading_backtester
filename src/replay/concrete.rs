@@ -25,9 +25,9 @@ use {
         utils::{
             input::one_tick::OneTickTradedPairReader,
             queue::{LessElementBinaryHeap, MessageReceiver},
-            rand::Rng,
         },
     },
+    rand::Rng,
     std::{
         cmp::Reverse,
         collections::{HashMap, HashSet},

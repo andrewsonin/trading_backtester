@@ -2,36 +2,44 @@ use {
     crate::{
         broker::{
             Broker,
-            BrokerActionKind,
             BrokerToExchange,
             BrokerToItself,
             BrokerToTrader,
         },
         exchange::{
             Exchange,
-            ExchangeAction,
             ExchangeActionKind,
             ExchangeToBroker,
             ExchangeToItself,
             ExchangeToReplay,
         },
+        kernel::action_processors::{BrokerActionProcessor, TraderActionProcessor},
         latency::LatencyGenerator,
-        replay::{Replay, ReplayAction, ReplayActionKind, ReplayToExchange, ReplayToItself},
+        replay::{Replay, ReplayActionKind, ReplayToExchange, ReplayToItself},
         trader::{
             Trader,
-            TraderAction,
-            TraderActionKind,
             TraderToBroker,
             TraderToItself,
         },
         types::{DateTime, Duration, Id},
-        utils::{
-            queue::{LessElementBinaryHeap, MessageReceiver},
-            rand::{Rng, rngs::StdRng, SeedableRng},
-        },
+        utils::queue::{LessElementBinaryHeap, MessageReceiver},
     },
+    rand::{Rng, rngs::StdRng, SeedableRng},
     std::{cmp::Reverse, collections::HashMap, marker::PhantomData},
 };
+
+mod action_processors;
+
+pub trait ActionProcessor<Action, OuterID: Id>
+{
+    type KerMsg: Ord;
+
+    fn process_action(
+        &mut self,
+        action: Action,
+        latency_generator: impl LatencyGenerator<OuterID>,
+        rng: &mut impl Rng) -> Self::KerMsg;
+}
 
 pub struct Kernel<T, B, E, R, RNG>
     where
@@ -76,7 +84,7 @@ impl<T, B, E, R, RNG> InnerMessage for Kernel<T, B, E, R, RNG>
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
-pub struct Message<MessageContent: Ord> {
+struct Message<MessageContent: Ord> {
     datetime: DateTime,
     body: MessageContent,
 }
@@ -435,18 +443,14 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |latency_generator, action: B::Action, rng: &mut RNG|
-            Self::process_broker_action(
-                self.current_dt,
-                &mut self.traders,
-                rng,
-                latency_generator,
-                action,
-                broker_id,
-            );
+        let broker_action_processor = BrokerActionProcessor::<B::BrokerID, B::Action, T, E, R>::new(
+            self.current_dt,
+            broker_id,
+            &mut self.traders,
+        );
         broker.process_exchange_reply(
             MessageReceiver::new(&mut self.message_queue),
-            process_broker_action,
+            broker_action_processor,
             reply,
             exchange_id,
             &mut self.rng,
@@ -459,18 +463,14 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |latency_generator, action, rng: &mut RNG|
-            Self::process_broker_action(
-                self.current_dt,
-                &mut self.traders,
-                rng,
-                latency_generator,
-                action,
-                broker_id,
-            );
+        let broker_action_processor = BrokerActionProcessor::<B::BrokerID, B::Action, T, E, R>::new(
+            self.current_dt,
+            broker_id,
+            &mut self.traders,
+        );
         broker.wakeup(
             MessageReceiver::new(&mut self.message_queue),
-            process_broker_action,
+            broker_action_processor,
             scheduled_action,
             &mut self.rng,
         )
@@ -507,17 +507,13 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
             || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
-        let process_trader_action = |trader: &T, action, rng: &mut RNG|
-            Self::process_trader_action(
-                self.current_dt,
-                rng,
-                trader,
-                action,
-                trader_id,
-            );
+        let trader_action_processor = TraderActionProcessor::<T::TraderID, T::Action, B, E, R>::new(
+            self.current_dt,
+            trader_id,
+        );
         trader.process_broker_reply(
             MessageReceiver::new(&mut self.message_queue),
-            process_trader_action,
+            trader_action_processor,
             reply,
             broker_id,
             &mut self.rng,
@@ -530,17 +526,13 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
             || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
-        let process_trader_action = |trader: &T, action, rng: &mut RNG|
-            Self::process_trader_action(
-                self.current_dt,
-                rng,
-                trader,
-                action,
-                trader_id,
-            );
+        let trader_action_processor = TraderActionProcessor::<T::TraderID, T::Action, B, E, R>::new(
+            self.current_dt,
+            trader_id,
+        );
         trader.wakeup(
             MessageReceiver::new(&mut self.message_queue),
-            process_trader_action,
+            trader_action_processor,
             scheduled_action,
             &mut self.rng,
         )
@@ -553,18 +545,14 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
             || panic!("Kernel does not know such an Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |latency_generator, action, rng: &mut RNG|
-            Self::process_broker_action(
-                self.current_dt,
-                &mut self.traders,
-                rng,
-                latency_generator,
-                action,
-                broker_id,
-            );
+        let broker_action_processor = BrokerActionProcessor::<B::BrokerID, B::Action, T, E, R>::new(
+            self.current_dt,
+            broker_id,
+            &mut self.traders,
+        );
         broker.process_trader_request(
             MessageReceiver::new(&mut self.message_queue),
-            process_broker_action,
+            broker_action_processor,
             request,
             trader_id,
             &mut self.rng,
@@ -629,75 +617,6 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
                 (
                     delayed_dt,
                     MessageContent::ExchangeWakeUp(exchange_id, wakeup)
-                )
-            }
-        };
-        Message { datetime, body }
-    }
-
-    fn process_broker_action(
-        current_dt: DateTime,
-        traders: &mut HashMap<T::TraderID, T>,
-        rng: &mut RNG,
-        mut latency_generator: impl LatencyGenerator<E::ExchangeID>,
-        action: B::Action,
-        broker_id: B::BrokerID) -> Message<<Self as InnerMessage>::MessageContent>
-    {
-        let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
-        let (datetime, body) = match action.content
-        {
-            BrokerActionKind::BrokerToTrader(reply) => {
-                let trader_id = reply.get_trader_id();
-                let trader = traders.get_mut(&trader_id).unwrap_or_else(
-                    || panic!("Kernel does not know such a Trader: {trader_id}")
-                );
-                *trader.current_datetime_mut() = current_dt;
-                let latency = trader.broker_to_trader_latency(broker_id, delayed_dt, rng);
-                (
-                    delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::BrokerToTrader(broker_id, reply)
-                )
-            }
-            BrokerActionKind::BrokerToExchange(request) => {
-                let exchange_id = request.get_exchange_id();
-                let latency = latency_generator.outgoing_latency(exchange_id, delayed_dt, rng);
-                (
-                    delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::BrokerToExchange(broker_id, request)
-                )
-            }
-            BrokerActionKind::BrokerToItself(wakeup) => {
-                (
-                    delayed_dt,
-                    MessageContent::BrokerWakeUp(broker_id, wakeup)
-                )
-            }
-        };
-        Message { datetime, body }
-    }
-
-    fn process_trader_action(
-        current_dt: DateTime,
-        rng: &mut RNG,
-        trader: &T,
-        action: T::Action,
-        trader_id: T::TraderID) -> Message<<Self as InnerMessage>::MessageContent>
-    {
-        let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
-        let (datetime, body) = match action.content
-        {
-            TraderActionKind::TraderToBroker(request) => {
-                let broker_id = request.get_broker_id();
-                let latency = trader.trader_to_broker_latency(broker_id, delayed_dt, rng);
-                (
-                    delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::TraderToBroker(trader_id, request)
-                )
-            }
-            TraderActionKind::TraderToItself(wakeup) => {
-                (
-                    delayed_dt,
-                    MessageContent::TraderWakeUp(trader_id, wakeup)
                 )
             }
         };

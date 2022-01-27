@@ -5,6 +5,8 @@ use {
             reply::{BasicBrokerReply, BasicBrokerToTrader},
         },
         exchange::reply::ExchangeEventNotification,
+        kernel::ActionProcessor,
+        latency::{concrete::ConstantLatency, Latent},
         settlement::GetSettlementLag,
         trader::{
             request::BasicTraderToBroker,
@@ -14,8 +16,9 @@ use {
             TraderToItself,
         },
         types::{Agent, Date, DateTime, Id, Named, Nothing, ObState, PriceStep, Size, TimeSync},
-        utils::{queue::MessageReceiver, rand::Rng},
+        utils::queue::MessageReceiver,
     },
+    rand::Rng,
     std::{fs::File, io::Write, marker::PhantomData, path::Path},
 };
 
@@ -92,6 +95,23 @@ impl<
     T2B: TraderToBroker<BrokerID=BrokerID>,
     T2T: TraderToItself
 >
+Latent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+{
+    type OuterID = BrokerID;
+    type LatencyGenerator = ConstantLatency<0, 0>;
+
+    fn get_latency_generator(&self) -> Self::LatencyGenerator {
+        ConstantLatency::<0, 0>
+    }
+}
+
+impl<
+    TraderID: Id,
+    BrokerID: Id,
+    B2T: BrokerToTrader<TraderID=TraderID>,
+    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2T: TraderToItself
+>
 Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
 {
     type TraderID = TraderID;
@@ -104,7 +124,7 @@ Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        _: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: T2T,
         _: &mut RNG,
     ) {}
@@ -112,14 +132,12 @@ Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        _: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: B2T,
         _: BrokerID,
         _: &mut RNG,
     ) {}
 
-    fn broker_to_trader_latency(&self, _: BrokerID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
-    fn trader_to_broker_latency(&self, _: BrokerID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }
 
@@ -178,6 +196,24 @@ Agent for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     >;
 }
 
+impl<
+    TraderID: Id,
+    BrokerID: Id,
+    ExchangeID: Id,
+    Symbol: Id,
+    Settlement: GetSettlementLag
+>
+Latent
+for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+{
+    type OuterID = BrokerID;
+    type LatencyGenerator = ConstantLatency<0, 0>;
+
+    fn get_latency_generator(&self) -> Self::LatencyGenerator {
+        ConstantLatency::<0, 0>
+    }
+}
+
 impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
 Trader
 for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
@@ -192,7 +228,7 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        _: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: Self::T2T,
         _: &mut RNG,
     ) {
@@ -202,7 +238,7 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        _: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         reply: Self::B2T,
         _: BrokerID,
         _: &mut RNG,
@@ -236,7 +272,5 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
         }
     }
 
-    fn broker_to_trader_latency(&self, _: BrokerID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
-    fn trader_to_broker_latency(&self, _: BrokerID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }

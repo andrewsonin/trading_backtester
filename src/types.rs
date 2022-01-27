@@ -12,11 +12,9 @@ use {
         exchange::{ExchangeToBroker, ExchangeToItself, ExchangeToReplay},
         replay::{ReplayToExchange, ReplayToItself},
         trader::{TraderToBroker, TraderToItself},
-        utils::{
-            derive_more,
-            derive_more::{Add, AddAssign, From, FromStr, Into, Sub, SubAssign, Sum},
-        },
     },
+    derive_more,
+    derive_more::{Add, AddAssign, From, FromStr, Into, Sub, SubAssign, Sum},
     std::{
         cmp::Ordering,
         convert::Infallible,

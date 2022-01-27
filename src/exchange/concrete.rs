@@ -52,8 +52,9 @@ use {
             Size,
             TimeSync,
         },
-        utils::{queue::MessageReceiver, rand::Rng},
+        utils::queue::MessageReceiver,
     },
+    rand::Rng,
     std::{
         collections::{hash_map::Entry::*, HashMap},
         iter::{once, once_with},

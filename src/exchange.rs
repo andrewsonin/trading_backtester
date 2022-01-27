@@ -1,12 +1,15 @@
-use crate::{
-    broker::BrokerToExchange,
-    replay::ReplayToExchange,
-    types::{Agent, Id, Named, TimeSync},
-    utils::{queue::MessageReceiver, rand::Rng},
+use {
+    crate::{
+        broker::BrokerToExchange,
+        replay::ReplayToExchange,
+        types::{Agent, Id, Named, TimeSync},
+        utils::queue::MessageReceiver,
+    },
+    rand::Rng,
 };
 
-pub mod reply;
 pub mod concrete;
+pub mod reply;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub struct ExchangeAction<

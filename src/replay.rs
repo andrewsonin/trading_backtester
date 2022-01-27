@@ -2,13 +2,14 @@ use {
     crate::{
         exchange::ExchangeToReplay,
         types::{DateTime, Id, TimeSync},
-        utils::{queue::MessageReceiver, rand::Rng},
+        utils::queue::MessageReceiver,
     },
+    rand::Rng,
     std::fmt::Debug,
 };
 
-pub mod request;
 pub mod concrete;
+pub mod request;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ReplayAction<R2R: ReplayToItself, R2E: ReplayToExchange> {

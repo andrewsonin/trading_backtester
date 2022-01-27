@@ -5,7 +5,7 @@ use {
             reply::{BasicBrokerReply, BasicBrokerToTrader},
         },
         exchange::reply::ExchangeEventNotification,
-        kernel::ActionProcessor,
+        kernel::LatentActionProcessor,
         latency::{concrete::ConstantLatency, Latent},
         settlement::GetSettlementLag,
         trader::{
@@ -124,7 +124,7 @@ Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: T2T,
         _: &mut RNG,
     ) {}
@@ -132,7 +132,7 @@ Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: B2T,
         _: BrokerID,
         _: &mut RNG,
@@ -228,7 +228,7 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: Self::T2T,
         _: &mut RNG,
     ) {
@@ -238,7 +238,7 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         reply: Self::B2T,
         _: BrokerID,
         _: &mut RNG,

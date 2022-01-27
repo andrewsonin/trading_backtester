@@ -1,7 +1,7 @@
 use {
     crate::{
         broker::BrokerToTrader,
-        kernel::ActionProcessor,
+        kernel::LatentActionProcessor,
         latency::Latent,
         types::{Agent, Id, Named, TimeSync},
         utils::queue::MessageReceiver,
@@ -45,7 +45,7 @@ TimeSync + Latent<OuterID=Self::BrokerID> + Named<Self::TraderID> + Agent<
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        action_processor: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
+        action_processor: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         scheduled_action: Self::T2T,
         rng: &mut RNG,
     );
@@ -53,7 +53,7 @@ TimeSync + Latent<OuterID=Self::BrokerID> + Named<Self::TraderID> + Agent<
     fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        action_processor: impl ActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
+        action_processor: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         reply: Self::B2T,
         broker_id: Self::BrokerID,
         rng: &mut RNG,

@@ -9,7 +9,7 @@ use {
             BrokerToTrader,
         },
         exchange::Exchange,
-        kernel::{ActionProcessor, Message, MessageContent},
+        kernel::{LatentActionProcessor, Message, MessageContent},
         latency::LatencyGenerator,
         replay::Replay,
         trader::{Trader, TraderAction, TraderActionKind, TraderToBroker, TraderToItself},
@@ -85,7 +85,7 @@ impl<
     E: Exchange<BrokerID=BrokerID, ExchangeID=R::ExchangeID, B2E=B2E, E2R=R::E2R, R2E=R::R2E>,
     R: Replay,
 >
-ActionProcessor<BrokerAction<B2E, B2T, B2B>, E::ExchangeID>
+LatentActionProcessor<BrokerAction<B2E, B2T, B2B>, E::ExchangeID>
 for BrokerActionProcessor<'a, BrokerID, BrokerAction<B2E, B2T, B2B>, T, E, R>
 {
     type KerMsg = Message<
@@ -145,7 +145,7 @@ impl<
     E: Exchange<BrokerID=B::BrokerID, ExchangeID=R::ExchangeID, B2E=B::B2E, E2R=R::E2R, R2E=R::R2E>,
     R: Replay
 >
-ActionProcessor<TraderAction<T2B, T2T>, B::BrokerID>
+LatentActionProcessor<TraderAction<T2B, T2T>, B::BrokerID>
 for TraderActionProcessor<TraderID, TraderAction<T2B, T2T>, B, E, R>
 {
     type KerMsg = Message<

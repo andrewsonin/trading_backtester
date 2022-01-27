@@ -30,7 +30,7 @@ use {
 
 mod action_processors;
 
-pub trait ActionProcessor<Action, OuterID: Id>
+pub trait LatentActionProcessor<Action, OuterID: Id>
 {
     type KerMsg: Ord;
 

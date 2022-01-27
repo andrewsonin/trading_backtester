@@ -26,7 +26,7 @@ use {
             OrderExecuted,
             OrderPartiallyExecuted,
         },
-        kernel::ActionProcessor,
+        kernel::LatentActionProcessor,
         latency::{concrete::ConstantLatency, Latent},
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
@@ -129,7 +129,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         _: Nothing,
         _: &mut RNG,
     ) {
@@ -139,7 +139,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn process_trader_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut action_processor: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        mut action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         request: BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
         trader_id: TraderID,
         rng: &mut RNG,
@@ -255,7 +255,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut action_processor: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        mut action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         reply: BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
         exchange_id: ExchangeID,
         rng: &mut RNG,
@@ -500,7 +500,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn handle_exchange_notification<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut action_processor: impl ActionProcessor<<Self as Agent>::Action, <Self as Broker>::ExchangeID, KerMsg=KerMsg>,
+        mut action_processor: impl LatentActionProcessor<<Self as Agent>::Action, <Self as Broker>::ExchangeID, KerMsg=KerMsg>,
         notification: ExchangeEventNotification<Symbol, Settlement>,
         exchange_id: ExchangeID,
         exchange_dt: DateTime,

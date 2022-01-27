@@ -1,7 +1,7 @@
 use {
     crate::{
         exchange::ExchangeToBroker,
-        kernel::ActionProcessor,
+        kernel::LatentActionProcessor,
         latency::Latent,
         trader::TraderToBroker,
         types::{Agent, Id, Named, TimeSync},
@@ -65,7 +65,7 @@ TimeSync + Latent<OuterID=Self::ExchangeID> + Named<Self::BrokerID> + Agent<
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        action_processor: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         scheduled_action: Self::B2B,
         rng: &mut RNG,
     );
@@ -73,7 +73,7 @@ TimeSync + Latent<OuterID=Self::ExchangeID> + Named<Self::BrokerID> + Agent<
     fn process_trader_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        action_processor: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         request: Self::T2B,
         trader_id: Self::TraderID,
         rng: &mut RNG,
@@ -82,7 +82,7 @@ TimeSync + Latent<OuterID=Self::ExchangeID> + Named<Self::BrokerID> + Agent<
     fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
-        action_processor: impl ActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         reply: Self::E2B,
         exchange_id: Self::ExchangeID,
         rng: &mut RNG,

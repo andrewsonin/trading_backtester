@@ -36,7 +36,7 @@ pub mod prelude {
             ExchangeToReplay,
             reply as exchange_reply,
         },
-        kernel::{Kernel, KernelBuilder},
+        kernel::{Kernel, KernelBuilder, LatentActionProcessor},
         latency::{concrete as latency_examples, LatencyGenerator, Latent},
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
         order_book::{LimitOrder, OrderBook, OrderBookEvent, OrderBookEventKind},
@@ -307,79 +307,55 @@ mod tests {
             .run_simulation::<Trader, Broker, Exchange, Replay>()
     }
 
-    // #[allow(dead_code)]
-    // mod test_enum_def {
-    //     use {
-    //         broker_examples::BasicBroker,
-    //         crate::{
-    //             broker::{reply::BasicBrokerToTrader, request::BasicBrokerToExchange},
-    //             exchange::reply::{BasicExchangeToBroker, BasicExchangeToReplay},
-    //             prelude::*,
-    //             replay::request::BasicReplayToExchange,
-    //             trader::request::BasicTraderToBroker,
-    //         },
-    //         derive_macros::{Broker, Exchange, Replay},
-    //         exchange_example::BasicExchange,
-    //         rand::Rng,
-    //         replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
-    //     };
-    //
-    //     enum_def! {
-    //         #[derive(Replay)]
-    //         #[replay(
-    //             ExchangeID,
-    //             BasicExchangeToReplay<Symbol, Settlement>,
-    //             Nothing,
-    //             BasicReplayToExchange<ExchangeID, Symbol, Settlement>
-    //         )]
-    //         ReplayEnum<
-    //             ExchangeID: Id,
-    //             Symbol: Id,
-    //             Settlement: GetSettlementLag,
-    //             ObSnapshotDelay: Sized + Copy
-    //         > where
-    //             ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-    //             ObSnapshotDelay: Clone
-    //         {
-    //             OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
-    //         }
-    //     }
-    //
-    //     enum_def! {
-    //         #[derive(Exchange)]
-    //         #[exchange(
-    //             ExchangeID,
-    //             BrokerID,
-    //             BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
-    //             BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-    //             BasicExchangeToReplay<Symbol, Settlement>,
-    //             BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-    //             Nothing
-    //         )]
-    //         ExchangeEnum<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
-    //         {
-    //             BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
-    //         }
-    //     }
-    //
-    //     enum_def! {
-    //         #[derive(Broker)]
-    //         #[broker(
-    //             BrokerID, TraderID, ExchangeID,
-    //             BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-    //             BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-    //             BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-    //             BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-    //             Nothing,
-    //             SubscriptionConfig<ExchangeID, Symbol, Settlement>
-    //         )]
-    //         BrokerEnum<
-    //             BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id,
-    //             Settlement: GetSettlementLag
-    //         > {
-    //             BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
-    //         }
-    //     }
-    // }
+    #[allow(dead_code)]
+    mod test_enum_def {
+        use {
+            broker_examples::BasicBroker,
+            crate::{
+                broker::{reply::BasicBrokerToTrader, request::BasicBrokerToExchange},
+                exchange::reply::{BasicExchangeToBroker, BasicExchangeToReplay},
+                prelude::*,
+                replay::request::BasicReplayToExchange,
+                trader::request::BasicTraderToBroker,
+            },
+            derive_macros::{Broker, Exchange},
+            exchange_example::BasicExchange,
+            rand::Rng,
+            replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
+        };
+
+// enum_def! {
+        //     #[derive(Replay)]
+        //     ReplayEnum<
+        //         ExchangeID: Id,
+        //         Symbol: Id,
+        //         Settlement: GetSettlementLag,
+        //         ObSnapshotDelay: Sized + Copy
+        //     > where
+        //         ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+        //         ObSnapshotDelay: Clone
+        //     {
+        //         OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+        //     }
+        // }
+
+        enum_def! {
+            #[derive(Exchange)]
+            ExchangeEnum<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
+            {
+                BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
+            }
+        }
+
+        enum_def! {
+            #[derive(Broker)]
+            BrokerEnum<
+                BrokerID, TraderID: Id, ExchangeID: Id, Symbol: Id,
+                Settlement: GetSettlementLag
+            > where BrokerID: Id {
+                BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+            }
+        }
+    }
 }
 

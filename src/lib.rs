@@ -74,6 +74,7 @@ pub mod prelude {
             chrono,
             constants,
             derive_macros,
+            derive_more,
             input::{
                 config::{from_structs::*, from_yaml::parse_yaml},
                 one_tick::OneTickTradedPairReader,
@@ -323,21 +324,6 @@ mod tests {
             rand::Rng,
             replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
         };
-
-// enum_def! {
-        //     #[derive(Replay)]
-        //     ReplayEnum<
-        //         ExchangeID: Id,
-        //         Symbol: Id,
-        //         Settlement: GetSettlementLag,
-        //         ObSnapshotDelay: Sized + Copy
-        //     > where
-        //         ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-        //         ObSnapshotDelay: Clone
-        //     {
-        //         OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
-        //     }
-        // }
 
         enum_def! {
             #[derive(Exchange)]

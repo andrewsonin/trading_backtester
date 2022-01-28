@@ -1,6 +1,7 @@
 use {
     proc_macro::TokenStream,
     quote::quote,
+    std::str::FromStr,
     syn::{
         {Data, DeriveInput, Field, Ident, parse_macro_input},
         __private::TokenStream2,
@@ -71,9 +72,15 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
     let (outer_id, action, broker_id, trader_id, exchange_id, e2b, t2b, b2e, b2t, b2b, sub_cfg)
         = get_associated_types(&first_field_type);
 
-    let (mut time_sync, mut get_latency, mut named,
-        mut wakeup, mut process_trader_request,
+    let (mut time_sync,
+        mut get_latency, mut latency_generator, mut get_latency_generator,
+        mut outgoing_latency, mut incoming_latency,
+        mut named, mut wakeup, mut process_trader_request,
         mut process_exchange_reply, mut upon_connection_to_exchange, mut register_trader) = (
+        TokenStream2::new(),
+        TokenStream2::new(),
+        TokenStream2::new(),
+        TokenStream2::new(),
         TokenStream2::new(),
         TokenStream2::new(),
         TokenStream2::new(),
@@ -84,8 +91,18 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         TokenStream2::new()
     );
 
-    let process_variant = |variant_name: &Ident| {
+    let process_variant = |(variant_name, variant_field): (&Ident, &Field)| {
+        let as_trait = quote! {<#variant_field as Latent>};
+        latency_generator.extend(quote! {#variant_name(#as_trait::LatencyGenerator),});
+        get_latency_generator.extend(
+            quote! {Self::#variant_name(v) =>
+                Self::LatencyGenerator::#variant_name(v.get_latency_generator()),
+            }
+        );
+
         let match_arm = quote! {Self::#variant_name(v) => v};
+        outgoing_latency.extend(quote! {#match_arm.outgoing_latency(outer_id, event_dt, rng),});
+        incoming_latency.extend(quote! {#match_arm.incoming_latency(outer_id, event_dt, rng),});
 
         time_sync.extend(quote! {#match_arm.current_datetime_mut(),});
         get_latency.extend(quote! {#match_arm.get_latency_generator(),});
@@ -114,11 +131,42 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         register_trader.extend(quote! {#match_arm.register_trader(trader_id, sub_cfgs),})
     };
 
-    idents.into_iter().for_each(process_variant);
+    idents.into_iter().zip(field_types.into_iter()).for_each(process_variant);
 
-    let unimplemented_msg = format!("get_latency_generator called for {name}");
+    let vis = ast.vis;
+    let latency_generator_name = TokenStream2::from_str(&format!("{name}LatencyGenerator"))
+        .unwrap();
+
     let tokens = quote! {
-        #into_impls
+        #vis enum #latency_generator_name #impl_generics
+        #where_clause
+        {
+            #latency_generator
+        }
+
+        impl #impl_generics
+        LatencyGenerator<#outer_id>
+        for #latency_generator_name #ty_generics
+        #where_clause
+        {
+            fn outgoing_latency(
+                &mut self,
+                outer_id: #outer_id,
+                event_dt: DateTime,
+                rng: &mut impl Rng) -> u64
+            {
+                match self { #outgoing_latency }
+            }
+
+            fn incoming_latency(
+                &mut self,
+                outer_id: #outer_id,
+                event_dt: DateTime,
+                rng: &mut impl Rng) -> u64
+            {
+                match self { #incoming_latency }
+            }
+        }
 
         impl #impl_generics Broker
         for #name #ty_generics
@@ -192,10 +240,10 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         for #name #ty_generics
         #where_clause {
             type OuterID = #outer_id;
-            type LatencyGenerator = Nothing;
+            type LatencyGenerator = #latency_generator_name #ty_generics;
 
             fn get_latency_generator(&self) -> Self::LatencyGenerator {
-                unimplemented!(#unimplemented_msg)
+                match self { #get_latency_generator }
             }
         }
 
@@ -212,6 +260,8 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         #where_clause {
             type Action = #action;
         }
+
+        #into_impls
     };
     tokens.into()
 }

@@ -314,7 +314,7 @@ mod tests {
             broker_examples::BasicBroker,
             broker_reply::BasicBrokerToTrader,
             crate::prelude::*,
-            derive_macros::{Broker, Exchange, Replay, Trader, LatencyGenerator},
+            derive_macros::{Broker, Exchange, LatencyGenerator, Replay, Trader},
             exchange_example::BasicExchange,
             latency_examples::ConstantLatency,
             rand::Rng,
@@ -370,9 +370,15 @@ mod tests {
         const ZERO: u64 = 0;
         enum_def! {
             #[derive(LatencyGenerator)]
-            LatencyGenEnum<OuterID: Id>{
+            LatencyGenEnum<OuterID: Id> {
                 ConstantLatency<OuterID, ZERO, ZERO>
             }
+        }
+
+        #[derive(LatencyGenerator)]
+        enum AnotherLatencyGenEnum<OuterID: Id> {
+            Var1(ConstantLatency<OuterID, 0, 0>),
+            Var2(ConstantLatency<OuterID, 1, 1>),
         }
     }
 }

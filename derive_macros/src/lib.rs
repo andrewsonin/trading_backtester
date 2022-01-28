@@ -856,8 +856,8 @@ pub fn derive_latency_generator(input: TokenStream) -> TokenStream
     let process_variant = |variant_name: &Ident| {
         let match_arm = quote! {Self::#variant_name(v) => v};
 
-        outgoing_latency.extend(quote! { #match_arm.outgoing_latency(outer_id, event_dt, rng) });
-        incoming_latency.extend(quote! { #match_arm.incoming_latency(outer_id, event_dt, rng) })
+        outgoing_latency.extend(quote! { #match_arm.outgoing_latency(outer_id, event_dt, rng), });
+        incoming_latency.extend(quote! { #match_arm.incoming_latency(outer_id, event_dt, rng), })
     };
 
     idents.into_iter().for_each(process_variant);

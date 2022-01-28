@@ -1,7 +1,7 @@
 use {
     crate::{
         latency::LatencyGenerator,
-        types::{DateTime, Id, NeverType},
+        types::{DateTime, Id},
     },
     rand::Rng,
 };
@@ -17,14 +17,5 @@ for ConstantLatency<OUTGOING, INCOMING>
     }
     fn incoming_latency(&mut self, _: OuterID, _: DateTime, _: &mut impl Rng) -> u64 {
         INCOMING
-    }
-}
-
-impl<OuterID: Id, K> LatencyGenerator<OuterID> for NeverType<K> {
-    fn outgoing_latency(&mut self, _: OuterID, _: DateTime, _: &mut impl Rng) -> u64 {
-        unimplemented!("outgoing_latency is not implemented for NeverType")
-    }
-    fn incoming_latency(&mut self, _: OuterID, _: DateTime, _: &mut impl Rng) -> u64 {
-        unimplemented!("incoming_latency is not implemented for NeverType")
     }
 }

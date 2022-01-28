@@ -314,8 +314,9 @@ mod tests {
             broker_examples::BasicBroker,
             broker_reply::BasicBrokerToTrader,
             crate::prelude::*,
-            derive_macros::{Broker, Exchange, Replay, Trader},
+            derive_macros::{Broker, Exchange, Replay, Trader, LatencyGenerator},
             exchange_example::BasicExchange,
+            latency_examples::ConstantLatency,
             rand::Rng,
             replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
             trader_examples::{SpreadWriter, VoidTrader},
@@ -363,6 +364,14 @@ mod tests {
                 where ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>
             {
                 OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+            }
+        }
+
+        const ZERO: u64 = 0;
+        enum_def! {
+            #[derive(LatencyGenerator)]
+            LatencyGenEnum<OuterID: Id>{
+                ConstantLatency<OuterID, ZERO, ZERO>
             }
         }
     }

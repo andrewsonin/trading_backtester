@@ -799,3 +799,94 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
     };
     tokens.into()
 }
+
+#[proc_macro_derive(LatencyGenerator)]
+pub fn derive_latency_generator(input: TokenStream) -> TokenStream
+{
+    let ast = parse_macro_input!(input as DeriveInput);
+    let data = ast.data;
+    let data = if let Data::Enum(data) = data {
+        data
+    } else {
+        panic!("Enum type expected. Got {data:?}")
+    };
+
+    let get_associated_types = |variant_field: &Field| {
+        let as_trait = quote! {<#variant_field as LatencyGenerator>};
+        quote! {#as_trait::OuterID}
+    };
+
+    let name = ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
+    let mut into_impls = TokenStream2::new();
+    let (idents, field_types): (Vec<_>, Vec<_>) = data.variants
+        .iter()
+        .zip(1..)
+        .map(
+            |(v, i)| (
+                &v.ident,
+                v.fields.iter().next().unwrap_or_else(|| panic!("No inner fields for {i} variant"))
+            )
+        )
+        .inspect(
+            |(ident, field_type)| into_impls.extend(
+                quote! {
+                    impl #impl_generics From<#field_type>
+                    for #name #ty_generics
+                    #where_clause {
+                        fn from(value: #field_type) -> Self {
+                            Self::#ident(value)
+                        }
+                    }
+                }
+            )
+        )
+        .unzip();
+
+    let first_field_type = field_types.first().expect("No inner fields");
+    let outer_id = get_associated_types(&first_field_type);
+
+
+    let (mut outgoing_latency, mut incoming_latency) = (
+        TokenStream2::new(),
+        TokenStream2::new()
+    );
+
+    let process_variant = |variant_name: &Ident| {
+        let match_arm = quote! {Self::#variant_name(v) => v};
+
+        outgoing_latency.extend(quote! { #match_arm.outgoing_latency(outer_id, event_dt, rng) });
+        incoming_latency.extend(quote! { #match_arm.incoming_latency(outer_id, event_dt, rng) })
+    };
+
+    idents.into_iter().for_each(process_variant);
+
+    let tokens = quote! {
+        impl #impl_generics LatencyGenerator
+        for #name #ty_generics
+        #where_clause
+        {
+            type OuterID = #outer_id;
+
+            fn outgoing_latency(
+                &mut self,
+                outer_id: Self::OuterID,
+                event_dt: DateTime,
+                rng: &mut impl Rng) -> u64
+            {
+                match self { #outgoing_latency }
+            }
+
+            fn incoming_latency(
+                &mut self,
+                outer_id: Self::OuterID,
+                event_dt: DateTime,
+                rng: &mut impl Rng) -> u64
+            {
+                match self { #incoming_latency }
+            }
+        }
+    };
+    tokens.into()
+}

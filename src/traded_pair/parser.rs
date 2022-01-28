@@ -26,12 +26,13 @@ pub mod concrete {
             traded_pair::Base,
             types::Id,
         },
-        std::str::FromStr,
+        std::{fmt::Debug, str::FromStr},
     };
 
     pub struct SpotBaseTradedPairParser;
 
-    impl<Symbol: Id + FromStr> TradedPairParser<Symbol, SpotSettlement>
+    impl<Symbol: Id + FromStr<Err=Err>, Err: Debug>
+    TradedPairParser<Symbol, SpotSettlement>
     for SpotBaseTradedPairParser
     {
         fn parse<ExchangeID: Id>(
@@ -45,7 +46,7 @@ pub mod concrete {
             );
 
             let quoted_symbol = FromStr::from_str(quoted_symbol).unwrap_or_else(
-                |_| panic!("Cannot parse {quoted_symbol} to Symbol")
+                |err| panic!("Cannot parse {quoted_symbol} to Symbol. Error: {err:?}")
             );
             const PATTERN: &str = "base :: spot";
             let quoted_symbol = if let PATTERN = kind.to_lowercase().as_str() {
@@ -58,7 +59,7 @@ pub mod concrete {
             };
 
             let base_symbol = FromStr::from_str(base_symbol).unwrap_or_else(
-                |_| panic!("Cannot parse {base_symbol} to Symbol")
+                |err| panic!("Cannot parse {base_symbol} to Symbol. Error: {err:?}")
             );
             let base_symbol = Base::new(base_symbol);
             TradedPair {

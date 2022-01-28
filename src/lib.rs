@@ -312,18 +312,42 @@ mod tests {
     mod test_enum_def {
         use {
             broker_examples::BasicBroker,
-            crate::{
-                broker::{reply::BasicBrokerToTrader, request::BasicBrokerToExchange},
-                exchange::reply::{BasicExchangeToBroker, BasicExchangeToReplay},
-                prelude::*,
-                replay::request::BasicReplayToExchange,
-                trader::request::BasicTraderToBroker,
-            },
-            derive_macros::{Broker, Exchange},
+            broker_reply::BasicBrokerToTrader,
+            crate::prelude::*,
+            derive_macros::{Broker, Exchange, Replay, Trader},
             exchange_example::BasicExchange,
             rand::Rng,
             replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
+            trader_examples::{SpreadWriter, VoidTrader},
+            trader_request::BasicTraderToBroker,
         };
+
+        enum_def! {
+            #[derive(Trader)]
+            TraderEnum<
+                TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id,
+                Settlement: GetSettlementLag
+            > {
+                SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
+                VoidTrader<
+                    TraderID, BrokerID,
+                    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+                    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+                    Nothing
+                >
+            }
+        }
+
+        enum_def! {
+            #[derive(Broker)]
+            BrokerEnum<
+                BrokerID, TraderID: Id, ExchangeID: Id, Symbol: Id,
+                Settlement: GetSettlementLag
+            >
+            where BrokerID: Id {
+                BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+            }
+        }
 
         enum_def! {
             #[derive(Exchange)]
@@ -334,14 +358,12 @@ mod tests {
         }
 
         enum_def! {
-            #[derive(Broker)]
-            BrokerEnum<
-                BrokerID, TraderID: Id, ExchangeID: Id, Symbol: Id,
-                Settlement: GetSettlementLag
-            > where BrokerID: Id {
-                BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+            #[derive(Replay)]
+            ReplayEnum<ExchangeID: Id, Symbol: Id, ObSnapshotDelay, Settlement: GetSettlementLag>
+                where ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>
+            {
+                OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             }
         }
     }
 }
-

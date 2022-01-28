@@ -1,6 +1,7 @@
 pub mod broker;
 pub mod exchange;
 pub mod kernel;
+pub mod latency;
 pub mod order;
 pub mod order_book;
 pub mod parallel;
@@ -35,7 +36,8 @@ pub mod prelude {
             ExchangeToReplay,
             reply as exchange_reply,
         },
-        kernel::{Kernel, KernelBuilder},
+        kernel::{Kernel, KernelBuilder, LatentActionProcessor},
+        latency::{concrete as latency_examples, LatencyGenerator, Latent},
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
         order_book::{LimitOrder, OrderBook, OrderBookEvent, OrderBookEventKind},
         parallel::{ParallelBacktester, ThreadConfig},
@@ -69,6 +71,7 @@ pub mod prelude {
         },
         types::*,
         utils::{
+            chrono,
             constants,
             derive_macros,
             derive_more,
@@ -95,6 +98,9 @@ mod tests {
         traded_pair_parser_examples::SpotBaseTradedPairParser,
         trader_examples::SpreadWriter,
     };
+
+    use crate::exchange::concrete::BasicExchange;
+    use crate::replay::concrete::OneTickReplay;
 
     #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
     enum ExchangeName {
@@ -145,7 +151,8 @@ mod tests {
     struct DelayScheduler;
 
     impl<ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
-    GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement> for DelayScheduler
+    GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>
+    for DelayScheduler
     {
         fn get_ob_snapshot_delay(
             &mut self,
@@ -178,8 +185,8 @@ mod tests {
             DelayScheduler,
         );
 
-        let exchanges = exchange_names.iter().map(BuildExchange::build);
-        let replay = replay_config.build();
+        let exchanges = exchange_names.iter().map(BasicExchange::from);
+        let replay = OneTickReplay::from(&replay_config);
         let brokers = [
             (
                 BasicBroker::new(BrokerName::Broker1),
@@ -222,6 +229,7 @@ mod tests {
             SpotBaseTradedPairParser,
             DelayScheduler,
         );
+
         let broker_configs = [
             (
                 BrokerName::Broker1,
@@ -270,13 +278,18 @@ mod tests {
             second_thread_config.clone()
         ];
 
+        type Trader = SpreadWriter<u8, BrokerName, ExchangeName, SymbolName, SpotSettlement>;
+        type Broker = BasicBroker<BrokerName, u8, ExchangeName, SymbolName, SpotSettlement>;
+        type Exchange = BasicExchange<ExchangeName, BrokerName, SymbolName, SpotSettlement>;
+        type Replay = OneTickReplay<ExchangeName, SymbolName, DelayScheduler, SpotSettlement>;
+
         ParallelBacktester::new(
             exchange_names.clone(),
             broker_configs,
             per_thread_configs,
             (start_dt, end_dt),
         )
-            .run_simulation();
+            .run_simulation::<Trader, Broker, Exchange, Replay>();
 
         let per_thread_configs = [
             first_thread_config.clone(),
@@ -292,38 +305,62 @@ mod tests {
         )
             .with_rng::<StdRng>()
             .with_num_threads(2)
-            .run_simulation()
+            .run_simulation::<Trader, Broker, Exchange, Replay>()
     }
 
     #[allow(dead_code)]
     mod test_enum_def {
         use {
-            crate::{
-                exchange::reply::BasicExchangeToReplay,
-                prelude::*,
-                replay::request::BasicReplayToExchange,
-            },
-            derive_macros::Replay,
+            broker_examples::BasicBroker,
+            broker_reply::BasicBrokerToTrader,
+            crate::prelude::*,
+            derive_macros::{Broker, Exchange, Replay, Trader},
+            exchange_example::BasicExchange,
             rand::Rng,
             replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
+            trader_examples::{SpreadWriter, VoidTrader},
+            trader_request::BasicTraderToBroker,
         };
 
         enum_def! {
+            #[derive(Trader)]
+            TraderEnum<
+                TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id,
+                Settlement: GetSettlementLag
+            > {
+                SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
+                VoidTrader<
+                    TraderID, BrokerID,
+                    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+                    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+                    Nothing
+                >
+            }
+        }
+
+        enum_def! {
+            #[derive(Broker)]
+            BrokerEnum<
+                BrokerID, TraderID: Id, ExchangeID: Id, Symbol: Id,
+                Settlement: GetSettlementLag
+            >
+            where BrokerID: Id {
+                BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+            }
+        }
+
+        enum_def! {
+            #[derive(Exchange)]
+            ExchangeEnum<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
+            {
+                BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
+            }
+        }
+
+        enum_def! {
             #[derive(Replay)]
-            #[replay(
-                ExchangeID,
-                BasicExchangeToReplay<Symbol, Settlement>,
-                Nothing,
-                BasicReplayToExchange<ExchangeID, Symbol, Settlement>
-            )]
-            ReplayEnum<
-                ExchangeID: Id,
-                Symbol: Id,
-                Settlement: GetSettlementLag,
-                ObSnapshotDelay: Sized + Copy
-            > where
-                ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-                ObSnapshotDelay: Clone
+            ReplayEnum<ExchangeID: Id, Symbol: Id, ObSnapshotDelay, Settlement: GetSettlementLag>
+                where ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>
             {
                 OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             }

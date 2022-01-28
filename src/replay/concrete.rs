@@ -25,9 +25,9 @@ use {
         utils::{
             input::one_tick::OneTickTradedPairReader,
             queue::{LessElementBinaryHeap, MessageReceiver},
-            rand::Rng,
         },
     },
+    rand::Rng,
     std::{
         cmp::Reverse,
         collections::{HashMap, HashSet},
@@ -263,19 +263,20 @@ impl<
     ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 >
-Replay<
-    ExchangeID,
-    BasicExchangeToReplay<Symbol, Settlement>,
-    Nothing,
-    BasicReplayToExchange<ExchangeID, Symbol, Settlement>
->
+Replay
 for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
+    type ExchangeID = ExchangeID;
+
+    type E2R = BasicExchangeToReplay<Symbol, Settlement>;
+    type R2R = Nothing;
+    type R2E = BasicReplayToExchange<ExchangeID, Symbol, Settlement>;
+
     fn wakeup<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl Fn(Self::Item) -> KerMsg,
-        _: Nothing,
+        _: Self::R2R,
         _: &mut impl Rng,
     ) {
         unreachable!("{} :: Replay wakeups are not planned", self.current_dt)
@@ -285,7 +286,7 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
         process_action: impl Fn(Self::Item) -> KerMsg,
-        reply: BasicExchangeToReplay<Symbol, Settlement>,
+        reply: Self::E2R,
         exchange_id: ExchangeID,
         rng: &mut impl Rng,
     ) {

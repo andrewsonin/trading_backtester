@@ -1,12 +1,15 @@
-use crate::{
-    broker::BrokerToExchange,
-    replay::ReplayToExchange,
-    types::{Agent, Id, Named, TimeSync},
-    utils::{queue::MessageReceiver, rand::Rng},
+use {
+    crate::{
+        broker::BrokerToExchange,
+        replay::ReplayToExchange,
+        types::{Agent, Id, Named, TimeSync},
+        utils::queue::MessageReceiver,
+    },
+    rand::Rng,
 };
 
-pub mod reply;
 pub mod concrete;
+pub mod reply;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub struct ExchangeAction<
@@ -38,21 +41,23 @@ pub trait ExchangeToBroker: Ord {
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
-pub trait Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>:
-TimeSync + Named<ExchangeID> + Agent<Action=ExchangeAction<E2R, E2B, E2E>>
-    where ExchangeID: Id,
-          BrokerID: Id,
-          R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-          E2R: ExchangeToReplay,
-          E2B: ExchangeToBroker<BrokerID=BrokerID>,
-          E2E: ExchangeToItself,
+pub trait Exchange:
+TimeSync + Named<Self::ExchangeID> + Agent<Action=ExchangeAction<Self::E2R, Self::E2B, Self::E2E>>
 {
+    type ExchangeID: Id;
+    type BrokerID: Id;
+
+    type R2E: ReplayToExchange<ExchangeID=Self::ExchangeID>;
+    type B2E: BrokerToExchange<ExchangeID=Self::ExchangeID>;
+    type E2R: ExchangeToReplay;
+    type E2B: ExchangeToBroker<BrokerID=Self::BrokerID>;
+    type E2E: ExchangeToItself;
+
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
-        scheduled_action: E2E,
+        scheduled_action: Self::E2E,
         rng: &mut RNG,
     );
 
@@ -60,8 +65,8 @@ TimeSync + Named<ExchangeID> + Agent<Action=ExchangeAction<E2R, E2B, E2E>>
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
-        request: B2E,
-        broker_id: BrokerID,
+        request: Self::B2E,
+        broker_id: Self::BrokerID,
         rng: &mut RNG,
     );
 
@@ -69,9 +74,9 @@ TimeSync + Named<ExchangeID> + Agent<Action=ExchangeAction<E2R, E2B, E2E>>
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
-        request: R2E,
+        request: Self::R2E,
         rng: &mut RNG,
     );
 
-    fn connect_broker(&mut self, broker: BrokerID);
+    fn connect_broker(&mut self, broker: Self::BrokerID);
 }

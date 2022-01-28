@@ -52,8 +52,9 @@ use {
             Size,
             TimeSync,
         },
-        utils::{queue::MessageReceiver, rand::Rng},
+        utils::queue::MessageReceiver,
     },
+    rand::Rng,
     std::{
         collections::{hash_map::Entry::*, HashMap},
         iter::{once, once_with},
@@ -115,28 +116,24 @@ Agent for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     >;
 }
 
-impl<
-    ExchangeID: Id,
-    BrokerID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
-Exchange<
-    ExchangeID,
-    BrokerID,
-    BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
-    BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-    BasicExchangeToReplay<Symbol, Settlement>,
-    BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-    Nothing
->
+impl<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
+Exchange
 for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
+    type ExchangeID = ExchangeID;
+    type BrokerID = BrokerID;
+
+    type R2E = BasicReplayToExchange<ExchangeID, Symbol, Settlement>;
+    type B2E = BasicBrokerToExchange<ExchangeID, Symbol, Settlement>;
+    type E2R = BasicExchangeToReplay<Symbol, Settlement>;
+    type E2B = BasicExchangeToBroker<BrokerID, Symbol, Settlement>;
+    type E2E = Nothing;
+
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
-        _: Nothing,
+        _: Self::E2E,
         _: &mut RNG,
     ) {
         unreachable!("{} :: Exchange wakeups are not planned", self.current_dt)
@@ -146,7 +143,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         mut process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
-        request: BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+        request: Self::B2E,
         broker_id: BrokerID,
         rng: &mut RNG,
     ) {
@@ -176,7 +173,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         mut process_action: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
-        request: BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
+        request: Self::R2E,
         rng: &mut RNG,
     ) {
         let get_broker_id_plug = || unreachable!("Replay does not have BrokerID");

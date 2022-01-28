@@ -26,6 +26,8 @@ use {
             OrderExecuted,
             OrderPartiallyExecuted,
         },
+        kernel::LatentActionProcessor,
+        latency::{concrete::ConstantLatency, Latent},
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         trader::{
@@ -33,8 +35,9 @@ use {
             subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
         },
         types::{Agent, Date, DateTime, Id, Named, Nothing, OrderID, TimeSync},
-        utils::{queue::MessageReceiver, rand::Rng},
+        utils::queue::MessageReceiver,
     },
+    rand::Rng,
     std::collections::{HashMap, HashSet},
 };
 
@@ -98,21 +101,35 @@ Agent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 }
 
 impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
-Broker<
-    BrokerID, TraderID, ExchangeID,
-    BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-    BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-    Nothing,
-    SubscriptionConfig<ExchangeID, Symbol, Settlement>
->
+Latent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+{
+    type OuterID = ExchangeID;
+    type LatencyGenerator = ConstantLatency<0, 0>;
+
+    fn get_latency_generator(&self) -> Self::LatencyGenerator {
+        ConstantLatency::<0, 0>
+    }
+}
+
+impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+Broker
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
+    type BrokerID = BrokerID;
+    type TraderID = TraderID;
+    type ExchangeID = ExchangeID;
+
+    type E2B = BasicExchangeToBroker<BrokerID, Symbol, Settlement>;
+    type T2B = BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>;
+    type B2E = BasicBrokerToExchange<ExchangeID, Symbol, Settlement>;
+    type B2T = BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>;
+    type B2B = Nothing;
+    type SubCfg = SubscriptionConfig<ExchangeID, Symbol, Settlement>;
+
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         _: MessageReceiver<KerMsg>,
-        _: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         _: Nothing,
         _: &mut RNG,
     ) {
@@ -122,7 +139,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn process_trader_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        mut action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         request: BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
         trader_id: TraderID,
         rng: &mut RNG,
@@ -230,13 +247,15 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 }
             }
         };
-        message_receiver.push(process_action(&self, action, rng))
+        message_receiver.push(
+            action_processor.process_action(action, self.get_latency_generator(), rng)
+        )
     }
 
     fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut process_action: impl FnMut(&Self, Self::Action, &mut RNG) -> KerMsg,
+        mut action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         reply: BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
         exchange_id: ExchangeID,
         rng: &mut RNG,
@@ -417,7 +436,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
             BasicExchangeToBrokerReply::ExchangeEventNotification(notification) => {
                 self.handle_exchange_notification(
                     message_receiver,
-                    process_action,
+                    action_processor,
                     notification,
                     exchange_id,
                     reply.exchange_dt,
@@ -426,12 +445,10 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 return;
             }
         };
-        message_receiver.push(process_action(&self, message, rng))
+        message_receiver.push(
+            action_processor.process_action(message, self.get_latency_generator(), rng)
+        )
     }
-
-    fn broker_to_exchange_latency(&self, _: ExchangeID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
-
-    fn exchange_to_broker_latency(&self, _: ExchangeID, _: DateTime, _: &mut impl Rng) -> u64 { 0 }
 
     fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID) {
         self.registered_exchanges.insert(exchange_id);
@@ -483,13 +500,18 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     fn handle_exchange_notification<KerMsg: Ord, RNG: Rng>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
-        mut process_action: impl FnMut(&Self, <Self as Agent>::Action, &mut RNG) -> KerMsg,
+        mut action_processor: impl LatentActionProcessor<<Self as Agent>::Action, <Self as Broker>::ExchangeID, KerMsg=KerMsg>,
         notification: ExchangeEventNotification<Symbol, Settlement>,
         exchange_id: ExchangeID,
         exchange_dt: DateTime,
         rng: &mut RNG,
     ) {
-        let process_action = |action| process_action(&self, action, rng);
+        let process_action = |action|
+            action_processor.process_action(
+                action,
+                self.get_latency_generator(),
+                rng,
+            );
         match notification {
             ExchangeEventNotification::ExchangeOpen => {
                 let action_iterator = self.trader_configs.keys().map(

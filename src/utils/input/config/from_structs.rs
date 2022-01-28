@@ -1,97 +1,18 @@
 use {
     crate::{
-        broker::{
-            Broker,
-            BrokerToExchange,
-            BrokerToItself,
-            BrokerToTrader,
-            concrete::BasicBroker,
-            reply::BasicBrokerToTrader,
-            request::BasicBrokerToExchange,
-        },
-        exchange::{
-            concrete::BasicExchange,
-            Exchange,
-            ExchangeToBroker,
-            ExchangeToItself,
-            ExchangeToReplay,
-            reply::{BasicExchangeToBroker, BasicExchangeToReplay},
-        },
-        replay::{
-            concrete::{ExchangeSession, GetNextObSnapshotDelay, OneTickReplay, TradedPairLifetime},
-            Replay,
-            ReplayToExchange,
-            ReplayToItself,
-            request::BasicReplayToExchange,
+        broker::concrete::BasicBroker,
+        exchange::concrete::BasicExchange,
+        replay::concrete::{
+            ExchangeSession, GetNextObSnapshotDelay, OneTickReplay, TradedPairLifetime,
         },
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
-        trader::{
-            concrete::SpreadWriter,
-            request::BasicTraderToBroker,
-            subscriptions::SubscriptionConfig,
-            Trader,
-            TraderToBroker,
-            TraderToItself,
-        },
-        types::{DateTime, Id, Nothing, PriceStep},
+        trader::concrete::SpreadWriter,
+        types::{DateTime, Id, PriceStep},
         utils::input::one_tick::{OneTickTradedPairReader, OneTickTrdPrlConfig},
     },
     std::path::{Path, PathBuf},
 };
-
-pub trait BuildExchange<
-    ExchangeID: Id,
-    BrokerID: Id,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    E2R: ExchangeToReplay,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    E2E: ExchangeToItself
-> {
-    type E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>;
-
-    fn build(&self) -> Self::E;
-}
-
-pub trait BuildReplay<
-    ExchangeID: Id,
-    E2R: ExchangeToReplay,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>
-> {
-    type R: Replay<ExchangeID, E2R, R2R, R2E>;
-
-    fn build(&self) -> Self::R;
-}
-
-pub trait BuildBroker<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    SubCfg
-> {
-    type B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>;
-
-    fn build(&self) -> Self::B;
-}
-
-pub trait BuildTrader<
-    TraderID: Id,
-    BrokerID: Id,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself
-> {
-    type T: Trader<TraderID, BrokerID, B2T, T2B, T2T>;
-
-    fn build(&self) -> Self::T;
-}
 
 #[derive(Clone)]
 pub struct OneTickTradedPairReaderConfig<
@@ -145,23 +66,16 @@ impl<
     ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 >
-BuildReplay<
-    ExchangeID,
-    BasicExchangeToReplay<Symbol, Settlement>,
-    Nothing,
-    BasicReplayToExchange<ExchangeID, Symbol, Settlement>
->
-for OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+From<&OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>>
+for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
-    type R = OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>;
-
-    fn build(&self) -> Self::R {
-        Self::R::new(
-            self.start_dt,
-            self.traded_pair_configs.iter().map(From::from),
-            self.exchange_open_close_events.iter().cloned(),
-            self.traded_pair_creation_events.iter().cloned(),
-            self.ob_snapshot_delay_scheduler.clone(),
+    fn from(cfg: &OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>) -> Self {
+        Self::new(
+            cfg.start_dt,
+            cfg.traded_pair_configs.iter().map(From::from),
+            cfg.exchange_open_close_events.iter().cloned(),
+            cfg.traded_pair_creation_events.iter().cloned(),
+            cfg.ob_snapshot_delay_scheduler.clone(),
         )
     }
 }
@@ -174,21 +88,11 @@ impl<
     Symbol: Id,
     Settlement: GetSettlementLag
 >
-BuildExchange<
-    ExchangeID,
-    BrokerID,
-    BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
-    BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-    BasicExchangeToReplay<Symbol, Settlement>,
-    BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-    Nothing
->
-for ExchangeID
+From<&ExchangeID>
+for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
 {
-    type E = BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>;
-
-    fn build(&self) -> Self::E {
-        Self::E::new(*self)
+    fn from(exchange_id: &ExchangeID) -> Self {
+        Self::new(*exchange_id)
     }
 }
 
@@ -201,23 +105,11 @@ impl<
     Symbol: Id,
     Settlement: GetSettlementLag
 >
-BuildBroker<
-    BrokerID,
-    TraderID,
-    ExchangeID,
-    BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
-    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-    BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
-    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-    Nothing,
-    SubscriptionConfig<ExchangeID, Symbol, Settlement>
->
-for BrokerID
+From<&BrokerID>
+for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
-    type B = BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>;
-
-    fn build(&self) -> Self::B {
-        Self::B::new(*self)
+    fn from(broker_id: &BrokerID) -> Self {
+        Self::new(*broker_id)
     }
 }
 
@@ -232,11 +124,7 @@ impl<TraderID: Id, PS: Into<PriceStep> + Copy, F: AsRef<Path>>
 SpreadWriterConfig<TraderID, PS, F>
 {
     pub fn new(name: TraderID, file: F, price_step: PS) -> Self {
-        Self {
-            name,
-            file,
-            price_step,
-        }
+        Self { name, file, price_step }
     }
 }
 
@@ -249,18 +137,10 @@ impl<
     PS: Into<PriceStep> + Copy,
     F: AsRef<Path>
 >
-BuildTrader<
-    TraderID,
-    BrokerID,
-    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-    Nothing
->
-for SpreadWriterConfig<TraderID, PS, F>
+From<&SpreadWriterConfig<TraderID, PS, F>>
+for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 {
-    type T = SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>;
-
-    fn build(&self) -> Self::T {
-        Self::T::new(self.name, self.price_step, &self.file)
+    fn from(cfg: &SpreadWriterConfig<TraderID, PS, F>) -> Self {
+        Self::new(cfg.name, cfg.price_step, &cfg.file)
     }
 }

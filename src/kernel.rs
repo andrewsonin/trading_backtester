@@ -2,100 +2,91 @@ use {
     crate::{
         broker::{
             Broker,
-            BrokerAction,
-            BrokerActionKind,
             BrokerToExchange,
             BrokerToItself,
             BrokerToTrader,
         },
         exchange::{
             Exchange,
-            ExchangeAction,
             ExchangeActionKind,
             ExchangeToBroker,
             ExchangeToItself,
             ExchangeToReplay,
         },
-        replay::{Replay, ReplayAction, ReplayActionKind, ReplayToExchange, ReplayToItself},
+        kernel::action_processors::{BrokerActionProcessor, TraderActionProcessor},
+        latency::LatencyGenerator,
+        replay::{Replay, ReplayActionKind, ReplayToExchange, ReplayToItself},
         trader::{
             Trader,
-            TraderAction,
-            TraderActionKind,
             TraderToBroker,
             TraderToItself,
         },
         types::{DateTime, Duration, Id},
-        utils::{
-            queue::{LessElementBinaryHeap, MessageReceiver},
-            rand::{Rng, rngs::StdRng, SeedableRng},
-        },
+        utils::queue::{LessElementBinaryHeap, MessageReceiver},
     },
+    rand::{Rng, rngs::StdRng, SeedableRng},
     std::{cmp::Reverse, collections::HashMap, marker::PhantomData},
 };
 
-pub struct Kernel<
-    TraderID,
-    BrokerID,
-    ExchangeID,
-    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-    T, B, E, R,
-    SubCfg, RNG
-> where
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
-    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
-    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
-    R: Replay<ExchangeID, E2R, R2R, R2E>,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself,
-    E2R: ExchangeToReplay,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    E2E: ExchangeToItself,
-    RNG: SeedableRng + Rng
+mod action_processors;
+
+pub trait LatentActionProcessor<Action, OuterID: Id>
 {
-    traders: HashMap<TraderID, T>,
-    brokers: HashMap<BrokerID, B>,
-    exchanges: HashMap<ExchangeID, E>,
+    type KerMsg: Ord;
+
+    fn process_action(
+        &mut self,
+        action: Action,
+        latency_generator: impl LatencyGenerator<OuterID>,
+        rng: &mut impl Rng) -> Self::KerMsg;
+}
+
+pub struct Kernel<T, B, E, R, RNG>
+    where
+        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
+        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
+        E: Exchange<ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        R: Replay,
+        RNG: SeedableRng + Rng
+{
+    traders: HashMap<T::TraderID, T>,
+    brokers: HashMap<B::BrokerID, B>,
+    exchanges: HashMap<E::ExchangeID, E>,
     replay: R,
 
-    message_queue: LessElementBinaryHeap<
-        Message<ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E>
-    >,
+    message_queue: LessElementBinaryHeap<Message<<Self as InnerMessage>::MessageContent>>,
 
     end_dt: DateTime,
     current_dt: DateTime,
 
     rng: RNG,
-    phantom_data: PhantomData<SubCfg>,
+}
+
+trait InnerMessage {
+    type MessageContent: Ord;
+}
+
+impl<T, B, E, R, RNG> InnerMessage for Kernel<T, B, E, R, RNG>
+    where
+        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
+        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
+        E: Exchange<ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        R: Replay,
+        RNG: SeedableRng + Rng
+{
+    type MessageContent = MessageContent<
+        E::ExchangeID, B::BrokerID, T::TraderID,
+        R::R2R, R::R2E,
+        B::B2E, B::B2T, B::B2B,
+        T::T2B, T::T2T,
+        E::E2R, E::E2B, E::E2E
+    >;
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
-pub struct Message<
-    ExchangeID: Id,
-    BrokerID: Id,
-    TraderID: Id,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself,
-    E2R: ExchangeToReplay,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    E2E: ExchangeToItself
-> {
+struct Message<MessageContent: Ord> {
     datetime: DateTime,
-    body: MessageContent<
-        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
-    >,
+    body: MessageContent,
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
@@ -135,36 +126,17 @@ enum MessageContent<
     TraderToBroker(TraderID, T2B),
 }
 
-pub struct KernelBuilder<
-    TraderID,
-    BrokerID,
-    ExchangeID,
-    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-    T, B, E, R,
-    SubCfg, RNG
-> where
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
-    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
-    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
-    R: Replay<ExchangeID, E2R, R2R, R2E>,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself,
-    E2R: ExchangeToReplay,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    E2E: ExchangeToItself,
-    RNG: SeedableRng + Rng
+pub struct KernelBuilder<T, B, E, R, RNG>
+    where
+        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
+        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
+        E: Exchange<ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        R: Replay,
+        RNG: SeedableRng + Rng
 {
-    traders: HashMap<TraderID, T>,
-    brokers: HashMap<BrokerID, B>,
-    exchanges: HashMap<ExchangeID, E>,
+    traders: HashMap<T::TraderID, T>,
+    brokers: HashMap<B::BrokerID, B>,
+    exchanges: HashMap<E::ExchangeID, E>,
     replay: R,
 
     start_dt: DateTime,
@@ -172,40 +144,16 @@ pub struct KernelBuilder<
 
     seed: Option<u64>,
 
-    phantoms: PhantomData<(T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E, SubCfg, RNG)>,
+    phantoms: PhantomData<RNG>,
 }
 
-impl<
-    TraderID,
-    BrokerID,
-    ExchangeID,
-    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-    T, B, E, R,
-    SubCfg
->
-KernelBuilder<
-    TraderID, BrokerID, ExchangeID,
-    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-    T, B, E, R,
-    SubCfg, StdRng
-> where
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
-    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
-    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
-    R: Replay<ExchangeID, E2R, R2R, R2E>,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself,
-    E2R: ExchangeToReplay,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    E2E: ExchangeToItself
+impl<T, B, E, R>
+KernelBuilder<T, B, E, R, StdRng>
+    where
+        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
+        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
+        E: Exchange<ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        R: Replay,
 {
     pub fn new<CE, CB, SC>(exchanges: impl IntoIterator<Item=E>,
                            brokers: impl IntoIterator<Item=(B, CE)>,
@@ -213,9 +161,9 @@ KernelBuilder<
                            replay: R,
                            date_range: (DateTime, DateTime)) -> Self
         where
-            CE: IntoIterator<Item=ExchangeID>,      // Connected Exchanges
-            CB: IntoIterator<Item=(BrokerID, SC)>,  // Connected Brokers
-            SC: IntoIterator<Item=SubCfg>
+            CE: IntoIterator<Item=E::ExchangeID>,      // Connected Exchanges
+            CB: IntoIterator<Item=(B::BrokerID, SC)>,  // Connected Brokers
+            SC: IntoIterator<Item=B::SubCfg>
     {
         let (start_dt, end_dt) = date_range;
         if end_dt < start_dt {
@@ -223,7 +171,7 @@ KernelBuilder<
         }
         let exchanges: Vec<_> = exchanges.into_iter().collect();
         let n_exchanges = exchanges.len();
-        let mut exchanges: HashMap<ExchangeID, E> = exchanges.into_iter()
+        let mut exchanges: HashMap<E::ExchangeID, E> = exchanges.into_iter()
             .map(
                 |mut exchange| {
                     *exchange.current_datetime_mut() = start_dt;
@@ -237,7 +185,7 @@ KernelBuilder<
 
         let brokers: Vec<_> = brokers.into_iter().collect();
         let n_brokers = brokers.len();
-        let mut brokers: HashMap<BrokerID, B> = brokers.into_iter()
+        let mut brokers: HashMap<B::BrokerID, B> = brokers.into_iter()
             .map(
                 |(mut broker, exchanges_to_connect)| {
                     *broker.current_datetime_mut() = start_dt;
@@ -262,7 +210,7 @@ KernelBuilder<
 
         let traders: Vec<_> = traders.into_iter().collect();
         let n_traders = traders.len();
-        let traders: HashMap<TraderID, T> = traders.into_iter()
+        let traders: HashMap<T::TraderID, T> = traders.into_iter()
             .map(
                 |(mut trader, brokers_to_register)| {
                     *trader.current_datetime_mut() = start_dt;
@@ -295,12 +243,8 @@ KernelBuilder<
         }
     }
 
-    pub fn with_rng<RNG: Rng + SeedableRng>(self) -> KernelBuilder<
-        TraderID, BrokerID, ExchangeID,
-        T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-        T, B, E, R,
-        SubCfg, RNG
-    > {
+    pub fn with_rng<RNG: Rng + SeedableRng>(self) -> KernelBuilder<T, B, E, R, RNG>
+    {
         let KernelBuilder {
             traders, brokers, exchanges, replay, end_dt, start_dt, seed, ..
         } = self;
@@ -317,61 +261,28 @@ KernelBuilder<
     }
 }
 
-impl<
-    TraderID,
-    BrokerID,
-    ExchangeID,
-    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-    T, B, E, R,
-    SubCfg, RNG
->
-KernelBuilder<
-    TraderID, BrokerID, ExchangeID,
-    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-    T, B, E, R,
-    SubCfg, RNG
-> where
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
-    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
-    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
-    R: Replay<ExchangeID, E2R, R2R, R2E>,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself,
-    E2R: ExchangeToReplay,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    E2E: ExchangeToItself,
-    RNG: Rng + SeedableRng
+impl<T, B, E, R, RNG>
+KernelBuilder<T, B, E, R, RNG>
+    where
+        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
+        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
+        E: Exchange<ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        R: Replay,
+        RNG: Rng + SeedableRng
 {
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = Some(seed);
         self
     }
 
-    pub fn build(self) -> Kernel<
-        TraderID, BrokerID, ExchangeID,
-        T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-        T, B, E, R,
-        SubCfg, RNG
-    > {
+    pub fn build(self) -> Kernel<T, B, E, R, RNG>
+    {
         let KernelBuilder {
             traders, brokers, exchanges, mut replay, end_dt, start_dt, seed, ..
         } = self;
 
         *replay.current_datetime_mut() = start_dt;
-        let first_message = Kernel::<
-            TraderID, BrokerID, ExchangeID,
-            T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-            T, B, E, R,
-            SubCfg, RNG
-        >::process_replay_action(
+        let first_message = Kernel::<T, B, E, R, RNG>::process_replay_action(
             start_dt,
             replay.next().expect("Replay does not contain any entries"),
         );
@@ -391,43 +302,17 @@ KernelBuilder<
             } else {
                 RNG::from_entropy()
             },
-            phantom_data: Default::default(),
         }
     }
 }
 
-impl<
-    TraderID,
-    BrokerID,
-    ExchangeID,
-    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-    T, B, E, R,
-    SubCfg, RNG
->
-Kernel<
-    TraderID, BrokerID, ExchangeID,
-    T2B, T2T, B2E, B2T, B2B, E2R, E2B, E2E, R2R, R2E,
-    T, B, E, R,
-    SubCfg, RNG
-> where
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    T: Trader<TraderID, BrokerID, B2T, T2B, T2T>,
-    B: Broker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>,
-    E: Exchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>,
-    R: Replay<ExchangeID, E2R, R2R, R2E>,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself,
-    E2R: ExchangeToReplay,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    E2E: ExchangeToItself,
-    RNG: SeedableRng + Rng
+impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
+    where
+        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
+        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
+        E: Exchange<ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        R: Replay,
+        RNG: SeedableRng + Rng
 {
     pub fn run_simulation(&mut self)
     {
@@ -441,12 +326,8 @@ Kernel<
         }
     }
 
-    fn handle_message(
-        &mut self,
-        message: MessageContent<
-            ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
-        >,
-    ) {
+    fn handle_message(&mut self, message: <Self as InnerMessage>::MessageContent)
+    {
         match message
         {
             MessageContent::ReplayWakeUp(scheduled_action) => {
@@ -485,7 +366,7 @@ Kernel<
         }
     }
 
-    fn handle_replay_wakeup(&mut self, scheduled_action: R2R)
+    fn handle_replay_wakeup(&mut self, scheduled_action: R::R2R)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
         let process_replay_action = |action| Self::process_replay_action(self.current_dt, action);
@@ -497,7 +378,7 @@ Kernel<
         )
     }
 
-    fn handle_replay_to_exchange(&mut self, request: R2E)
+    fn handle_replay_to_exchange(&mut self, request: R::R2E)
     {
         let exchange_id = request.get_exchange_id();
         let exchange = self.exchanges.get_mut(&exchange_id).unwrap_or_else(
@@ -520,7 +401,7 @@ Kernel<
         )
     }
 
-    fn handle_exchange_wakeup(&mut self, exchange_id: ExchangeID, scheduled_action: E2E)
+    fn handle_exchange_wakeup(&mut self, exchange_id: E::ExchangeID, scheduled_action: E::E2E)
     {
         let exchange = self.exchanges.get_mut(&exchange_id).unwrap_or_else(
             || panic!("Kernel does not know such an Exchange: {exchange_id}")
@@ -542,7 +423,7 @@ Kernel<
         )
     }
 
-    fn handle_exchange_to_replay(&mut self, exchange_id: ExchangeID, reply: E2R)
+    fn handle_exchange_to_replay(&mut self, exchange_id: E::ExchangeID, reply: R::E2R)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
         let process_replay_action = |action| Self::process_replay_action(self.current_dt, action);
@@ -555,55 +436,47 @@ Kernel<
         )
     }
 
-    fn handle_exchange_to_broker(&mut self, exchange_id: ExchangeID, reply: E2B)
+    fn handle_exchange_to_broker(&mut self, exchange_id: E::ExchangeID, reply: B::E2B)
     {
         let broker_id = reply.get_broker_id();
         let broker = self.brokers.get_mut(&broker_id).unwrap_or_else(
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |broker: &B, action, rng: &mut RNG|
-            Self::process_broker_action(
-                self.current_dt,
-                &mut self.traders,
-                rng,
-                broker,
-                action,
-                broker_id,
-            );
+        let broker_action_processor = BrokerActionProcessor::<B::BrokerID, B::Action, T, E, R>::new(
+            self.current_dt,
+            broker_id,
+            &mut self.traders,
+        );
         broker.process_exchange_reply(
             MessageReceiver::new(&mut self.message_queue),
-            process_broker_action,
+            broker_action_processor,
             reply,
             exchange_id,
             &mut self.rng,
         )
     }
 
-    fn handle_broker_wakeup(&mut self, broker_id: BrokerID, scheduled_action: B2B)
+    fn handle_broker_wakeup(&mut self, broker_id: B::BrokerID, scheduled_action: B::B2B)
     {
         let broker = self.brokers.get_mut(&broker_id).unwrap_or_else(
             || panic!("Kernel does not know such a Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |broker: &B, action, rng: &mut RNG|
-            Self::process_broker_action(
-                self.current_dt,
-                &mut self.traders,
-                rng,
-                broker,
-                action,
-                broker_id,
-            );
+        let broker_action_processor = BrokerActionProcessor::<B::BrokerID, B::Action, T, E, R>::new(
+            self.current_dt,
+            broker_id,
+            &mut self.traders,
+        );
         broker.wakeup(
             MessageReceiver::new(&mut self.message_queue),
-            process_broker_action,
+            broker_action_processor,
             scheduled_action,
             &mut self.rng,
         )
     }
 
-    fn handle_broker_to_exchange(&mut self, broker_id: BrokerID, request: B2E)
+    fn handle_broker_to_exchange(&mut self, broker_id: B::BrokerID, request: E::B2E)
     {
         let exchange_id = request.get_exchange_id();
         let exchange = self.exchanges.get_mut(&exchange_id).unwrap_or_else(
@@ -627,71 +500,59 @@ Kernel<
         )
     }
 
-    fn handle_broker_to_trader(&mut self, broker_id: BrokerID, reply: B2T)
+    fn handle_broker_to_trader(&mut self, broker_id: B::BrokerID, reply: B::B2T)
     {
         let trader_id = reply.get_trader_id();
         let trader = self.traders.get_mut(&trader_id).unwrap_or_else(
             || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
-        let process_trader_action = |trader: &T, action, rng: &mut RNG|
-            Self::process_trader_action(
-                self.current_dt,
-                rng,
-                trader,
-                action,
-                trader_id,
-            );
+        let trader_action_processor = TraderActionProcessor::<T::TraderID, T::Action, B, E, R>::new(
+            self.current_dt,
+            trader_id,
+        );
         trader.process_broker_reply(
             MessageReceiver::new(&mut self.message_queue),
-            process_trader_action,
+            trader_action_processor,
             reply,
             broker_id,
             &mut self.rng,
         )
     }
 
-    fn handle_trader_wakeup(&mut self, trader_id: TraderID, scheduled_action: T2T)
+    fn handle_trader_wakeup(&mut self, trader_id: T::TraderID, scheduled_action: T::T2T)
     {
         let trader = self.traders.get_mut(&trader_id).unwrap_or_else(
             || panic!("Kernel does not know such a Trader: {trader_id}")
         );
         *trader.current_datetime_mut() = self.current_dt;
-        let process_trader_action = |trader: &T, action, rng: &mut RNG|
-            Self::process_trader_action(
-                self.current_dt,
-                rng,
-                trader,
-                action,
-                trader_id,
-            );
+        let trader_action_processor = TraderActionProcessor::<T::TraderID, T::Action, B, E, R>::new(
+            self.current_dt,
+            trader_id,
+        );
         trader.wakeup(
             MessageReceiver::new(&mut self.message_queue),
-            process_trader_action,
+            trader_action_processor,
             scheduled_action,
             &mut self.rng,
         )
     }
 
-    fn handle_trader_to_broker(&mut self, trader_id: TraderID, request: T2B)
+    fn handle_trader_to_broker(&mut self, trader_id: T::TraderID, request: B::T2B)
     {
         let broker_id = request.get_broker_id();
         let broker = self.brokers.get_mut(&broker_id).unwrap_or_else(
             || panic!("Kernel does not know such an Broker: {broker_id}")
         );
         *broker.current_datetime_mut() = self.current_dt;
-        let process_broker_action = |broker: &B, action, rng: &mut RNG|
-            Self::process_broker_action(
-                self.current_dt,
-                &mut self.traders,
-                rng,
-                broker,
-                action,
-                broker_id,
-            );
+        let broker_action_processor = BrokerActionProcessor::<B::BrokerID, B::Action, T, E, R>::new(
+            self.current_dt,
+            broker_id,
+            &mut self.traders,
+        );
         broker.process_trader_request(
             MessageReceiver::new(&mut self.message_queue),
-            process_broker_action,
+            broker_action_processor,
             request,
             trader_id,
             &mut self.rng,
@@ -700,9 +561,8 @@ Kernel<
 
     fn process_replay_action(
         current_dt: DateTime,
-        action: ReplayAction<R2R, R2E>) -> Message<
-        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
-    > {
+        action: R::Item) -> Message<<Self as InnerMessage>::MessageContent>
+    {
         if action.datetime < current_dt {
             panic!(
                 "Replay yielded action {action:?} which DateTime ({}) \
@@ -725,12 +585,11 @@ Kernel<
 
     fn process_exchange_action(
         current_dt: DateTime,
-        brokers: &mut HashMap<BrokerID, B>,
+        brokers: &mut HashMap<B::BrokerID, B>,
         rng: &mut RNG,
-        action: ExchangeAction<E2R, E2B, E2E>,
-        exchange_id: ExchangeID) -> Message<
-        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
-    > {
+        action: E::Action,
+        exchange_id: E::ExchangeID) -> Message<<Self as InnerMessage>::MessageContent>
+    {
         let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
         let (datetime, body) = match action.content
         {
@@ -740,7 +599,9 @@ Kernel<
                     || panic!("Kernel does not know such a Broker: {broker_id}")
                 );
                 *broker.current_datetime_mut() = current_dt;
-                let latency = broker.exchange_to_broker_latency(exchange_id, delayed_dt, rng);
+                let latency = broker
+                    .get_latency_generator()
+                    .incoming_latency(exchange_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
                     MessageContent::ExchangeToBroker(exchange_id, reply)
@@ -756,77 +617,6 @@ Kernel<
                 (
                     delayed_dt,
                     MessageContent::ExchangeWakeUp(exchange_id, wakeup)
-                )
-            }
-        };
-        Message { datetime, body }
-    }
-
-    fn process_broker_action(
-        current_dt: DateTime,
-        traders: &mut HashMap<TraderID, T>,
-        rng: &mut RNG,
-        broker: &B,
-        action: BrokerAction<B2E, B2T, B2B>,
-        broker_id: BrokerID) -> Message<
-        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
-    > {
-        let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
-        let (datetime, body) = match action.content
-        {
-            BrokerActionKind::BrokerToTrader(reply) => {
-                let trader_id = reply.get_trader_id();
-                let trader = traders.get_mut(&trader_id).unwrap_or_else(
-                    || panic!("Kernel does not know such a Trader: {trader_id}")
-                );
-                *trader.current_datetime_mut() = current_dt;
-                let latency = trader.broker_to_trader_latency(broker_id, delayed_dt, rng);
-                (
-                    delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::BrokerToTrader(broker_id, reply)
-                )
-            }
-            BrokerActionKind::BrokerToExchange(request) => {
-                let exchange_id = request.get_exchange_id();
-                let latency = broker.broker_to_exchange_latency(exchange_id, delayed_dt, rng);
-                (
-                    delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::BrokerToExchange(broker_id, request)
-                )
-            }
-            BrokerActionKind::BrokerToItself(wakeup) => {
-                (
-                    delayed_dt,
-                    MessageContent::BrokerWakeUp(broker_id, wakeup)
-                )
-            }
-        };
-        Message { datetime, body }
-    }
-
-    fn process_trader_action(
-        current_dt: DateTime,
-        rng: &mut RNG,
-        trader: &T,
-        action: TraderAction<T2B, T2T>,
-        trader_id: TraderID) -> Message<
-        ExchangeID, BrokerID, TraderID, R2R, R2E, B2E, B2T, B2B, T2B, T2T, E2R, E2B, E2E
-    > {
-        let delayed_dt = current_dt + Duration::nanoseconds(action.delay as i64);
-        let (datetime, body) = match action.content
-        {
-            TraderActionKind::TraderToBroker(request) => {
-                let broker_id = request.get_broker_id();
-                let latency = trader.trader_to_broker_latency(broker_id, delayed_dt, rng);
-                (
-                    delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::TraderToBroker(trader_id, request)
-                )
-            }
-            TraderActionKind::TraderToItself(wakeup) => {
-                (
-                    delayed_dt,
-                    MessageContent::TraderWakeUp(trader_id, wakeup)
                 )
             }
         };

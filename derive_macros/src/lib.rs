@@ -130,13 +130,15 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
         }
 
         impl #impl_generics
-        LatencyGenerator<#outer_id>
+        LatencyGenerator
         for #latency_generator_name #ty_generics
         #where_clause
         {
+            type OuterID = #outer_id;
+
             fn outgoing_latency(
                 &mut self,
-                outer_id: #outer_id,
+                outer_id: Self::OuterID,
                 event_dt: DateTime,
                 rng: &mut impl Rng) -> u64
             {
@@ -145,7 +147,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
 
             fn incoming_latency(
                 &mut self,
-                outer_id: #outer_id,
+                outer_id: Self::OuterID,
                 event_dt: DateTime,
                 rng: &mut impl Rng) -> u64
             {
@@ -365,13 +367,15 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         }
 
         impl #impl_generics
-        LatencyGenerator<#outer_id>
+        LatencyGenerator
         for #latency_generator_name #ty_generics
         #where_clause
         {
+            type OuterID = #outer_id;
+
             fn outgoing_latency(
                 &mut self,
-                outer_id: #outer_id,
+                outer_id: Self::OuterID,
                 event_dt: DateTime,
                 rng: &mut impl Rng) -> u64
             {
@@ -380,7 +384,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
 
             fn incoming_latency(
                 &mut self,
-                outer_id: #outer_id,
+                outer_id: Self::OuterID,
                 event_dt: DateTime,
                 rng: &mut impl Rng) -> u64
             {

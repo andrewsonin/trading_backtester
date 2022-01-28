@@ -104,10 +104,10 @@ impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSett
 Latent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
     type OuterID = ExchangeID;
-    type LatencyGenerator = ConstantLatency<0, 0>;
+    type LatencyGenerator = ConstantLatency<ExchangeID, 0, 0>;
 
     fn get_latency_generator(&self) -> Self::LatencyGenerator {
-        ConstantLatency::<0, 0>
+        ConstantLatency::<ExchangeID, 0, 0>::new()
     }
 }
 

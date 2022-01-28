@@ -37,7 +37,7 @@ pub trait LatentActionProcessor<Action, OuterID: Id>
     fn process_action(
         &mut self,
         action: Action,
-        latency_generator: impl LatencyGenerator<OuterID>,
+        latency_generator: impl LatencyGenerator<OuterID=OuterID>,
         rng: &mut impl Rng) -> Self::KerMsg;
 }
 

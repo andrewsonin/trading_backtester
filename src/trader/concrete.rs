@@ -98,10 +98,10 @@ impl<
 Latent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
 {
     type OuterID = BrokerID;
-    type LatencyGenerator = ConstantLatency<0, 0>;
+    type LatencyGenerator = ConstantLatency<BrokerID, 0, 0>;
 
     fn get_latency_generator(&self) -> Self::LatencyGenerator {
-        ConstantLatency::<0, 0>
+        ConstantLatency::<BrokerID, 0, 0>::new()
     }
 }
 
@@ -207,10 +207,10 @@ Latent
 for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 {
     type OuterID = BrokerID;
-    type LatencyGenerator = ConstantLatency<0, 0>;
+    type LatencyGenerator = ConstantLatency<BrokerID, 0, 0>;
 
     fn get_latency_generator(&self) -> Self::LatencyGenerator {
-        ConstantLatency::<0, 0>
+        ConstantLatency::<BrokerID, 0, 0>::new()
     }
 }
 

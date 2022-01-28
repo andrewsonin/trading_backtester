@@ -98,7 +98,7 @@ for BrokerActionProcessor<'a, BrokerID, BrokerAction<B2E, B2T, B2B>, T, E, R>
     fn process_action(
         &mut self,
         action: BrokerAction<B2E, B2T, B2B>,
-        mut latency_generator: impl LatencyGenerator<E::ExchangeID>,
+        mut latency_generator: impl LatencyGenerator<OuterID=E::ExchangeID>,
         rng: &mut impl Rng) -> Self::KerMsg
     {
         let delayed_dt = self.current_dt + Duration::nanoseconds(action.delay as i64);
@@ -158,7 +158,7 @@ for TraderActionProcessor<TraderID, TraderAction<T2B, T2T>, B, E, R>
     fn process_action(
         &mut self,
         action: TraderAction<T2B, T2T>,
-        mut latency_generator: impl LatencyGenerator<B::BrokerID>,
+        mut latency_generator: impl LatencyGenerator<OuterID=B::BrokerID>,
         rng: &mut impl Rng) -> Self::KerMsg
     {
         let delayed_dt = self.current_dt + Duration::nanoseconds(action.delay as i64);

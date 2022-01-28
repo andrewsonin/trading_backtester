@@ -4,18 +4,30 @@ use {
         types::{DateTime, Id},
     },
     rand::Rng,
+    std::marker::PhantomData,
 };
 
-pub struct ConstantLatency<const OUTGOING: u64, const INCOMING: u64>;
+pub struct ConstantLatency<OuterID: Id, const OUTGOING: u64, const INCOMING: u64>
+(PhantomData<OuterID>);
 
 impl<OuterID: Id, const OUTGOING: u64, const INCOMING: u64>
-LatencyGenerator<OuterID>
-for ConstantLatency<OUTGOING, INCOMING>
+ConstantLatency<OuterID, OUTGOING, INCOMING>
 {
-    fn outgoing_latency(&mut self, _: OuterID, _: DateTime, _: &mut impl Rng) -> u64 {
+    pub fn new() -> Self {
+        ConstantLatency(PhantomData::default())
+    }
+}
+
+impl<OuterID: Id, const OUTGOING: u64, const INCOMING: u64>
+LatencyGenerator
+for ConstantLatency<OuterID, OUTGOING, INCOMING>
+{
+    type OuterID = OuterID;
+
+    fn outgoing_latency(&mut self, _: Self::OuterID, _: DateTime, _: &mut impl Rng) -> u64 {
         OUTGOING
     }
-    fn incoming_latency(&mut self, _: OuterID, _: DateTime, _: &mut impl Rng) -> u64 {
+    fn incoming_latency(&mut self, _: Self::OuterID, _: DateTime, _: &mut impl Rng) -> u64 {
         INCOMING
     }
 }

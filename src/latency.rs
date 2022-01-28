@@ -8,22 +8,24 @@ pub mod concrete;
 pub trait Latent
 {
     type OuterID: Id;
-    type LatencyGenerator: LatencyGenerator<Self::OuterID>;
+    type LatencyGenerator: LatencyGenerator<OuterID=Self::OuterID>;
 
     fn get_latency_generator(&self) -> Self::LatencyGenerator;
 }
 
-pub trait LatencyGenerator<OuterID: Id>
+pub trait LatencyGenerator
 {
+    type OuterID: Id;
+
     fn outgoing_latency(
         &mut self,
-        outer_id: OuterID,
+        outer_id: Self::OuterID,
         event_dt: DateTime,
         rng: &mut impl Rng) -> u64;
 
     fn incoming_latency(
         &mut self,
-        outer_id: OuterID,
+        outer_id: Self::OuterID,
         event_dt: DateTime,
         rng: &mut impl Rng) -> u64;
 }

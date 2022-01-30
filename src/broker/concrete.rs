@@ -40,7 +40,7 @@ use {
         traded_pair::TradedPair,
         trader::{
             request::{BasicTraderRequest, BasicTraderToBroker},
-            subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
+            subscriptions::{SubscriptionConfig, SubscriptionList},
             TraderToBroker,
         },
         types::{Agent, Date, DateTime, Id, Named, NeverType, Nothing, OrderID, TimeSync},
@@ -565,7 +565,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 let action_iterator = self.trader_configs.iter().filter_map(
                     |(trader_id, configs)| {
                         if let Some(config) = configs.get(&(exchange_id, cancelled.traded_pair)) {
-                            if config.contains(Subscription::CancelledLimitOrders) {
+                            if config.contains(SubscriptionList::CANCELLED_LIMIT_ORDERS) {
                                 let notification = Self::create_broker_reply(
                                     *trader_id,
                                     exchange_id,
@@ -586,7 +586,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 let action_iterator = self.trader_configs.iter().filter_map(
                     |(trader_id, configs)| {
                         if let Some(config) = configs.get(&(exchange_id, placed.traded_pair)) {
-                            if config.contains(Subscription::NewLimitOrders) {
+                            if config.contains(SubscriptionList::NEW_LIMIT_ORDERS) {
                                 let notification = Self::create_broker_reply(
                                     *trader_id,
                                     exchange_id,
@@ -607,7 +607,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 let action_iterator = self.trader_configs.iter().filter_map(
                     |(trader_id, configs)| {
                         if let Some(config) = configs.get(&(exchange_id, trade.traded_pair)) {
-                            if config.contains(Subscription::Trades) {
+                            if config.contains(SubscriptionList::TRADES) {
                                 let notification = Self::create_broker_reply(
                                     *trader_id,
                                     exchange_id,
@@ -628,7 +628,7 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 let action_iterator = self.trader_configs.iter().filter_map(
                     |(trader_id, configs)| {
                         if let Some(config) = configs.get(&(exchange_id, ob_snapshot.traded_pair)) {
-                            if config.contains(Subscription::ObSnapshots) {
+                            if config.contains(SubscriptionList::OB_SNAPSHOTS) {
                                 let ob_snapshot = Self::create_broker_reply(
                                     *trader_id,
                                     exchange_id,

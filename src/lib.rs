@@ -108,7 +108,7 @@ pub mod prelude {
         trader::{
             concrete as trader_examples,
             request as trader_request,
-            subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
+            subscriptions::{SubscriptionConfig, SubscriptionList},
             Trader,
             TraderAction,
             TraderActionKind,

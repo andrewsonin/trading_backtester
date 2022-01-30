@@ -1,5 +1,5 @@
 use {
-    bitmask::bitmask,
+    bitflags::bitflags,
     crate::{
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
@@ -7,13 +7,12 @@ use {
     },
 };
 
-bitmask! {
-    #[derive(Debug)]
-    pub mask SubscriptionList: u8 where flags Subscription {
-        Trades                = 0b00000001,
-        NewLimitOrders        = 0b00000010,
-        CancelledLimitOrders  = 0b00000100,
-        ObSnapshots           = 0b00001000
+bitflags! {
+    pub struct SubscriptionList: u8 {
+        const TRADES                  = 0b00000001;
+        const NEW_LIMIT_ORDERS        = 0b00000010;
+        const CANCELLED_LIMIT_ORDERS  = 0b00000100;
+        const OB_SNAPSHOTS            = 0b00001000;
     }
 }
 
@@ -29,30 +28,37 @@ pub struct SubscriptionConfig<
 }
 
 impl SubscriptionList {
+    #[inline]
     pub fn subscribe() -> Self {
-        SubscriptionList::none()
+        SubscriptionList::empty()
     }
+    #[inline]
     pub fn to(mut self, subscription_list: SubscriptionList) -> Self {
         self |= subscription_list;
         self
     }
+    #[inline]
     pub fn to_everything(self) -> Self {
         SubscriptionList::all()
     }
+    #[inline]
     pub fn to_trades(mut self) -> Self {
-        self |= Subscription::Trades;
+        self |= SubscriptionList::TRADES;
         self
     }
+    #[inline]
     pub fn to_new_limit_orders(mut self) -> Self {
-        self |= Subscription::NewLimitOrders;
+        self |= SubscriptionList::NEW_LIMIT_ORDERS;
         self
     }
+    #[inline]
     pub fn to_cancelled_limit_orders(mut self) -> Self {
-        self |= Subscription::CancelledLimitOrders;
+        self |= SubscriptionList::CANCELLED_LIMIT_ORDERS;
         self
     }
+    #[inline]
     pub fn to_ob_snapshots(mut self) -> Self {
-        self |= Subscription::ObSnapshots;
+        self |= SubscriptionList::OB_SNAPSHOTS;
         self
     }
 }

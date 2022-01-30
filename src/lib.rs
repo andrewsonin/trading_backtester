@@ -313,11 +313,12 @@ mod tests {
         use {
             broker_examples::{BasicBroker, BasicVoidBroker},
             crate::prelude::*,
-            derive_macros::{Broker, Exchange, LatencyGenerator, Replay, Trader},
+            derive_macros::{Broker, Exchange, GetSettlementLag, LatencyGenerator, Replay, Trader},
             exchange_example::{BasicExchange, BasicVoidExchange},
             latency_examples::ConstantLatency,
             rand::Rng,
             replay_examples::{BasicVoidReplay, GetNextObSnapshotDelay, OneTickReplay},
+            settlement_examples::{SpotSettlement, VoidSettlement},
             trader_examples::{BasicVoidTrader, SpreadWriter},
         };
 
@@ -420,6 +421,20 @@ mod tests {
         enum AnotherLatencyGenEnum<OuterID: Id> {
             Var1(ConstantLatency<OuterID, 0, 0>),
             Var2(ConstantLatency<OuterID, 1, 0>),
+        }
+
+        enum_def! {
+            #[derive(GetSettlementLag, Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Clone, Copy)]
+            SettlementEnum {
+                VoidSettlement,
+                SpotSettlement
+            }
+        }
+
+        #[derive(GetSettlementLag, Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Clone, Copy)]
+        enum AnotherSettlementEnum {
+            Var1(VoidSettlement),
+            Var2(SpotSettlement),
         }
     }
 }

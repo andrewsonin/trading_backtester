@@ -892,3 +892,55 @@ pub fn derive_latency_generator(input: TokenStream) -> TokenStream
     };
     tokens.into()
 }
+
+#[proc_macro_derive(GetSettlementLag)]
+pub fn derive_get_settlement_lag(input: TokenStream) -> TokenStream
+{
+    let ast = parse_macro_input!(input as DeriveInput);
+    let data = ast.data;
+    let data = if let Data::Enum(data) = data {
+        data
+    } else {
+        panic!("Enum type expected. Got {data:?}")
+    };
+
+    let name = ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
+    let (mut into_impls, mut get_settlement_lag) = (TokenStream2::new(), TokenStream2::new());
+    data.variants.iter().zip(1..).for_each(
+        |(var, i)| {
+            let ident = &var.ident;
+            let field_type = var.fields.iter().next()
+                .unwrap_or_else(|| panic!("No inner fields for {i} variant"));
+
+            let match_arm = quote! {Self::#ident(v) => v};
+            get_settlement_lag.extend(quote! { #match_arm.get_settlement_lag(transaction_dt), });
+            into_impls.extend(
+                quote! {
+                    impl #impl_generics From<#field_type>
+                    for #name #ty_generics
+                    #where_clause {
+                        fn from(value: #field_type) -> Self {
+                            Self::#ident(value)
+                        }
+                    }
+                }
+            )
+        }
+    );
+
+    let tokens = quote! {
+        impl #impl_generics GetSettlementLag
+        for #name #ty_generics
+        #where_clause
+        {
+            fn get_settlement_lag(&self, transaction_dt: DateTime) -> u64 {
+                match self { #get_settlement_lag }
+            }
+        }
+
+        #into_impls
+    };
+    tokens.into()
+}

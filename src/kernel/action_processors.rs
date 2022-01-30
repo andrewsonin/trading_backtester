@@ -169,13 +169,13 @@ for TraderActionProcessor<TraderID, TraderAction<T2B, T2T>, B, E, R>
                 let latency = latency_generator.outgoing_latency(broker_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::TraderToBroker{ trader_id: self.trader_id, t2b: request}
+                    MessageContent::TraderToBroker { trader_id: self.trader_id, t2b: request }
                 )
             }
             TraderActionKind::TraderToItself(wakeup) => {
                 (
                     delayed_dt,
-                    MessageContent::TraderWakeUp{ trader_id: self.trader_id, t2t: wakeup}
+                    MessageContent::TraderWakeUp { trader_id: self.trader_id, t2t: wakeup }
                 )
             }
         };

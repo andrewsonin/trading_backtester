@@ -91,16 +91,14 @@ mod tests {
     use {
         broker_examples::BasicBroker,
         crate::prelude::*,
+        exchange_example::BasicExchange,
         rand::{Rng, rngs::StdRng},
-        replay_examples::GetNextObSnapshotDelay,
+        replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
         settlement_examples::SpotSettlement,
         std::{num::NonZeroU64, path::Path, str::FromStr},
         traded_pair_parser_examples::SpotBaseTradedPairParser,
         trader_examples::SpreadWriter,
     };
-
-    use crate::exchange::concrete::BasicExchange;
-    use crate::replay::concrete::OneTickReplay;
 
     #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
     enum ExchangeName {
@@ -405,14 +403,13 @@ mod tests {
             Var2(BasicVoidReplay<ExchangeID, Symbol, Settlement>),
         }
 
-        const ZERO: u64 = 0;
-
+        type ZeroLatency<OuterID> = ConstantLatency<OuterID, 0, 0>;
         type OneNSLatency<OuterID> = ConstantLatency<OuterID, 1, 1>;
 
         enum_def! {
             #[derive(LatencyGenerator)]
             LatencyGenEnum<OuterID: Id> {
-                ConstantLatency<OuterID, ZERO, ZERO>,
+                ZeroLatency<OuterID>,
                 OneNSLatency<OuterID>
             }
         }

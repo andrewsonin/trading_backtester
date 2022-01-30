@@ -12,6 +12,48 @@ pub mod trader;
 pub mod types;
 pub mod utils;
 
+pub mod custom {
+    pub use {chrono, derive_macros, rand};
+
+    pub use crate::{
+        broker::{
+            Broker,
+            BrokerAction,
+            BrokerActionKind,
+            BrokerToExchange,
+            BrokerToItself,
+            BrokerToTrader,
+        },
+        enum_def,
+        exchange::{
+            Exchange,
+            ExchangeAction,
+            ExchangeActionKind,
+            ExchangeToBroker,
+            ExchangeToItself,
+            ExchangeToReplay,
+        },
+        kernel::{Kernel, KernelBuilder, LatentActionProcessor},
+        latency::{LatencyGenerator, Latent},
+        parallel::{ParallelBacktester, ThreadConfig},
+        replay::{
+            Replay,
+            ReplayAction,
+            ReplayActionKind,
+            ReplayToExchange,
+            ReplayToItself,
+        },
+        trader::{
+            Trader,
+            TraderAction,
+            TraderActionKind,
+            TraderToBroker,
+            TraderToItself,
+        },
+        types::{Agent, Id, Named, TimeSync},
+    };
+}
+
 pub mod prelude {
     pub use crate::{
         broker::{

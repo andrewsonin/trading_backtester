@@ -200,6 +200,7 @@ mod order_book_logic_macros {
 }
 
 impl OrderBook {
+    #[inline]
     pub fn new() -> Self {
         OrderBook {
             bids: Default::default(),
@@ -210,6 +211,7 @@ impl OrderBook {
         }
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         self.best_bid = Price(0);
         self.best_ask = Price(0);
@@ -218,6 +220,7 @@ impl OrderBook {
         self.id_to_price_and_side.clear();
     }
 
+    #[inline]
     pub fn get_all_ids(&self) -> impl IntoIterator<Item=OrderID> + '_ {
         let get_filter_map_closure = || |order: &LimitOrder| {
             if order.size != Size(0) { Some(order.id) } else { None }
@@ -232,6 +235,7 @@ impl OrderBook {
             )
     }
 
+    #[inline]
     pub fn cancel_limit_order(&mut self, id: OrderID) -> Option<(LimitOrder, Direction, Price)>
     {
         let (price, buy) = if let Occupied(e) = self.id_to_price_and_side.entry(id) {
@@ -267,7 +271,8 @@ impl OrderBook {
         None
     }
 
-    pub(crate) fn insert_limit_order<const DUMMY: bool, const BUY: bool>(
+    #[inline]
+    pub fn insert_limit_order<const DUMMY: bool, const BUY: bool>(
         &mut self,
         dt: DateTime,
         id: OrderID,
@@ -377,7 +382,8 @@ impl OrderBook {
         reports
     }
 
-    pub(crate) fn insert_market_order<const DUMMY: bool, const BUY: bool>(
+    #[inline]
+    pub fn insert_market_order<const DUMMY: bool, const BUY: bool>(
         &mut self,
         mut size: Size) -> Vec<OrderBookEvent>
     {
@@ -418,6 +424,7 @@ impl OrderBook {
         reports
     }
 
+    #[inline]
     pub fn get_ob_side<const UPPER: bool>(&self) -> Vec<(Price, Vec<(Size, DateTime)>)>
     {
         let (side, price) = if UPPER {
@@ -454,6 +461,7 @@ impl OrderBook {
             .collect()
     }
 
+    #[inline]
     pub fn get_ob_state(&self) -> ObState {
         ObState {
             bids: self.get_ob_side::<false>(),

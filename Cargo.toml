@@ -3,6 +3,10 @@ name = "trading_backtester"
 version = "0.0.1"
 edition = "2021"
 authors = ["Andrew Sonin <sonin.cel@yandex.ru>"]
+description = """
+A highly customizable framework designed for parallel tuning of trading algorithms \
+by reproducing and simulating the trading history of exchanges and the behaviour of brokers.
+"""
 keywords = ["library", "lib", "trading", "backtester_engine"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

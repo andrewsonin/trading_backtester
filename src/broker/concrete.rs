@@ -6,6 +6,7 @@ use {
             BrokerActionKind,
             BrokerToExchange,
             BrokerToItself,
+            BrokerToReplay,
             BrokerToTrader,
             reply::{
                 BasicBrokerReply,
@@ -34,6 +35,7 @@ use {
         },
         kernel::LatentActionProcessor,
         latency::{concrete::ConstantLatency, Latent},
+        replay::ReplayToBroker,
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         trader::{
@@ -41,7 +43,7 @@ use {
             subscriptions::{Subscription, SubscriptionConfig, SubscriptionList},
             TraderToBroker,
         },
-        types::{Agent, Date, DateTime, Id, Named, Nothing, OrderID, TimeSync},
+        types::{Agent, Date, DateTime, Id, Named, NeverType, Nothing, OrderID, TimeSync},
         utils::queue::MessageReceiver,
     },
     rand::Rng,
@@ -101,6 +103,7 @@ impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSett
 Agent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 {
     type Action = BrokerAction<
+        Nothing,
         BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
         BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
         Nothing
@@ -126,8 +129,10 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     type TraderID = TraderID;
     type ExchangeID = ExchangeID;
 
+    type R2B = NeverType<BrokerID>;
     type E2B = BasicExchangeToBroker<BrokerID, Symbol, Settlement>;
     type T2B = BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>;
+    type B2R = Nothing;
     type B2E = BasicBrokerToExchange<ExchangeID, Symbol, Settlement>;
     type B2T = BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>;
     type B2B = Nothing;
@@ -457,6 +462,16 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         )
     }
 
+    fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        _: Self::R2B,
+        _: &mut RNG,
+    ) {
+        unreachable!("{} :: Did not plan to communicate with brokers", self.current_dt)
+    }
+
     fn upon_connection_to_exchange(&mut self, exchange_id: ExchangeID) {
         self.registered_exchanges.insert(exchange_id);
     }
@@ -698,8 +713,10 @@ pub struct VoidBroker<
     BrokerID: Id,
     TraderID: Id,
     ExchangeID: Id,
+    R2B: ReplayToBroker<BrokerID=BrokerID>,
     E2B: ExchangeToBroker<BrokerID=BrokerID>,
     T2B: TraderToBroker<BrokerID=BrokerID>,
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange<ExchangeID=ExchangeID>,
     B2T: BrokerToTrader<TraderID=TraderID>,
     B2B: BrokerToItself,
@@ -707,21 +724,23 @@ pub struct VoidBroker<
 > {
     current_dt: DateTime,
     broker_id: BrokerID,
-    phantom: PhantomData<(TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg)>,
+    phantom: PhantomData<(TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg)>,
 }
 
 impl<
     BrokerID: Id,
     TraderID: Id,
     ExchangeID: Id,
+    R2B: ReplayToBroker<BrokerID=BrokerID>,
     E2B: ExchangeToBroker<BrokerID=BrokerID>,
     T2B: TraderToBroker<BrokerID=BrokerID>,
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange<ExchangeID=ExchangeID>,
     B2T: BrokerToTrader<TraderID=TraderID>,
     B2B: BrokerToItself,
     SubCfg
 >
-VoidBroker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>
+VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 {
     pub fn new(broker_id: BrokerID) -> Self {
         Self {
@@ -736,14 +755,16 @@ impl<
     BrokerID: Id,
     TraderID: Id,
     ExchangeID: Id,
+    R2B: ReplayToBroker<BrokerID=BrokerID>,
     E2B: ExchangeToBroker<BrokerID=BrokerID>,
     T2B: TraderToBroker<BrokerID=BrokerID>,
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange<ExchangeID=ExchangeID>,
     B2T: BrokerToTrader<TraderID=TraderID>,
     B2B: BrokerToItself,
     SubCfg
 >
-TimeSync for VoidBroker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>
+TimeSync for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime {
         &mut self.current_dt
@@ -754,15 +775,17 @@ impl<
     BrokerID: Id,
     TraderID: Id,
     ExchangeID: Id,
+    R2B: ReplayToBroker<BrokerID=BrokerID>,
     E2B: ExchangeToBroker<BrokerID=BrokerID>,
     T2B: TraderToBroker<BrokerID=BrokerID>,
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange<ExchangeID=ExchangeID>,
     B2T: BrokerToTrader<TraderID=TraderID>,
     B2B: BrokerToItself,
     SubCfg
 >
 Latent
-for VoidBroker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>
+for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 {
     type OuterID = ExchangeID;
     type LatencyGenerator = ConstantLatency<ExchangeID, 0, 0>;
@@ -776,14 +799,17 @@ impl<
     BrokerID: Id,
     TraderID: Id,
     ExchangeID: Id,
+    R2B: ReplayToBroker<BrokerID=BrokerID>,
     E2B: ExchangeToBroker<BrokerID=BrokerID>,
     T2B: TraderToBroker<BrokerID=BrokerID>,
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange<ExchangeID=ExchangeID>,
     B2T: BrokerToTrader<TraderID=TraderID>,
     B2B: BrokerToItself,
     SubCfg
 >
-Named<BrokerID> for VoidBroker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>
+Named<BrokerID>
+for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 {
     fn get_name(&self) -> BrokerID {
         self.broker_id
@@ -794,35 +820,42 @@ impl<
     BrokerID: Id,
     TraderID: Id,
     ExchangeID: Id,
+    R2B: ReplayToBroker<BrokerID=BrokerID>,
     E2B: ExchangeToBroker<BrokerID=BrokerID>,
     T2B: TraderToBroker<BrokerID=BrokerID>,
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange<ExchangeID=ExchangeID>,
     B2T: BrokerToTrader<TraderID=TraderID>,
     B2B: BrokerToItself, SubCfg
 >
 Agent
-for VoidBroker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg> {
-    type Action = BrokerAction<B2E, B2T, B2B>;
+for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg> {
+    type Action = BrokerAction<B2R, B2E, B2T, B2B>;
 }
 
 impl<
     BrokerID: Id,
     TraderID: Id,
     ExchangeID: Id,
+    R2B: ReplayToBroker<BrokerID=BrokerID>,
     E2B: ExchangeToBroker<BrokerID=BrokerID>,
     T2B: TraderToBroker<BrokerID=BrokerID>,
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange<ExchangeID=ExchangeID>,
     B2T: BrokerToTrader<TraderID=TraderID>,
     B2B: BrokerToItself,
     SubCfg
 >
-Broker for VoidBroker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, SubCfg>
+Broker for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 {
     type BrokerID = BrokerID;
     type TraderID = TraderID;
     type ExchangeID = ExchangeID;
+
+    type R2B = R2B;
     type E2B = E2B;
     type T2B = T2B;
+    type B2R = B2R;
     type B2E = B2E;
     type B2T = B2T;
     type B2B = B2B;
@@ -856,6 +889,14 @@ Broker for VoidBroker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, S
         _: &mut RNG,
     ) {}
 
+    fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        _: Self::R2B,
+        _: &mut RNG,
+    ) {}
+
     fn upon_connection_to_exchange(&mut self, _: Self::ExchangeID) {}
 
     fn register_trader(&mut self, _: Self::TraderID, _: impl IntoIterator<Item=Self::SubCfg>) {}
@@ -863,8 +904,10 @@ Broker for VoidBroker<BrokerID, TraderID, ExchangeID, E2B, T2B, B2E, B2T, B2B, S
 
 pub type BasicVoidBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement> = VoidBroker<
     BrokerID, TraderID, ExchangeID,
+    NeverType<BrokerID>,
     BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
     BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+    Nothing,
     BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
     BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
     Nothing,

@@ -252,14 +252,17 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         let broker_id = quote! {#as_trait::BrokerID};
         let trader_id = quote! {#as_trait::TraderID};
         let exchange_id = quote! {#as_trait::ExchangeID};
+        let r2b = quote! {#as_trait::R2B};
         let e2b = quote! {#as_trait::E2B};
         let t2b = quote! {#as_trait::T2B};
+        let b2r = quote! {#as_trait::B2R};
         let b2e = quote! {#as_trait::B2E};
         let b2t = quote! {#as_trait::B2T};
         let b2b = quote! {#as_trait::B2B};
         let sub_cfg = quote! {#as_trait::SubCfg};
 
-        (outer_id, action, broker_id, trader_id, exchange_id, e2b, t2b, b2e, b2t, b2b, sub_cfg)
+        (outer_id, action, broker_id, trader_id, exchange_id,
+         r2b, e2b, t2b, b2r, b2e, b2t, b2b, sub_cfg)
     };
 
     let name = ast.ident;
@@ -291,14 +294,15 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         .unzip();
 
     let first_field_type = field_types.first().expect("No inner fields");
-    let (outer_id, action, broker_id, trader_id, exchange_id, e2b, t2b, b2e, b2t, b2b, sub_cfg)
-        = get_associated_types(&first_field_type);
+    let (outer_id, action, broker_id, trader_id, exchange_id,
+        r2b, e2b, t2b, b2r, b2e, b2t, b2b, sub_cfg) = get_associated_types(&first_field_type);
 
     let (mut time_sync,
         mut get_latency, mut latency_generator, mut get_latency_generator,
         mut outgoing_latency, mut incoming_latency,
-        mut named, mut wakeup, mut process_trader_request,
-        mut process_exchange_reply, mut upon_connection_to_exchange, mut register_trader) = (
+        mut named, mut wakeup, mut process_trader_request, mut process_exchange_reply,
+        mut process_replay_request, mut upon_connection_to_exchange, mut register_trader) = (
+        TokenStream2::new(),
         TokenStream2::new(),
         TokenStream2::new(),
         TokenStream2::new(),
@@ -344,6 +348,13 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
             quote! {
                 #match_arm.process_exchange_reply(
                     message_receiver, action_processor, reply, exchange_id, rng
+                ),
+            }
+        );
+        process_replay_request.extend(
+            quote! {
+                #match_arm.process_replay_request(
+                    message_receiver, action_processor, request, rng
                 ),
             }
         );
@@ -400,8 +411,10 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
             type TraderID = #trader_id;
             type ExchangeID = #exchange_id;
 
+            type R2B = #r2b;
             type E2B = #e2b;
             type T2B = #t2b;
+            type B2R = #b2r;
             type B2E = #b2e;
             type B2T = #b2t;
             type B2B = #b2b;
@@ -437,6 +450,16 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
                 rng: &mut RNG,
             ) {
                 match self { #process_exchange_reply }
+            }
+
+            fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+                &mut self,
+                message_receiver: MessageReceiver<KerMsg>,
+                action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+                request: Self::R2B,
+                rng: &mut RNG,
+            ) {
+                match self { #process_replay_request }
             }
 
             fn upon_connection_to_exchange(&mut self, exchange_id: Self::ExchangeID) {
@@ -679,12 +702,15 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
         let item = quote! {#as_trait::Item};
 
         let as_trait = quote! {<#variant_field as Replay>};
+        let broker_id = quote! {#as_trait::BrokerID};
         let exchange_id = quote! {#as_trait::ExchangeID};
         let e2r = quote! {#as_trait::E2R};
+        let b2r = quote! {#as_trait::B2R};
         let r2r = quote! {#as_trait::R2R};
         let r2e = quote! {#as_trait::R2E};
+        let r2b = quote! {#as_trait::R2B};
 
-        (item, exchange_id, e2r, r2r, r2e)
+        (item, broker_id, exchange_id, e2r, b2r, r2r, r2e, r2b)
     };
 
     let name = ast.ident;
@@ -716,10 +742,13 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
         .unzip();
 
     let first_field_type = field_types.first().expect("No inner fields");
-    let (item, exchange_id, e2r, r2r, r2e) = get_associated_types(&first_field_type);
+    let (item, broker_id, exchange_id, e2r, b2r, r2r, r2e, r2b)
+        = get_associated_types(&first_field_type);
 
 
-    let (mut time_sync, mut wakeup, mut handle_exchange_reply, mut next) = (
+    let (mut time_sync, mut wakeup,
+        mut handle_exchange_reply, mut handle_broker_reply, mut next) = (
+        TokenStream2::new(),
         TokenStream2::new(),
         TokenStream2::new(),
         TokenStream2::new(),
@@ -740,6 +769,13 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
                 ),
             }
         );
+        handle_broker_reply.extend(
+            quote! {
+                #match_arm.handle_broker_reply(
+                    message_receiver, process_action, reply, broker_id, rng
+                ),
+            }
+        );
         next.extend(quote! {#match_arm.next(),})
     };
 
@@ -752,11 +788,14 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
         for #name #ty_generics
         #where_clause
         {
+            type BrokerID = #broker_id;
             type ExchangeID = #exchange_id;
 
             type E2R = #e2r;
+            type B2R = #b2r;
             type R2R = #r2r;
             type R2E = #r2e;
+            type R2B = #r2b;
 
             fn wakeup<KerMsg: Ord>(
                 &mut self,
@@ -777,6 +816,17 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
                 rng: &mut impl Rng,
             ) {
                 match self { #handle_exchange_reply }
+            }
+
+            fn handle_broker_reply<KerMsg: Ord>(
+                &mut self,
+                message_receiver: MessageReceiver<KerMsg>,
+                process_action: impl Fn(Self::Item) -> KerMsg,
+                reply: Self::B2R,
+                broker_id: Self::BrokerID,
+                rng: &mut impl Rng,
+            ) {
+                match self { #handle_broker_reply }
             }
         }
 

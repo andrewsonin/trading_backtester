@@ -112,10 +112,10 @@ ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
 {
     pub fn run_simulation<T, B, E, R>(self)
         where
-            T: for<'a> From<&'a TraderConfig> + Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
-            B: for<'a> From<&'a BrokerConfig> + Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B, SubCfg=SubCfg>,
-            E: for<'a> From<&'a ExchangeConfig> + Exchange<BrokerID=BrokerID, ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
-            R: for<'a> From<&'a ReplayConfig> + Replay<ExchangeID=ExchangeID>
+            T: for<'a> From<&'a TraderConfig> + Trader<TraderID=B::TraderID, BrokerID=BrokerID, T2B=B::T2B, B2T=B::B2T>,
+            B: for<'a> From<&'a BrokerConfig> + Broker<BrokerID=BrokerID, ExchangeID=ExchangeID, B2R=R::B2R, B2E=E::B2E, R2B=R::R2B, E2B=E::E2B, SubCfg=SubCfg>,
+            E: for<'a> From<&'a ExchangeConfig> + Exchange<BrokerID=BrokerID, ExchangeID=ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+            R: for<'a> From<&'a ReplayConfig> + Replay<BrokerID=BrokerID, ExchangeID=ExchangeID>
     {
         let Self {
             num_threads,

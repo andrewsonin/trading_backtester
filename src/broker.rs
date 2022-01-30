@@ -3,6 +3,7 @@ use {
         exchange::ExchangeToBroker,
         kernel::LatentActionProcessor,
         latency::Latent,
+        replay::ReplayToBroker,
         trader::TraderToBroker,
         types::{Agent, Id, Named, TimeSync},
         utils::queue::MessageReceiver,
@@ -16,26 +17,31 @@ pub mod request;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub struct BrokerAction<
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange,
     B2T: BrokerToTrader,
     B2B: BrokerToItself
 > {
     pub delay: u64,
-    pub content: BrokerActionKind<B2E, B2T, B2B>,
+    pub content: BrokerActionKind<B2R, B2E, B2T, B2B>,
 }
 
 #[derive(Eq, PartialEq, Ord, PartialOrd)]
 pub enum BrokerActionKind<
+    B2R: BrokerToReplay,
     B2E: BrokerToExchange,
     B2T: BrokerToTrader,
     B2B: BrokerToItself
 > {
     BrokerToItself(B2B),
+    BrokerToReplay(B2R),
     BrokerToExchange(B2E),
     BrokerToTrader(B2T),
 }
 
 pub trait BrokerToItself: Ord {}
+
+pub trait BrokerToReplay: Ord {}
 
 pub trait BrokerToExchange: Ord {
     type ExchangeID: Id;
@@ -49,14 +55,16 @@ pub trait BrokerToTrader: Ord {
 
 pub trait Broker:
 TimeSync + Latent<OuterID=Self::ExchangeID> + Named<Self::BrokerID> + Agent<
-    Action=BrokerAction<Self::B2E, Self::B2T, Self::B2B>
+    Action=BrokerAction<Self::B2R, Self::B2E, Self::B2T, Self::B2B>
 > {
     type BrokerID: Id;
     type TraderID: Id;
     type ExchangeID: Id;
 
+    type R2B: ReplayToBroker<BrokerID=Self::BrokerID>;
     type E2B: ExchangeToBroker<BrokerID=Self::BrokerID>;
     type T2B: TraderToBroker<BrokerID=Self::BrokerID>;
+    type B2R: BrokerToReplay;
     type B2E: BrokerToExchange<ExchangeID=Self::ExchangeID>;
     type B2T: BrokerToTrader<TraderID=Self::TraderID>;
     type B2B: BrokerToItself;
@@ -85,6 +93,14 @@ TimeSync + Latent<OuterID=Self::ExchangeID> + Named<Self::BrokerID> + Agent<
         action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         reply: Self::E2B,
         exchange_id: Self::ExchangeID,
+        rng: &mut RNG,
+    );
+
+    fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+        &mut self,
+        message_receiver: MessageReceiver<KerMsg>,
+        action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
+        request: Self::R2B,
         rng: &mut RNG,
     );
 

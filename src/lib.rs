@@ -22,6 +22,7 @@ pub mod custom {
             BrokerActionKind,
             BrokerToExchange,
             BrokerToItself,
+            BrokerToReplay,
             BrokerToTrader,
         },
         enum_def,
@@ -40,6 +41,7 @@ pub mod custom {
             Replay,
             ReplayAction,
             ReplayActionKind,
+            ReplayToBroker,
             ReplayToExchange,
             ReplayToItself,
         },
@@ -62,6 +64,7 @@ pub mod prelude {
             BrokerActionKind,
             BrokerToExchange,
             BrokerToItself,
+            BrokerToReplay,
             BrokerToTrader,
             concrete as broker_examples,
             reply as broker_reply,
@@ -87,6 +90,7 @@ pub mod prelude {
             concrete as replay_examples,
             Replay,
             ReplayAction,
+            ReplayToBroker,
             ReplayToExchange,
             ReplayToItself,
             request as replay_request,
@@ -321,7 +325,9 @@ mod tests {
         type Trader = SpreadWriter<u8, BrokerName, ExchangeName, SymbolName, SpotSettlement>;
         type Broker = BasicBroker<BrokerName, u8, ExchangeName, SymbolName, SpotSettlement>;
         type Exchange = BasicExchange<ExchangeName, BrokerName, SymbolName, SpotSettlement>;
-        type Replay = OneTickReplay<ExchangeName, SymbolName, DelayScheduler, SpotSettlement>;
+        type Replay = OneTickReplay<
+            BrokerName, ExchangeName, SymbolName, DelayScheduler, SpotSettlement
+        >;
 
         ParallelBacktester::new(
             exchange_names.clone(),
@@ -426,23 +432,25 @@ mod tests {
 
         enum_def! {
             #[derive(Replay)]
-            ReplayEnum<ExchangeID: Id, Symbol: Id, ObSnapshotDelay, Settlement: GetSettlementLag>
-                where ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>
+            ReplayEnum<BrokerID: Id, ExchangeID: Id, Symbol: Id, ObSnapshotDelay, Settlement>
+                where ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+                      Settlement: GetSettlementLag
             {
-                OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>,
-                BasicVoidReplay<ExchangeID, Symbol, Settlement>
+                OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>,
+                BasicVoidReplay<BrokerID, ExchangeID, Symbol, Settlement>
             }
         }
 
         #[derive(Replay)]
         enum AnotherReplayEnum<
+            BrokerID: Id,
             ExchangeID: Id,
             Symbol: Id,
             ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
             Settlement: GetSettlementLag
         > {
-            Var1(OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>),
-            Var2(BasicVoidReplay<ExchangeID, Symbol, Settlement>),
+            Var1(OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>),
+            Var2(BasicVoidReplay<BrokerID, ExchangeID, Symbol, Settlement>),
         }
 
         type ZeroLatency<OuterID> = ConstantLatency<OuterID, 0, 0>;

@@ -61,13 +61,14 @@ pub struct OneTickReplayConfig<
 }
 
 impl<
+    BrokerID: Id,
     ExchangeID: Id,
     Symbol: Id,
     ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
     Settlement: GetSettlementLag
 >
 From<&OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>>
-for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 {
     fn from(cfg: &OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>) -> Self {
         Self::new(

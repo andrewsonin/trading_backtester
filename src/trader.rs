@@ -38,6 +38,7 @@ TimeSync + Latent<OuterID=Self::BrokerID> + Named<Self::TraderID> + Agent<
 > {
     type TraderID: Id;
     type BrokerID: Id;
+
     type B2T: BrokerToTrader<TraderID=Self::TraderID>;
     type T2T: TraderToItself;
     type T2B: TraderToBroker<BrokerID=Self::BrokerID>;

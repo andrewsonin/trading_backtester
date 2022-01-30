@@ -6,6 +6,7 @@ pub mod constants;
 pub mod input;
 pub mod queue;
 
+#[inline]
 pub fn parse_datetime(string: &str, format: &str) -> DateTime {
     DateTime::parse_from_str(string, format).unwrap_or_else(
         |err| panic!(

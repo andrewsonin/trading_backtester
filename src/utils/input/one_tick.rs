@@ -8,7 +8,7 @@ use {
         },
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
-        types::{DateTime, Direction, Id, Nothing, OrderID, Price, PriceStep, Size},
+        types::{DateTime, Direction, Id, NeverType, Nothing, OrderID, Price, PriceStep, Size},
     },
     csv::{Reader, ReaderBuilder, StringRecord},
     std::{
@@ -116,8 +116,12 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         self.limit_submitted_to_internal.clear()
     }
 
-    pub fn next(&mut self, next_order_id: &mut OrderID) -> Option<
-        ReplayAction<Nothing, BasicReplayToExchange<ExchangeID, Symbol, Settlement>>
+    pub fn next<BrokerID: Id>(&mut self, next_order_id: &mut OrderID) -> Option<
+        ReplayAction<
+            Nothing,
+            BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
+            NeverType<BrokerID>
+        >
     > {
         loop {
             let res;
@@ -155,13 +159,15 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         }
     }
 
-    fn create_replay_to_exchange(&self,
-                                 datetime: DateTime,
-                                 content: BasicReplayRequest<Symbol, Settlement>) -> ReplayAction<
+    fn create_replay_to_exchange<BrokerID: Id>(
+        &self,
+        datetime: DateTime,
+        content: BasicReplayRequest<Symbol, Settlement>) -> ReplayAction<
         Nothing,
         BasicReplayToExchange<
             ExchangeID, Symbol, Settlement
-        >
+        >,
+        NeverType<BrokerID>
     > {
         ReplayAction {
             datetime,
@@ -174,11 +180,15 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         }
     }
 
-    fn process_prl(
+    fn process_prl<BrokerID: Id>(
         &mut self,
         prl: HistoryEntry,
         next_order_id: &mut OrderID) -> Option<
-        ReplayAction<Nothing, BasicReplayToExchange<ExchangeID, Symbol, Settlement>>
+        ReplayAction<
+            Nothing,
+            BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
+            NeverType<BrokerID>
+        >
     > {
         let entry = self.active_limit_orders.entry(prl.order_id);
         if prl.size != Size(0) {
@@ -228,11 +238,15 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         None
     }
 
-    fn process_trd(
+    fn process_trd<BrokerID: Id>(
         &mut self,
         mut trd: HistoryEntry,
         next_order_id: &mut OrderID) -> Option<
-        ReplayAction<Nothing, BasicReplayToExchange<ExchangeID, Symbol, Settlement>>
+        ReplayAction<
+            Nothing,
+            BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
+            NeverType<BrokerID>
+        >
     > {
         if let Some((_, size)) = self.active_limit_orders.get_mut(&trd.order_id) {
             if *size >= trd.size {

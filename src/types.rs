@@ -8,9 +8,9 @@ pub use chrono::{
 
 use {
     crate::{
-        broker::{BrokerToExchange, BrokerToItself, BrokerToTrader},
+        broker::{BrokerToExchange, BrokerToItself, BrokerToReplay, BrokerToTrader},
         exchange::{ExchangeToBroker, ExchangeToItself, ExchangeToReplay},
-        replay::{ReplayToExchange, ReplayToItself},
+        replay::{ReplayToBroker, ReplayToExchange, ReplayToItself},
         trader::{TraderToBroker, TraderToItself},
     },
     derive_more,
@@ -77,6 +77,7 @@ const ACCEPTABLE_PRECISION_ERROR: f64 = 1e-11;
 
 impl Price
 {
+    #[inline]
     pub fn from_decimal_str(string: &str, price_step: PriceStep) -> Self
     {
         let parsed_f64 = f64::from_str(string).unwrap_or_else(
@@ -85,6 +86,7 @@ impl Price
         Self::from_f64(parsed_f64, price_step)
     }
 
+    #[inline]
     pub fn from_f64(value: f64, price_step: PriceStep) -> Self {
         let price_steps = value / price_step.0;
         let rounded_price_steps = price_steps.round();
@@ -98,12 +100,14 @@ impl Price
         }
     }
 
+    #[inline]
     pub fn to_f64(&self, price_step: PriceStep) -> f64 {
         self.0 as f64 * price_step.0
     }
 }
 
 impl PartialEq for PriceStep {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         let diff = self.0 - other.0;
         diff.abs() < ACCEPTABLE_PRECISION_ERROR
@@ -113,6 +117,7 @@ impl PartialEq for PriceStep {
 impl Eq for PriceStep {}
 
 impl Ord for PriceStep {
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         if self < other {
             Ordering::Less
@@ -128,6 +133,8 @@ impl ExchangeToItself for Nothing {}
 
 impl ExchangeToReplay for Nothing {}
 
+impl BrokerToReplay for Nothing {}
+
 impl BrokerToItself for Nothing {}
 
 impl TraderToItself for Nothing {}
@@ -136,6 +143,13 @@ impl<ExchangeID: Id> ReplayToExchange for NeverType<ExchangeID> {
     type ExchangeID = ExchangeID;
     fn get_exchange_id(&self) -> ExchangeID {
         unreachable!("Does not contain ExchangeID")
+    }
+}
+
+impl<BrokerID: Id> ReplayToBroker for NeverType<BrokerID> {
+    type BrokerID = BrokerID;
+    fn get_broker_id(&self) -> BrokerID {
+        unreachable!("Does not contain BrokerID")
     }
 }
 

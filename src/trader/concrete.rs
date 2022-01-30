@@ -274,3 +274,10 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }
+
+pub type BasicVoidTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement> = VoidTrader<
+    TraderID, BrokerID,
+    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+    Nothing
+>;

@@ -1,8 +1,9 @@
 use {
     crate::{
-        broker::request::{BasicBrokerRequest, BasicBrokerToExchange},
+        broker::{BrokerToExchange, request::{BasicBrokerRequest, BasicBrokerToExchange}},
         exchange::{
             Exchange, ExchangeAction, ExchangeActionKind,
+            ExchangeToBroker, ExchangeToItself, ExchangeToReplay,
             reply::{
                 BasicExchangeToBroker,
                 BasicExchangeToBrokerReply,
@@ -36,7 +37,7 @@ use {
         },
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
         order_book::{OrderBook, OrderBookEvent, OrderBookEventKind},
-        replay::request::{BasicReplayRequest, BasicReplayToExchange},
+        replay::{ReplayToExchange, request::{BasicReplayRequest, BasicReplayToExchange}},
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{
@@ -58,6 +59,7 @@ use {
     std::{
         collections::{hash_map::Entry::*, HashMap},
         iter::{once, once_with},
+        marker::PhantomData,
         rc::Rc,
     },
 };
@@ -1292,3 +1294,144 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         }
     }
 }
+
+pub struct VoidExchange<
+    ExchangeID: Id,
+    BrokerID: Id,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself,
+> {
+    current_dt: DateTime,
+    exchange_id: ExchangeID,
+    phantom: PhantomData<(BrokerID, R2E, B2E, E2R, E2B, E2E)>,
+}
+
+impl<
+    ExchangeID: Id,
+    BrokerID: Id,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself,
+>
+VoidExchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>
+{
+    pub fn new(exchange_id: ExchangeID) -> Self {
+        Self {
+            current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
+            exchange_id,
+            phantom: Default::default(),
+        }
+    }
+}
+
+impl<
+    ExchangeID: Id,
+    BrokerID: Id,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself
+>
+TimeSync
+for VoidExchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>
+{
+    fn current_datetime_mut(&mut self) -> &mut DateTime {
+        &mut self.current_dt
+    }
+}
+
+impl<
+    ExchangeID: Id,
+    BrokerID: Id,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself
+>
+Named<ExchangeID>
+for VoidExchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>
+{
+    fn get_name(&self) -> ExchangeID {
+        self.exchange_id
+    }
+}
+
+impl<
+    ExchangeID: Id,
+    BrokerID: Id,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself
+>
+Agent for VoidExchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>
+{
+    type Action = ExchangeAction<E2R, E2B, E2E>;
+}
+
+impl<
+    ExchangeID: Id,
+    BrokerID: Id,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+    E2R: ExchangeToReplay,
+    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2E: ExchangeToItself,
+>
+Exchange for VoidExchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>
+{
+    type ExchangeID = ExchangeID;
+    type BrokerID = BrokerID;
+    type R2E = R2E;
+    type B2E = B2E;
+    type E2R = E2R;
+    type E2B = E2B;
+    type E2E = E2E;
+
+    fn wakeup<KerMsg: Ord, RNG: Rng>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
+        _: Self::E2E,
+        _: &mut RNG,
+    ) {
+        unreachable!("{} :: Exchange wakeups are not planned", self.current_dt)
+    }
+
+    fn process_broker_request<KerMsg: Ord, RNG: Rng>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
+        _: Self::B2E,
+        _: Self::BrokerID,
+        _: &mut RNG,
+    ) {}
+
+    fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl FnMut(Self::Action, &mut RNG) -> KerMsg,
+        _: Self::R2E,
+        _: &mut RNG,
+    ) {}
+
+    fn connect_broker(&mut self, _: Self::BrokerID) {}
+}
+
+pub type BasicVoidExchange<ExchangeID, BrokerID, Symbol, Settlement> = VoidExchange<
+    ExchangeID,
+    BrokerID,
+    BasicReplayToExchange<ExchangeID, Symbol, Settlement>,
+    BasicBrokerToExchange<ExchangeID, Symbol, Settlement>,
+    BasicExchangeToReplay<Symbol, Settlement>,
+    BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
+    Nothing
+>;

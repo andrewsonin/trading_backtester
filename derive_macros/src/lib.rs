@@ -587,8 +587,6 @@ pub fn derive_exchange(input: TokenStream) -> TokenStream
     idents.into_iter().for_each(process_variant);
 
     let tokens = quote! {
-        #into_impls
-
         impl #impl_generics Exchange
         for #name #ty_generics
         #where_clause
@@ -659,6 +657,8 @@ pub fn derive_exchange(input: TokenStream) -> TokenStream
         #where_clause {
             type Action = #action;
         }
+
+        #into_impls
     };
     tokens.into()
 }
@@ -887,6 +887,8 @@ pub fn derive_latency_generator(input: TokenStream) -> TokenStream
                 match self { #incoming_latency }
             }
         }
+
+        #into_impls
     };
     tokens.into()
 }

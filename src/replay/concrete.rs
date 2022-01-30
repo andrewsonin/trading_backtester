@@ -1,19 +1,25 @@
 use {
     crate::{
-        exchange::reply::{
-            BasicExchangeToReplay,
-            BasicExchangeToReplayReply,
-            ExchangeEventNotification,
+        exchange::{
+            ExchangeToReplay,
+            reply::{
+                BasicExchangeToReplay,
+                BasicExchangeToReplayReply,
+                ExchangeEventNotification,
+            },
         },
         replay::{
             Replay,
             ReplayAction,
             ReplayActionKind,
+            ReplayToExchange,
+            ReplayToItself,
             request::{BasicReplayRequest, BasicReplayToExchange},
         },
         settlement::GetSettlementLag,
         traded_pair::TradedPair,
         types::{
+            Date,
             DateTime,
             Duration,
             Id,
@@ -32,6 +38,7 @@ use {
         cmp::Reverse,
         collections::{HashMap, HashSet},
         io::Write,
+        marker::PhantomData,
         num::NonZeroU64,
     },
 };
@@ -397,3 +404,97 @@ for OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
         }
     }
 }
+
+pub struct VoidReplay<
+    ExchangeID: Id,
+    E2R: ExchangeToReplay,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>
+> {
+    current_dt: DateTime,
+    phantom: PhantomData<(ExchangeID, E2R, R2R, R2E)>,
+}
+
+impl<
+    ExchangeID: Id,
+    E2R: ExchangeToReplay,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>
+>
+VoidReplay<ExchangeID, E2R, R2R, R2E>
+{
+    pub fn new() -> Self {
+        Self {
+            current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
+            phantom: Default::default(),
+        }
+    }
+}
+
+impl<
+    ExchangeID: Id,
+    E2R: ExchangeToReplay,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>
+>
+TimeSync for VoidReplay<ExchangeID, E2R, R2R, R2E>
+{
+    fn current_datetime_mut(&mut self) -> &mut DateTime {
+        &mut self.current_dt
+    }
+}
+
+impl<
+    ExchangeID: Id,
+    E2R: ExchangeToReplay,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>
+>
+Iterator for VoidReplay<ExchangeID, E2R, R2R, R2E>
+{
+    type Item = ReplayAction<R2R, R2E>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
+}
+
+impl<
+    ExchangeID: Id,
+    E2R: ExchangeToReplay,
+    R2R: ReplayToItself,
+    R2E: ReplayToExchange<ExchangeID=ExchangeID>
+>
+Replay for VoidReplay<ExchangeID, E2R, R2R, R2E>
+{
+    type ExchangeID = ExchangeID;
+    type E2R = E2R;
+    type R2R = R2R;
+    type R2E = R2E;
+
+    fn wakeup<KerMsg: Ord>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl Fn(Self::Item) -> KerMsg,
+        _: Self::R2R,
+        _: &mut impl Rng,
+    ) {
+        unreachable!("{} :: Replay wakeups are not planned", self.current_dt)
+    }
+
+    fn handle_exchange_reply<KerMsg: Ord>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl Fn(Self::Item) -> KerMsg,
+        _: Self::E2R,
+        _: Self::ExchangeID,
+        _: &mut impl Rng,
+    ) {}
+}
+
+pub type BasicVoidReplay<ExchangeID, Symbol, Settlement> = VoidReplay<
+    ExchangeID,
+    BasicExchangeToReplay<Symbol, Settlement>,
+    Nothing,
+    BasicReplayToExchange<ExchangeID, Symbol, Settlement>
+>;

@@ -311,16 +311,14 @@ mod tests {
     #[allow(dead_code)]
     mod test_enum_def {
         use {
-            broker_examples::BasicBroker,
-            broker_reply::BasicBrokerToTrader,
+            broker_examples::{BasicBroker, BasicVoidBroker},
             crate::prelude::*,
             derive_macros::{Broker, Exchange, LatencyGenerator, Replay, Trader},
-            exchange_example::BasicExchange,
+            exchange_example::{BasicExchange, BasicVoidExchange},
             latency_examples::ConstantLatency,
             rand::Rng,
-            replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
-            trader_examples::{SpreadWriter, VoidTrader},
-            trader_request::BasicTraderToBroker,
+            replay_examples::{BasicVoidReplay, GetNextObSnapshotDelay, OneTickReplay},
+            trader_examples::{BasicVoidTrader, SpreadWriter},
         };
 
         enum_def! {
@@ -330,13 +328,17 @@ mod tests {
                 Settlement: GetSettlementLag
             > {
                 SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>,
-                VoidTrader<
-                    TraderID, BrokerID,
-                    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-                    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-                    Nothing
-                >
+                BasicVoidTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
             }
+        }
+
+        #[derive(Trader)]
+        enum AnotherTraderEnum<
+            TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id,
+            Settlement: GetSettlementLag
+        > {
+            Var1(SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>),
+            Var2(BasicVoidTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement>),
         }
 
         enum_def! {
@@ -345,17 +347,40 @@ mod tests {
                 BrokerID, TraderID: Id, ExchangeID: Id, Symbol: Id,
                 Settlement: GetSettlementLag
             >
-            where BrokerID: Id {
-                BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+            where BrokerID: Id
+            {
+                BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>,
+                BasicVoidBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
             }
+        }
+
+        #[derive(Broker)]
+        enum AnotherBrokerEnum<
+            BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id,
+            Settlement: GetSettlementLag
+        > {
+            Var1(BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>),
+            Var2(BasicVoidBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>),
         }
 
         enum_def! {
             #[derive(Exchange)]
             ExchangeEnum<ExchangeID: Id, BrokerID: Id, Symbol: Id, Settlement: GetSettlementLag>
             {
-                BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
+                BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>,
+                BasicVoidExchange<ExchangeID, BrokerID, Symbol, Settlement>
             }
+        }
+
+        #[derive(Exchange)]
+        enum AnotherExchangeEnum<
+            ExchangeID: Id,
+            BrokerID: Id,
+            Symbol: Id,
+            Settlement: GetSettlementLag
+        > {
+            Var1(BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>),
+            Var2(BasicVoidExchange<ExchangeID, BrokerID, Symbol, Settlement>),
         }
 
         enum_def! {
@@ -363,22 +388,38 @@ mod tests {
             ReplayEnum<ExchangeID: Id, Symbol: Id, ObSnapshotDelay, Settlement: GetSettlementLag>
                 where ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>
             {
-                OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+                OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>,
+                BasicVoidReplay<ExchangeID, Symbol, Settlement>
             }
         }
 
+        #[derive(Replay)]
+        enum AnotherReplayEnum<
+            ExchangeID: Id,
+            Symbol: Id,
+            ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+            Settlement: GetSettlementLag
+        > {
+            Var1(OneTickReplay<ExchangeID, Symbol, ObSnapshotDelay, Settlement>),
+            Var2(BasicVoidReplay<ExchangeID, Symbol, Settlement>),
+        }
+
         const ZERO: u64 = 0;
+
+        type OneNSLatency<OuterID> = ConstantLatency<OuterID, 1, 1>;
+
         enum_def! {
             #[derive(LatencyGenerator)]
             LatencyGenEnum<OuterID: Id> {
-                ConstantLatency<OuterID, ZERO, ZERO>
+                ConstantLatency<OuterID, ZERO, ZERO>,
+                OneNSLatency<OuterID>
             }
         }
 
         #[derive(LatencyGenerator)]
         enum AnotherLatencyGenEnum<OuterID: Id> {
             Var1(ConstantLatency<OuterID, 0, 0>),
-            Var2(ConstantLatency<OuterID, 1, 1>),
+            Var2(ConstantLatency<OuterID, 1, 0>),
         }
     }
 }

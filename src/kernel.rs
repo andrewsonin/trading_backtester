@@ -109,21 +109,21 @@ enum MessageContent<
 
     ReplayToExchange(R2E),
 
-    ExchangeWakeUp(ExchangeID, E2E),
+    ExchangeWakeUp { exchange_id: ExchangeID, e2e: E2E },
 
-    ExchangeToReplay(ExchangeID, E2R),
+    ExchangeToReplay { exchange_id: ExchangeID, e2r: E2R },
 
-    ExchangeToBroker(ExchangeID, E2B),
+    ExchangeToBroker { exchange_id: ExchangeID, e2b: E2B },
 
-    BrokerWakeUp(BrokerID, B2B),
+    BrokerWakeUp { broker_id: BrokerID, b2b: B2B },
 
-    BrokerToExchange(BrokerID, B2E),
+    BrokerToExchange { broker_id: BrokerID, b2e: B2E },
 
-    BrokerToTrader(BrokerID, B2T),
+    BrokerToTrader { broker_id: BrokerID, b2t: B2T },
 
-    TraderWakeUp(TraderID, T2T),
+    TraderWakeUp { trader_id: TraderID, t2t: T2T },
 
-    TraderToBroker(TraderID, T2B),
+    TraderToBroker { trader_id: TraderID, t2b: T2B },
 }
 
 pub struct KernelBuilder<T, B, E, R, RNG>
@@ -339,28 +339,28 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
                 }
                 self.handle_replay_to_exchange(replay_request)
             }
-            MessageContent::ExchangeWakeUp(exchange_id, scheduled_action) => {
+            MessageContent::ExchangeWakeUp { exchange_id, e2e: scheduled_action } => {
                 self.handle_exchange_wakeup(exchange_id, scheduled_action)
             }
-            MessageContent::ExchangeToReplay(exchange_id, reply) => {
+            MessageContent::ExchangeToReplay { exchange_id, e2r: reply } => {
                 self.handle_exchange_to_replay(exchange_id, reply)
             }
-            MessageContent::ExchangeToBroker(exchange_id, reply) => {
+            MessageContent::ExchangeToBroker { exchange_id, e2b: reply } => {
                 self.handle_exchange_to_broker(exchange_id, reply)
             }
-            MessageContent::BrokerWakeUp(broker_id, scheduled_action) => {
+            MessageContent::BrokerWakeUp { broker_id, b2b: scheduled_action } => {
                 self.handle_broker_wakeup(broker_id, scheduled_action)
             }
-            MessageContent::BrokerToExchange(broker_id, request) => {
+            MessageContent::BrokerToExchange { broker_id, b2e: request } => {
                 self.handle_broker_to_exchange(broker_id, request)
             }
-            MessageContent::BrokerToTrader(broker_id, reply) => {
+            MessageContent::BrokerToTrader { broker_id, b2t: reply } => {
                 self.handle_broker_to_trader(broker_id, reply)
             }
-            MessageContent::TraderWakeUp(trader_id, scheduled_action) => {
+            MessageContent::TraderWakeUp { trader_id, t2t: scheduled_action } => {
                 self.handle_trader_wakeup(trader_id, scheduled_action)
             }
-            MessageContent::TraderToBroker(trader_id, request) => {
+            MessageContent::TraderToBroker { trader_id, t2b: request } => {
                 self.handle_trader_to_broker(trader_id, request)
             }
         }
@@ -604,19 +604,19 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
                     .incoming_latency(exchange_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::ExchangeToBroker(exchange_id, reply)
+                    MessageContent::ExchangeToBroker { exchange_id, e2b: reply }
                 )
             }
             ExchangeActionKind::ExchangeToReplay(reply) => {
                 (
                     delayed_dt,
-                    MessageContent::ExchangeToReplay(exchange_id, reply)
+                    MessageContent::ExchangeToReplay { exchange_id, e2r: reply }
                 )
             }
             ExchangeActionKind::ExchangeToItself(wakeup) => {
                 (
                     delayed_dt,
-                    MessageContent::ExchangeWakeUp(exchange_id, wakeup)
+                    MessageContent::ExchangeWakeUp { exchange_id, e2e: wakeup }
                 )
             }
         };

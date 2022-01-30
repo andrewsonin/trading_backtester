@@ -115,7 +115,7 @@ for BrokerActionProcessor<'a, BrokerID, BrokerAction<B2E, B2T, B2B>, T, E, R>
                     .incoming_latency(self.broker_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::BrokerToTrader(self.broker_id, reply)
+                    MessageContent::BrokerToTrader { broker_id: self.broker_id, b2t: reply }
                 )
             }
             BrokerActionKind::BrokerToExchange(request) => {
@@ -123,13 +123,13 @@ for BrokerActionProcessor<'a, BrokerID, BrokerAction<B2E, B2T, B2B>, T, E, R>
                 let latency = latency_generator.outgoing_latency(exchange_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::BrokerToExchange(self.broker_id, request)
+                    MessageContent::BrokerToExchange { broker_id: self.broker_id, b2e: request }
                 )
             }
             BrokerActionKind::BrokerToItself(wakeup) => {
                 (
                     delayed_dt,
-                    MessageContent::BrokerWakeUp(self.broker_id, wakeup)
+                    MessageContent::BrokerWakeUp { broker_id: self.broker_id, b2b: wakeup }
                 )
             }
         };
@@ -169,13 +169,13 @@ for TraderActionProcessor<TraderID, TraderAction<T2B, T2T>, B, E, R>
                 let latency = latency_generator.outgoing_latency(broker_id, delayed_dt, rng);
                 (
                     delayed_dt + Duration::nanoseconds(latency as i64),
-                    MessageContent::TraderToBroker(self.trader_id, request)
+                    MessageContent::TraderToBroker{ trader_id: self.trader_id, t2b: request}
                 )
             }
             TraderActionKind::TraderToItself(wakeup) => {
                 (
                     delayed_dt,
-                    MessageContent::TraderWakeUp(self.trader_id, wakeup)
+                    MessageContent::TraderWakeUp{ trader_id: self.trader_id, t2t: wakeup}
                 )
             }
         };

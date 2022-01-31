@@ -4,8 +4,6 @@ A highly customizable framework designed for parallel tuning of trading algorith
 
 ## Overview
 
----
-
 ### General workflow
 
 ![./docs/drawio/main_scheme.svg](./docs/drawio/main_scheme.svg)

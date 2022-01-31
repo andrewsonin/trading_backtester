@@ -17,6 +17,27 @@ pub fn parse_datetime(string: &str, format: &str) -> DateTime {
 }
 
 #[macro_export]
+/// Macro that generates an `enum` that can contain
+/// each of the listed types as a unique `enum` variant.
+///
+/// # Examples
+///
+/// ```
+/// enum_def! {
+///     #[derive(Clone, Copy, Ord, Eq, PartialEq, PartialOrd)]
+///     pub CustomEnum<M: Ord> where M: Copy {
+///         String,
+///         Option<M>
+///     }
+/// }
+///
+/// // Is equivalent to the following
+/// #[derive(Clone, Copy, Ord, Eq, PartialEq, PartialOrd)]
+/// pub enum AnotherCustomEnum<M: Ord> where M: Copy {
+///     String(String),
+///     Option(Option<M>),
+/// }
+/// ```
 macro_rules! enum_def {
     (
         $(#[$meta:meta])*

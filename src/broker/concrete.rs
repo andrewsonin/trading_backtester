@@ -138,23 +138,23 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     type B2B = Nothing;
     type SubCfg = SubscriptionConfig<ExchangeID, Symbol, Settlement>;
 
-    fn wakeup<KerMsg: Ord, RNG: Rng>(
+    fn wakeup<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         _: Nothing,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {
         unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
     }
 
-    fn process_trader_request<KerMsg: Ord, RNG: Rng>(
+    fn process_trader_request<KerMsg: Ord>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
         mut action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         request: BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
         trader_id: TraderID,
-        rng: &mut RNG,
+        rng: &mut impl Rng,
     ) {
         let action = match request.content {
             BasicTraderRequest::CancelLimitOrder(mut request, exchange_id) => {
@@ -264,13 +264,13 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         )
     }
 
-    fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
+    fn process_exchange_reply<KerMsg: Ord>(
         &mut self,
         mut message_receiver: MessageReceiver<KerMsg>,
         mut action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         reply: BasicExchangeToBroker<BrokerID, Symbol, Settlement>,
         exchange_id: ExchangeID,
-        rng: &mut RNG,
+        rng: &mut impl Rng,
     ) {
         let message = match reply.content {
             BasicExchangeToBrokerReply::OrderAccepted(accepted) => {
@@ -462,12 +462,12 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
         )
     }
 
-    fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+    fn process_replay_request<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         _: Self::R2B,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {
         unreachable!("{} :: Did not plan to communicate with brokers", self.current_dt)
     }
@@ -861,40 +861,40 @@ Broker for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B
     type B2B = B2B;
     type SubCfg = SubCfg;
 
-    fn wakeup<KerMsg: Ord, RNG: Rng>(
+    fn wakeup<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         _: Self::B2B,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {
         unreachable!("{} :: Broker wakeups are not planned", self.current_dt)
     }
 
-    fn process_trader_request<KerMsg: Ord, RNG: Rng>(
+    fn process_trader_request<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         _: Self::T2B,
         _: Self::TraderID,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {}
 
-    fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
+    fn process_exchange_reply<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         _: Self::E2B,
         _: Self::ExchangeID,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {}
 
-    fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+    fn process_replay_request<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
         _: Self::R2B,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {}
 
     fn upon_connection_to_exchange(&mut self, _: Self::ExchangeID) {}

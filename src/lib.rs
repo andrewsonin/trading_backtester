@@ -1,4 +1,6 @@
+/// Define everything related to [`Broker`](crate::broker::Broker).
 pub mod broker;
+/// Define everything related to [`Exchange`](crate::exchange::Exchange).
 pub mod exchange;
 pub mod kernel;
 pub mod latency;
@@ -12,6 +14,7 @@ pub mod trader;
 pub mod types;
 pub mod utils;
 
+/// Import all high-level abstract interfaces needed for the most flexible customization.
 pub mod custom {
     pub use {chrono, derive_macros, rand};
 

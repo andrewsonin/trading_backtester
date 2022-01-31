@@ -420,44 +420,44 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
             type B2B = #b2b;
             type SubCfg = #sub_cfg;
 
-            fn wakeup<KerMsg: Ord, RNG: Rng>(
+            fn wakeup<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
                 action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
                 scheduled_action: Self::B2B,
-                rng: &mut RNG,
+                rng: &mut impl Rng,
             ) {
                 match self { #wakeup }
             }
 
-            fn process_trader_request<KerMsg: Ord, RNG: Rng>(
+            fn process_trader_request<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
                 action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
                 request: Self::T2B,
                 trader_id: Self::TraderID,
-                rng: &mut RNG,
+                rng: &mut impl Rng,
             ) {
                 match self { #process_trader_request }
             }
 
-            fn process_exchange_reply<KerMsg: Ord, RNG: Rng>(
+            fn process_exchange_reply<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
                 action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
                 reply: Self::E2B,
                 exchange_id: Self::ExchangeID,
-                rng: &mut RNG,
+                rng: &mut impl Rng,
             ) {
                 match self { #process_exchange_reply }
             }
 
-            fn process_replay_request<KerMsg: Ord, RNG: Rng>(
+            fn process_replay_request<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
                 action_processor: impl LatentActionProcessor<Self::Action, Self::ExchangeID, KerMsg=KerMsg>,
                 request: Self::R2B,
-                rng: &mut RNG,
+                rng: &mut impl Rng,
             ) {
                 match self { #process_replay_request }
             }

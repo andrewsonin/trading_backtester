@@ -42,7 +42,10 @@ pub struct ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfs, RN
     phantom: PhantomData<RNG>,
 }
 
-impl<B: IntoIterator, E: IntoIterator, T: IntoIterator> ParallelBacktester<B, E, T, StdRng>
+impl<B, E, T> ParallelBacktester<B, E, T, StdRng>
+    where B: IntoIterator,
+          E: IntoIterator,
+          T: IntoIterator
 {
     pub fn new(
         exchange_configs: E,
@@ -80,13 +83,12 @@ impl<B: IntoIterator, E: IntoIterator, T: IntoIterator> ParallelBacktester<B, E,
     }
 }
 
-impl<
-    BrokerConfigs: IntoIterator,
-    ExchangeConfigs: IntoIterator,
-    PerThreadConfigs: IntoIterator,
-    RNG: Rng + SeedableRng
->
+impl<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
 ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
+    where BrokerConfigs: IntoIterator,
+          ExchangeConfigs: IntoIterator,
+          PerThreadConfigs: IntoIterator,
+          RNG: Rng + SeedableRng
 {
     pub fn with_num_threads(mut self, num_threads: usize) -> Self {
         self.num_threads = num_threads;
@@ -95,27 +97,48 @@ ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
 }
 
 impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    BrokerConfig: Sync,
-    ExchangeConfig: Sync,
-    BrokerConfigs: IntoIterator<Item=(BrokerConfig, impl IntoIterator<Item=ExchangeID>)>,
-    ExchangeConfigs: IntoIterator<Item=ExchangeConfig>,
-    TraderConfig: Send,
-    ReplayConfig: Send,
-    TraderConfigs: IntoIterator<Item=(TraderConfig, impl Send + IntoIterator<Item=(BrokerID, impl IntoIterator<Item=SubCfg>)>)>,
-    PerThreadConfigs: IntoIterator<Item=ThreadConfig<ReplayConfig, TraderConfigs>>,
-    RNG: Rng + SeedableRng,
+    BrokerID,
+    ExchangeID,
+    TraderConfig,
+    BrokerConfig,
+    ReplayConfig,
+    ExchangeConfig,
+    TraderConfigs,
+    BrokerConfigs,
+    ExchangeConfigs,
+    PerThreadConfigs,
+    ConnectedBrokers,
+    ConnectedExchanges,
+    SubscriptionConfigs,
+    RNG,
     SubCfg,
 >
 ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          TraderConfig: Send,
+          BrokerConfig: Sync,
+          ExchangeConfig: Sync,
+          ReplayConfig: Send,
+          TraderConfigs: IntoIterator<Item=(TraderConfig, ConnectedBrokers)>,
+          BrokerConfigs: IntoIterator<Item=(BrokerConfig, ConnectedExchanges)>,
+          ExchangeConfigs: IntoIterator<Item=ExchangeConfig>,
+          PerThreadConfigs: IntoIterator<Item=ThreadConfig<ReplayConfig, TraderConfigs>>,
+          ConnectedBrokers: Send + IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
+          ConnectedExchanges: IntoIterator<Item=ExchangeID>,
+          SubscriptionConfigs: IntoIterator<Item=SubCfg>,
+          RNG: Rng + SeedableRng
 {
     pub fn run_simulation<T, B, E, R>(self)
         where
-            T: for<'a> From<&'a TraderConfig> + Trader<TraderID=B::TraderID, BrokerID=BrokerID, T2B=B::T2B, B2T=B::B2T>,
-            B: for<'a> From<&'a BrokerConfig> + Broker<BrokerID=BrokerID, ExchangeID=ExchangeID, B2R=R::B2R, B2E=E::B2E, R2B=R::R2B, E2B=E::E2B, SubCfg=SubCfg>,
-            E: for<'a> From<&'a ExchangeConfig> + Exchange<BrokerID=BrokerID, ExchangeID=ExchangeID, E2R=R::E2R, R2E=R::R2E>,
-            R: for<'a> From<&'a ReplayConfig> + Replay<BrokerID=BrokerID, ExchangeID=ExchangeID>
+            T: for<'a> From<&'a TraderConfig>,
+            B: for<'a> From<&'a BrokerConfig>,
+            E: for<'a> From<&'a ExchangeConfig>,
+            R: for<'a> From<&'a ReplayConfig>,
+            T: Trader<TraderID=B::TraderID, BrokerID=BrokerID, T2B=B::T2B, B2T=B::B2T>,
+            B: Broker<BrokerID=BrokerID, ExchangeID=ExchangeID, B2R=R::B2R, R2B=R::R2B, SubCfg=SubCfg>,
+            E: Exchange<BrokerID=BrokerID, ExchangeID=ExchangeID, E2R=R::E2R, R2E=R::R2E, B2E=B::B2E, E2B=B::E2B>,
+            R: Replay<BrokerID=BrokerID, ExchangeID=ExchangeID>
     {
         let Self {
             num_threads,

@@ -44,9 +44,9 @@ pub trait LatentActionProcessor<Action, OuterID: Id>
 
 pub struct Kernel<T, B, E, R, RNG>
     where
-        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
-        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
-        E: Exchange<BrokerID=R::BrokerID, ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        T: Trader,
+        B: Broker,
+        E: Exchange,
         R: Replay,
         RNG: SeedableRng + Rng
 {
@@ -69,9 +69,9 @@ trait InnerMessage {
 
 impl<T, B, E, R, RNG> InnerMessage for Kernel<T, B, E, R, RNG>
     where
-        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
-        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
-        E: Exchange<BrokerID=R::BrokerID, ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        T: Trader,
+        B: Broker,
+        E: Exchange,
         R: Replay,
         RNG: SeedableRng + Rng
 {
@@ -96,16 +96,16 @@ enum MessageContent<
     BrokerID: Id,
     TraderID: Id,
     R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    R2B: ReplayToBroker<BrokerID=BrokerID>,
+    R2E: ReplayToExchange,
+    R2B: ReplayToBroker,
     B2R: BrokerToReplay,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
+    B2E: BrokerToExchange,
+    B2T: BrokerToTrader,
     B2B: BrokerToItself,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
+    T2B: TraderToBroker,
     T2T: TraderToItself,
     E2R: ExchangeToReplay,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
+    E2B: ExchangeToBroker,
     E2E: ExchangeToItself
 > {
     ReplayWakeUp(R2R),
@@ -135,9 +135,9 @@ enum MessageContent<
 
 pub struct KernelBuilder<T, B, E, R, RNG>
     where
-        T: Trader<TraderID=B::TraderID, BrokerID=B::BrokerID, T2B=B::T2B, B2T=B::B2T>,
-        B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2E=E::B2E, E2B=E::E2B>,
-        E: Exchange<BrokerID=R::BrokerID, ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
+        T: Trader,
+        B: Broker,
+        E: Exchange,
         R: Replay,
         RNG: SeedableRng + Rng
 {

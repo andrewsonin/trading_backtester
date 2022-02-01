@@ -41,8 +41,10 @@ pub trait ExchangeToBroker: Ord {
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
-pub trait Exchange:
-TimeSync + Named<Self::ExchangeID> + Agent<Action=ExchangeAction<Self::E2R, Self::E2B, Self::E2E>>
+pub trait Exchange
+    where Self: TimeSync,
+          Self: Named<Self::ExchangeID>,
+          Self: Agent<Action=ExchangeAction<Self::E2R, Self::E2B, Self::E2E>>
 {
     type ExchangeID: Id;
     type BrokerID: Id;

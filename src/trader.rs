@@ -32,10 +32,12 @@ pub trait TraderToBroker: Ord {
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
-pub trait Trader:
-TimeSync + Latent<OuterID=Self::BrokerID> + Named<Self::TraderID> + Agent<
-    Action=TraderAction<Self::T2B, Self::T2T>
-> {
+pub trait Trader
+    where Self: TimeSync,
+          Self: Latent<OuterID=Self::BrokerID>,
+          Self: Named<Self::TraderID>,
+          Self: Agent<Action=TraderAction<Self::T2B, Self::T2T>>
+{
     type TraderID: Id;
     type BrokerID: Id;
 

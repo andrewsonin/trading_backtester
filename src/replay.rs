@@ -37,7 +37,9 @@ pub trait ReplayToBroker: Debug + Ord {
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
-pub trait Replay: TimeSync + Iterator<Item=ReplayAction<Self::R2R, Self::R2E, Self::R2B>>
+pub trait Replay
+    where Self: TimeSync,
+          Self: Iterator<Item=ReplayAction<Self::R2R, Self::R2E, Self::R2B>>
 {
     type ExchangeID: Id;
     type BrokerID: Id;

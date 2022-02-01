@@ -97,21 +97,9 @@ ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
 }
 
 impl<
-    BrokerID,
-    ExchangeID,
-    TraderConfig,
-    BrokerConfig,
-    ReplayConfig,
-    ExchangeConfig,
-    TraderConfigs,
-    BrokerConfigs,
-    ExchangeConfigs,
-    PerThreadConfigs,
-    ConnectedBrokers,
-    ConnectedExchanges,
-    SubscriptionConfigs,
-    RNG,
-    SubCfg,
+    BrokerID, ExchangeID, TraderConfig, BrokerConfig, ReplayConfig, ExchangeConfig,
+    TraderConfigs, BrokerConfigs, ExchangeConfigs, PerThreadConfigs, ConnectedBrokers,
+    ConnectedExchanges, SubscriptionConfigs, RNG, SubCfg,
 >
 ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
     where BrokerID: Id,

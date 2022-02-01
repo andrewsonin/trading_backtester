@@ -197,7 +197,7 @@ pub trait Broker
     );
 
     /// Called whenever the [`Broker`]
-    /// is being connected to the [`Exchange`](crate::exchange::Exchange).
+    /// is being connected to an [`Exchange`](crate::exchange::Exchange).
     ///
     /// # Arguments
     ///
@@ -205,7 +205,7 @@ pub trait Broker
     /// of the [`Exchange`](crate::exchange::Exchange) to be connected to.
     fn upon_connection_to_exchange(&mut self, exchange_id: Self::ExchangeID);
 
-    /// Called whenever the [`Trader`](crate::trader::Trader) is being connected to the [`Broker`].
+    /// Called whenever a [`Trader`](crate::trader::Trader) is being connected to the [`Broker`].
     ///
     /// # Arguments
     ///

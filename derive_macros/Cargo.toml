@@ -1,8 +1,8 @@
 [package]
 name = "derive_macros"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["Andrew Sonin <sonin.cel@yandex.ru>"]
-description = "A `cargo generate` template for quick-starting a procedural macro crate"
+description = "Macros for deriving `trading_backtester::interface` traits for the enum-dispatched trait variants"
 keywords = ["template", "proc_macro", "procmacro"]
 edition = "2021"
 

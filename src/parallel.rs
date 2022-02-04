@@ -1,10 +1,7 @@
 use {
     crate::{
-        broker::Broker,
-        exchange::Exchange,
+        interface::{broker::Broker, exchange::Exchange, replay::Replay, trader::Trader},
         kernel::KernelBuilder,
-        replay::Replay,
-        trader::Trader,
         types::{DateTime, Id},
     },
     rand::{Rng, rngs::StdRng, SeedableRng},

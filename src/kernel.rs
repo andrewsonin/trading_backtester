@@ -1,27 +1,14 @@
 use {
     crate::{
-        broker::{
-            Broker,
-            BrokerToExchange,
-            BrokerToItself,
-            BrokerToReplay,
-            BrokerToTrader,
-        },
-        exchange::{
-            Exchange,
-            ExchangeActionKind,
-            ExchangeToBroker,
-            ExchangeToItself,
-            ExchangeToReplay,
+        interface::{
+            broker::Broker,
+            exchange::{Exchange, ExchangeActionKind},
+            latency::LatencyGenerator,
+            message::*,
+            replay::{Replay, ReplayActionKind},
+            trader::Trader,
         },
         kernel::action_processors::{BrokerActionProcessor, TraderActionProcessor},
-        latency::LatencyGenerator,
-        replay::{Replay, ReplayActionKind, ReplayToBroker, ReplayToExchange, ReplayToItself},
-        trader::{
-            Trader,
-            TraderToBroker,
-            TraderToItself,
-        },
         types::{DateTime, Duration, Id},
         utils::queue::{LessElementBinaryHeap, MessageReceiver},
     },
@@ -275,7 +262,7 @@ KernelBuilder<T, B, E, R, RNG>
         B: Broker<BrokerID=E::BrokerID, ExchangeID=E::ExchangeID, B2R=R::B2R, B2E=E::B2E, R2B=R::R2B, E2B=E::E2B>,
         E: Exchange<BrokerID=R::BrokerID, ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
         R: Replay,
-        RNG: Rng + SeedableRng
+        RNG: Rng + SeedableRng,
 {
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = Some(seed);
@@ -614,7 +601,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
     {
         if action.datetime < current_dt {
             panic!(
-                "Replay yielded action {action:?} which DateTime ({}) \
+                "Replay yielded action which DateTime ({}) \
                 is less than the Kernel current DateTime ({current_dt})",
                 action.datetime
             )

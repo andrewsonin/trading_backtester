@@ -1,104 +1,55 @@
-/// Define everything related to [`Broker`](crate::broker::Broker).
-pub mod broker;
-/// Define everything related to [`Exchange`](crate::exchange::Exchange).
-pub mod exchange;
+/// Concrete examples of entities that implement traits from the [`interface`] module.
+pub mod concrete;
+/// Abstract interfaces.
+pub mod interface;
+/// Kernel of the backtester.
 pub mod kernel;
-pub mod latency;
-pub mod order;
-pub mod order_book;
+/// Utilities for running backtesters in multiple threads.
 pub mod parallel;
-pub mod replay;
-pub mod settlement;
-pub mod traded_pair;
-pub mod trader;
+/// Auxiliary types and traits.
 pub mod types;
+/// Other auxiliary utilities.
 pub mod utils;
 
-/// Import all high-level abstract interfaces needed for the most flexible customization.
-pub mod custom {
-    pub use {chrono, derive_macros, rand};
-
-    pub use crate::{
-        broker::{
-            Broker,
-            BrokerAction,
-            BrokerActionKind,
-            BrokerToExchange,
-            BrokerToItself,
-            BrokerToReplay,
-            BrokerToTrader,
-        },
-        enum_def,
-        exchange::{
-            Exchange,
-            ExchangeAction,
-            ExchangeActionKind,
-            ExchangeToBroker,
-            ExchangeToItself,
-            ExchangeToReplay,
-        },
-        kernel::{Kernel, KernelBuilder, LatentActionProcessor},
-        latency::{LatencyGenerator, Latent},
-        parallel::{ParallelBacktester, ThreadConfig},
-        replay::{
-            Replay,
-            ReplayAction,
-            ReplayActionKind,
-            ReplayToBroker,
-            ReplayToExchange,
-            ReplayToItself,
-        },
-        trader::{
-            Trader,
-            TraderAction,
-            TraderActionKind,
-            TraderToBroker,
-            TraderToItself,
-        },
-        types::{Agent, Id, Named, TimeSync},
-    };
-}
-
+/// The Rust Prelude
 pub mod prelude {
     pub use crate::{
-        broker::{
-            Broker,
-            BrokerAction,
-            BrokerActionKind,
-            BrokerToExchange,
-            BrokerToItself,
-            BrokerToReplay,
-            BrokerToTrader,
-            concrete as broker_examples,
-            reply as broker_reply,
-            request as broker_request,
-        },
         enum_def,
-        exchange::{
-            concrete as exchange_example,
-            Exchange,
-            ExchangeAction,
-            ExchangeActionKind,
-            ExchangeToBroker,
-            ExchangeToItself,
-            ExchangeToReplay,
-            reply as exchange_reply,
-        },
+        interface::{broker::*, exchange::*, latency::*, message::*, replay::*, trader::*},
         kernel::{Kernel, KernelBuilder, LatentActionProcessor},
-        latency::{concrete as latency_examples, LatencyGenerator, Latent},
-        order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
-        order_book::{LimitOrder, OrderBook, OrderBookEvent, OrderBookEventKind},
         parallel::{ParallelBacktester, ThreadConfig},
-        replay::{
-            concrete as replay_examples,
-            Replay,
-            ReplayAction,
-            ReplayToBroker,
-            ReplayToExchange,
-            ReplayToItself,
-            request as replay_request,
+        types::*,
+        utils::{
+            chrono,
+            constants,
+            derive_macros,
+            derive_more,
+            queue::{LessElementBinaryHeap, MessageReceiver},
+            rand,
         },
-        settlement::{concrete as settlement_examples, GetSettlementLag},
+    };
+    pub use crate::concrete::{
+        broker as broker_examples,
+        exchange as exchange_example,
+        input::{
+            config::{from_structs::*, from_yaml::*},
+            one_tick::OneTickTradedPairReader,
+        },
+        latency as latency_examples,
+        message::{
+            broker::{reply as broker_reply, request as broker_request},
+            exchange::reply as exchange_reply,
+            replay::request as replay_request,
+            trader::request as trader_request,
+        },
+        order::{
+            LimitOrderCancelRequest,
+            LimitOrderPlacingRequest,
+            MarketOrderPlacingRequest,
+        },
+        order_book::{LimitOrder, OrderBook, OrderBookEvent, OrderBookEventKind},
+        replay as replay_examples,
+        replay::settlement::{concrete as settlement_examples, GetSettlementLag},
         traded_pair::{
             Asset,
             Base,
@@ -108,30 +59,9 @@ pub mod prelude {
             parser::{concrete as traded_pair_parser_examples, TradedPairParser},
             TradedPair,
         },
-        trader::{
-            concrete as trader_examples,
-            request as trader_request,
-            subscriptions::{SubscriptionConfig, SubscriptionList},
-            Trader,
-            TraderAction,
-            TraderActionKind,
-            TraderToBroker,
-            TraderToItself,
-        },
-        types::*,
-        utils::{
-            chrono,
-            constants,
-            derive_macros,
-            derive_more,
-            input::{
-                config::{from_structs::*, from_yaml::parse_yaml},
-                one_tick::OneTickTradedPairReader,
-            },
-            parse_datetime,
-            queue::{LessElementBinaryHeap, MessageReceiver},
-            rand,
-        },
+        trader as trader_examples,
+        trader::subscriptions::{SubscriptionConfig, SubscriptionList},
+        types as misc_types,
     };
 }
 
@@ -141,6 +71,7 @@ mod tests {
         broker_examples::BasicBroker,
         crate::prelude::*,
         exchange_example::BasicExchange,
+        misc_types::PriceStep,
         rand::{Rng, rngs::StdRng},
         replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
         settlement_examples::SpotSettlement,

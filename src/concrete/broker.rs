@@ -53,7 +53,7 @@ use {
         utils::queue::MessageReceiver,
     },
     rand::Rng,
-    std::{collections::{HashMap, HashSet}, marker::PhantomData},
+    std::{collections::{HashMap, HashSet}, marker::PhantomData, rc::Rc},
 };
 
 pub struct BasicBroker<
@@ -640,7 +640,9 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                                     exchange_id,
                                     exchange_dt,
                                     BasicBrokerReply::ExchangeEventNotification(
-                                        ExchangeEventNotification::ObSnapshot(ob_snapshot.clone())
+                                        ExchangeEventNotification::ObSnapshot(
+                                            Rc::clone(&ob_snapshot)
+                                        )
                                     ),
                                 );
                                 return Some(ob_snapshot);

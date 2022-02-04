@@ -269,7 +269,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
             let action_iterator = once_with(
                 || Self::create_replay_reply(
                     BasicExchangeToReplayReply::ExchangeEventNotification(
-                        ExchangeEventNotification::ObSnapshot(ob_snapshot.clone())
+                        ExchangeEventNotification::ObSnapshot(Rc::clone(&ob_snapshot))
                     )
                 )
             ).chain(
@@ -277,7 +277,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     |broker_id| self.create_broker_reply(
                         *broker_id,
                         BasicExchangeToBrokerReply::ExchangeEventNotification(
-                            ExchangeEventNotification::ObSnapshot(ob_snapshot.clone())
+                            ExchangeEventNotification::ObSnapshot(Rc::clone(&ob_snapshot))
                         ),
                     )
                 )

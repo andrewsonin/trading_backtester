@@ -22,7 +22,7 @@ pub mod prelude {
         utils::{
             chrono,
             constants,
-            derive_macros,
+            derive,
             derive_more,
             queue::{LessElementBinaryHeap, MessageReceiver},
             rand,
@@ -293,7 +293,7 @@ mod tests {
         use {
             broker_examples::{BasicBroker, BasicVoidBroker},
             crate::prelude::*,
-            derive_macros::{Broker, Exchange, GetSettlementLag, LatencyGenerator, Replay, Trader},
+            derive::{Broker, Exchange, GetSettlementLag, LatencyGenerator, Replay, Trader},
             exchange_example::{BasicExchange, BasicVoidExchange},
             latency_examples::ConstantLatency,
             rand::Rng,

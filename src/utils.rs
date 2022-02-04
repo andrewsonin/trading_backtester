@@ -1,4 +1,4 @@
-pub use {chrono, derive_macros, derive_more, rand};
+pub use {chrono, derive, derive_more, rand};
 
 pub mod constants;
 pub mod queue;

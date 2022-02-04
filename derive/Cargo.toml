@@ -1,5 +1,5 @@
 [package]
-name = "derive_macros"
+name = "derive"
 version = "0.0.1"
 authors = ["Andrew Sonin <sonin.cel@yandex.ru>"]
 description = "Macros for deriving `trading_backtester::interface` traits for the enum-dispatched trait variants"

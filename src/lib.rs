@@ -1,14 +1,20 @@
 #[cfg(feature = "concrete")]
 /// Concrete examples of entities that implement traits from the [`interface`] module.
 pub mod concrete;
+
 /// Abstract interfaces.
 pub mod interface;
+
 /// Kernel of the backtester.
 pub mod kernel;
+
+#[cfg(feature = "multithread")]
 /// Utilities for running backtesters in multiple threads.
 pub mod parallel;
+
 /// Auxiliary types and traits.
 pub mod types;
+
 /// Other auxiliary utilities.
 pub mod utils;
 
@@ -17,7 +23,6 @@ pub mod prelude {
     pub use crate::{
         interface::{broker::*, exchange::*, latency::*, message::*, replay::*, trader::*},
         kernel::{Kernel, KernelBuilder, LatentActionProcessor},
-        parallel::{ParallelBacktester, ThreadConfig},
         types::*,
         utils::{
             chrono,
@@ -64,6 +69,8 @@ pub mod prelude {
     };
     #[cfg(feature = "enum_def")]
     pub use crate::enum_def;
+    #[cfg(feature = "multithread")]
+    pub use crate::parallel::{ParallelBacktester, ThreadConfig};
     #[cfg(feature = "derive")]
     pub use crate::utils::derive;
     #[cfg(feature = "derive_more")]
@@ -197,6 +204,7 @@ mod tests {
             .run_simulation()
     }
 
+    #[cfg(feature = "multithread")]
     #[test]
     fn test_parse_yaml_in_parallel()
     {

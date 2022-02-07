@@ -26,8 +26,10 @@
 //!
 //! ```toml
 //! [dependencies]
-//! trading_backtester = { path = ..., features = [ ... ] }
+//! trading_backtester = { path = "???", features = ["???"] }
 //! ```
+//! where `path` should point to the location of the `trading_backtester` library,
+//! and `features` should consist of the available ones (or may not be set).
 //!
 //! ## Features
 //!

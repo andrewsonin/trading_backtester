@@ -33,24 +33,26 @@
 //!
 //! ## Features
 //!
+//! The following features are available for enabling. Each of them provides access to:
+//!
 //! * __`concrete`__
 //!
-//!   Concrete examples of entities that implement traits from the [`interface`] module.
+//!   Concrete examples of entities that implement traits from the `interface` module.
 //!
 //! * __`enum_def`__
 //!
-//!   Provide access to the macro that generates an `enum` that can contain
-//! each of the listed types as a unique `enum` variant.
-//! Simplifies the creation of statically dispatched trait objects.
+//!   The macro that generates an `enum` that can contain each
+//!   of the listed types as a unique `enum`
+//!   variant. Simplifies the creation of statically dispatched trait objects.
 //!
 //! * __`enum_dispatch`__
 //!
-//!   Provide access to derive macros for statically dispatched trait objects
-//! from the [`interface`] module. Convenient to use with `enum_def`.
+//!   Derive macros for statically dispatched trait objects from the `interface` module.
+//!   Convenient to use with the `enum_def`.
 //!
 //! * __`multithread`__
 //!
-//!   Provides access to utilities for running backtesters in multiple threads.
+//!   Utilities for running backtesters in multiple threads.
 
 #[cfg(feature = "concrete")]
 /// Concrete examples of entities that implement traits from the [`interface`] module.

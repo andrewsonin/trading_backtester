@@ -1,3 +1,4 @@
+#[cfg(feature = "concrete")]
 /// Concrete examples of entities that implement traits from the [`interface`] module.
 pub mod concrete;
 /// Abstract interfaces.
@@ -14,7 +15,6 @@ pub mod utils;
 /// The Rust Prelude
 pub mod prelude {
     pub use crate::{
-        enum_def,
         interface::{broker::*, exchange::*, latency::*, message::*, replay::*, trader::*},
         kernel::{Kernel, KernelBuilder, LatentActionProcessor},
         parallel::{ParallelBacktester, ThreadConfig},
@@ -22,12 +22,11 @@ pub mod prelude {
         utils::{
             chrono,
             constants,
-            derive,
-            derive_more,
             queue::{LessElementBinaryHeap, MessageReceiver},
             rand,
         },
     };
+    #[cfg(feature = "concrete")]
     pub use crate::concrete::{
         broker as broker_examples,
         exchange as exchange_example,
@@ -63,8 +62,15 @@ pub mod prelude {
         trader::subscriptions::{SubscriptionConfig, SubscriptionList},
         types as misc_types,
     };
+    #[cfg(feature = "enum_def")]
+    pub use crate::enum_def;
+    #[cfg(feature = "derive")]
+    pub use crate::utils::derive;
+    #[cfg(feature = "derive_more")]
+    pub use crate::utils::derive_more;
 }
 
+#[cfg(feature = "concrete")]
 #[cfg(test)]
 mod tests {
     use {
@@ -288,6 +294,7 @@ mod tests {
             .run_simulation::<Trader, Broker, Exchange, Replay>()
     }
 
+    #[cfg(feature = "derive")]
     #[allow(dead_code)]
     mod test_enum_def {
         use {

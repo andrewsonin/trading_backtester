@@ -1,8 +1,14 @@
-pub use {chrono, derive, derive_more, rand};
+#[cfg(feature = "derive_more")]
+pub use derive_more;
+
+pub use {chrono, rand};
+#[cfg(feature = "derive")]
+pub use derive;
 
 pub mod constants;
 pub mod queue;
 
+#[cfg(feature = "enum_def")]
 #[macro_export]
 /// Macro that generates an `enum` that can contain
 /// each of the listed types as a unique `enum` variant.

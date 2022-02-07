@@ -13,3 +13,4 @@ proc-macro = true
 quote = "^1"
 proc-macro2 = "^1"
 syn = "^1"
+derive_more = "^0.99.17"

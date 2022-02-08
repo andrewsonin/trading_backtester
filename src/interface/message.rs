@@ -1,47 +1,72 @@
 use crate::types::{Id, NeverType, Nothing};
 
+/// Indicate that the type is the [`Trader`](crate::interface::trader::Trader)-to-itself message.
 pub trait TraderToItself: Ord {}
 
+/// Indicate that the type is the
+/// [`Trader`](crate::interface::trader::Trader)-to-[`Broker`](crate::interface::broker::Broker)
+/// message.
 pub trait TraderToBroker: Ord {
     type BrokerID: Id;
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
-/// Trait indicating that the type is the [`Broker`]-to-itself message.
+/// Indicate that the type is the [`Broker`](crate::interface::broker::Broker)-to-itself message.
 pub trait BrokerToItself: Ord {}
 
-/// Trait indicating that the type is the [`Broker`]-to-[`Replay`] message.
+/// Indicate that the type is the
+/// [`Broker`](crate::interface::broker::Broker)-to-[`Replay`](crate::interface::replay::Replay)
+/// message.
 pub trait BrokerToReplay: Ord {}
 
-/// Trait indicating that the type
-/// is the [`Broker`]-to-[`Exchange`](crate::exchange::Exchange) message.
+/// Indicate that the type is the
+/// [`Broker`](crate::interface::broker::Broker)-to-[`Exchange`](
+/// crate::interface::exchange::Exchange) message.
 pub trait BrokerToExchange: Ord {
     type ExchangeID: Id;
     fn get_exchange_id(&self) -> Self::ExchangeID;
 }
 
-/// Trait indicating that the type is the [`Broker`]-to-[`Trader`](crate::trader::Trader) message.
+/// Indicate that the type is the
+/// [`Broker`](crate::interface::broker::Broker)-to-[`Trader`](crate::interface::trader::Trader)
+/// message.
 pub trait BrokerToTrader: Ord {
     type TraderID: Id;
     fn get_trader_id(&self) -> Self::TraderID;
 }
 
+/// Indicate that the type is the
+/// [`Exchange`](crate::interface::exchange::Exchange)-to-itself message.
 pub trait ExchangeToItself: Ord {}
 
+/// Indicate that the type is the
+/// [`Exchange`](crate::interface::exchange::Exchange)-to-[`Replay`](
+/// crate::interface::replay::Replay) message.
 pub trait ExchangeToReplay: Ord {}
 
+/// Indicate that the type is the
+/// [`Exchange`](crate::interface::exchange::Exchange)-to-[`Broker`](
+/// crate::interface::broker::Broker) message.
 pub trait ExchangeToBroker: Ord {
     type BrokerID: Id;
     fn get_broker_id(&self) -> Self::BrokerID;
 }
 
+/// Indicate that the type is the
+/// [`Replay`](crate::interface::replay::Replay)-to-itself message.
 pub trait ReplayToItself: Ord {}
 
+/// Indicate that the type is the
+/// [`Replay`](crate::interface::replay::Replay)-to-[`Exchange`](
+/// crate::interface::exchange::Exchange) message.
 pub trait ReplayToExchange: Ord {
     type ExchangeID: Id;
     fn get_exchange_id(&self) -> Self::ExchangeID;
 }
 
+/// Indicate that the type is the
+/// [`Replay`](crate::interface::replay::Replay)-to-[`Broker`]( crate::interface::broker::Broker)
+/// message.
 pub trait ReplayToBroker: Ord {
     type BrokerID: Id;
     fn get_broker_id(&self) -> Self::BrokerID;

@@ -32,9 +32,7 @@ use {
             Nothing,
             TimeSync,
         },
-        utils::{
-            queue::{LessElementBinaryHeap, MessageReceiver},
-        },
+        utils::queue::LessElementBinaryHeap,
     },
     rand::Rng,
     settlement::GetSettlementLag,
@@ -272,7 +270,7 @@ Iterator for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settle
             if reader_idx != -1 {
                 if let Some(next_action) = self.traded_pair_readers
                     .get_mut(reader_idx as usize)
-                    .unwrap_or_else(|| unreachable!("Index is out of bounds"))
+                    .unwrap_or_else(|| unreachable!("Index {reader_idx} is out of bounds"))
                     .next(&mut self.next_order_id)
                 {
                     self.action_queue.push((next_action, reader_idx))
@@ -304,20 +302,16 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
     type R2E = BasicReplayToExchange<ExchangeID, Symbol, Settlement>;
     type R2B = NeverType<BrokerID>;
 
-    fn wakeup<KerMsg: Ord>(
+    fn wakeup(
         &mut self,
-        _: MessageReceiver<KerMsg>,
-        _: impl Fn(Self::Item) -> KerMsg,
         _: Self::R2R,
         _: &mut impl Rng,
     ) {
         unreachable!("{} :: Replay wakeups are not planned", self.current_dt)
     }
 
-    fn handle_exchange_reply<KerMsg: Ord>(
+    fn handle_exchange_reply(
         &mut self,
-        mut message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl Fn(Self::Item) -> KerMsg,
         reply: Self::E2R,
         exchange_id: ExchangeID,
         rng: &mut impl Rng,
@@ -352,7 +346,7 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                                 get_ob_snapshot_delay(*traded_pair)
                             }
                         );
-                        message_receiver.extend(action_iterator.map(process_action))
+                        self.action_queue.extend(action_iterator.map(|action| (action, -1)))
                     }
                     ExchangeEventNotification::TradesStarted(traded_pair, _price_step) => {
                         if !self.active_traded_pairs.insert((exchange_id, traded_pair)) {
@@ -362,12 +356,12 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                             )
                         }
                         if let Some(action) = get_ob_snapshot_delay(traded_pair) {
-                            message_receiver.push(process_action(action))
+                            self.action_queue.push((action, -1))
                         }
                     }
                     ExchangeEventNotification::ObSnapshot(snapshot) => {
                         if let Some(action) = get_ob_snapshot_delay(snapshot.traded_pair) {
-                            message_receiver.push(process_action(action))
+                            self.action_queue.push((action, -1))
                         }
                     }
                     ExchangeEventNotification::TradesStopped(traded_pair) => {
@@ -429,10 +423,8 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
         }
     }
 
-    fn handle_broker_reply<KerMsg: Ord>(
+    fn handle_broker_reply(
         &mut self,
-        _: MessageReceiver<KerMsg>,
-        _: impl Fn(Self::Item) -> KerMsg,
         _: Self::B2R,
         _: Self::BrokerID,
         _: &mut impl Rng,
@@ -530,29 +522,23 @@ Replay for VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
     type R2E = R2E;
     type R2B = R2B;
 
-    fn wakeup<KerMsg: Ord>(
+    fn wakeup(
         &mut self,
-        _: MessageReceiver<KerMsg>,
-        _: impl Fn(Self::Item) -> KerMsg,
         _: Self::R2R,
         _: &mut impl Rng,
     ) {
         unreachable!("{} :: Replay wakeups are not planned", self.current_dt)
     }
 
-    fn handle_exchange_reply<KerMsg: Ord>(
+    fn handle_exchange_reply(
         &mut self,
-        _: MessageReceiver<KerMsg>,
-        _: impl Fn(Self::Item) -> KerMsg,
         _: Self::E2R,
         _: Self::ExchangeID,
         _: &mut impl Rng,
     ) {}
 
-    fn handle_broker_reply<KerMsg: Ord>(
+    fn handle_broker_reply(
         &mut self,
-        _: MessageReceiver<KerMsg>,
-        _: impl Fn(Self::Item) -> KerMsg,
         _: Self::B2R,
         _: Self::BrokerID,
         _: &mut impl Rng)

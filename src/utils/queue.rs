@@ -16,6 +16,10 @@ impl<T: Ord> LessElementBinaryHeap<T>
     pub fn push(&mut self, item: T) {
         self.0.push(Reverse(item))
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl<T: Ord> Extend<T> for LessElementBinaryHeap<T>

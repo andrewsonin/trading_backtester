@@ -760,21 +760,13 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
 
         time_sync.extend(quote! {#match_arm.current_datetime_mut(),});
         wakeup.extend(
-            quote! {#match_arm.wakeup(message_receiver, process_action, scheduled_action, rng),}
+            quote! {#match_arm.wakeup(scheduled_action, rng),}
         );
         handle_exchange_reply.extend(
-            quote! {
-                #match_arm.handle_exchange_reply(
-                    message_receiver, process_action, reply, exchange_id, rng
-                ),
-            }
+            quote! {#match_arm.handle_exchange_reply(reply, exchange_id, rng),}
         );
         handle_broker_reply.extend(
-            quote! {
-                #match_arm.handle_broker_reply(
-                    message_receiver, process_action, reply, broker_id, rng
-                ),
-            }
+            quote! {#match_arm.handle_broker_reply(reply, broker_id, rng),}
         );
         next.extend(quote! {#match_arm.next(),})
     };
@@ -797,20 +789,16 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
             type R2E = #r2e;
             type R2B = #r2b;
 
-            fn wakeup<KerMsg: Ord>(
+            fn wakeup(
                 &mut self,
-                message_receiver: MessageReceiver<KerMsg>,
-                process_action: impl Fn(Self::Item) -> KerMsg,
                 scheduled_action: Self::R2R,
                 rng: &mut impl Rng,
             ) {
                 match self { #wakeup }
             }
 
-            fn handle_exchange_reply<KerMsg: Ord>(
+            fn handle_exchange_reply(
                 &mut self,
-                message_receiver: MessageReceiver<KerMsg>,
-                process_action: impl Fn(Self::Item) -> KerMsg,
                 reply: Self::E2R,
                 exchange_id: Self::ExchangeID,
                 rng: &mut impl Rng,
@@ -818,10 +806,8 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
                 match self { #handle_exchange_reply }
             }
 
-            fn handle_broker_reply<KerMsg: Ord>(
+            fn handle_broker_reply(
                 &mut self,
-                message_receiver: MessageReceiver<KerMsg>,
-                process_action: impl Fn(Self::Item) -> KerMsg,
                 reply: Self::B2R,
                 broker_id: Self::BrokerID,
                 rng: &mut impl Rng,

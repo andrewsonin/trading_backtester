@@ -13,7 +13,7 @@ use {
         utils::queue::{LessElementBinaryHeap, MessageReceiver},
     },
     rand::{Rng, rngs::StdRng, SeedableRng},
-    std::{cmp::Reverse, collections::HashMap, marker::PhantomData},
+    std::{collections::HashMap, marker::PhantomData},
 };
 
 mod action_processors;
@@ -48,6 +48,7 @@ pub struct Kernel<T, B, E, R, RNG>
     current_dt: DateTime,
 
     rng: RNG,
+    num_replay_messages: usize,
 }
 
 trait InnerMessage {
@@ -276,19 +277,12 @@ KernelBuilder<T, B, E, R, RNG>
         } = self;
 
         *replay.current_datetime_mut() = start_dt;
-        let first_message = Kernel::<T, B, E, R, RNG>::process_replay_action(
-            start_dt,
-            replay.next().expect("Replay does not contain any entries"),
-        );
-        if first_message.datetime < start_dt {
-            panic!("First message datetime is less than the simulation start datetime")
-        }
-        Kernel {
+        let mut kernel = Kernel {
             traders,
             brokers,
             exchanges,
             replay,
-            message_queue: LessElementBinaryHeap([Reverse(first_message)].into()),
+            message_queue: LessElementBinaryHeap([].into()),
             end_dt,
             current_dt: start_dt,
             rng: if let Some(seed) = seed {
@@ -296,7 +290,13 @@ KernelBuilder<T, B, E, R, RNG>
             } else {
                 RNG::from_entropy()
             },
-        }
+            num_replay_messages: 0,
+        };
+        kernel.pop_next_replay_message();
+        if kernel.message_queue.len() == 0 {
+            panic!("Replay does not contain any entries")
+        };
+        kernel
     }
 }
 
@@ -325,25 +325,32 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         match message
         {
             MessageContent::ReplayWakeUp(scheduled_action) => {
-                self.handle_replay_wakeup(scheduled_action)
+                self.num_replay_messages -= 1;
+                self.handle_replay_wakeup(scheduled_action);
+                self.pop_next_replay_message()
             }
             MessageContent::ReplayToExchange(replay_request) => {
-                if let Some(action) = self.replay.next() {
-                    self.message_queue.push(Self::process_replay_action(self.current_dt, action))
+                self.num_replay_messages -= 1;
+                self.handle_replay_to_exchange(replay_request);
+                if self.num_replay_messages == 0 {
+                    *self.replay.current_datetime_mut() = self.current_dt;
+                    self.pop_next_replay_message()
                 }
-                self.handle_replay_to_exchange(replay_request)
             }
             MessageContent::ReplayToBroker(replay_request) => {
-                if let Some(action) = self.replay.next() {
-                    self.message_queue.push(Self::process_replay_action(self.current_dt, action))
+                self.num_replay_messages -= 1;
+                self.handle_replay_to_broker(replay_request);
+                if self.num_replay_messages == 0 {
+                    *self.replay.current_datetime_mut() = self.current_dt;
+                    self.pop_next_replay_message()
                 }
-                self.handle_replay_to_broker(replay_request)
             }
             MessageContent::ExchangeWakeUp { exchange_id, e2e } => {
                 self.handle_exchange_wakeup(exchange_id, e2e)
             }
             MessageContent::ExchangeToReplay { exchange_id, e2r } => {
-                self.handle_exchange_to_replay(exchange_id, e2r)
+                self.handle_exchange_to_replay(exchange_id, e2r);
+                self.pop_next_replay_message()
             }
             MessageContent::ExchangeToBroker { exchange_id, e2b } => {
                 self.handle_exchange_to_broker(exchange_id, e2b)
@@ -352,7 +359,8 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
                 self.handle_broker_wakeup(broker_id, b2b)
             }
             MessageContent::BrokerToReplay { broker_id, b2r } => {
-                self.handle_broker_to_replay(broker_id, b2r)
+                self.handle_broker_to_replay(broker_id, b2r);
+                self.pop_next_replay_message()
             }
             MessageContent::BrokerToExchange { broker_id, b2e } => {
                 self.handle_broker_to_exchange(broker_id, b2e)
@@ -369,16 +377,17 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         }
     }
 
+    fn pop_next_replay_message(&mut self) {
+        if let Some(action) = self.replay.next() {
+            let message = self.process_replay_action(action);
+            self.message_queue.push(message)
+        }
+    }
+
     fn handle_replay_wakeup(&mut self, scheduled_action: R::R2R)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
-        let process_replay_action = |action| Self::process_replay_action(self.current_dt, action);
-        self.replay.wakeup(
-            MessageReceiver::new(&mut self.message_queue),
-            process_replay_action,
-            scheduled_action,
-            &mut self.rng,
-        )
+        self.replay.wakeup(scheduled_action, &mut self.rng)
     }
 
     fn handle_replay_to_exchange(&mut self, request: R::R2E)
@@ -449,10 +458,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
     fn handle_exchange_to_replay(&mut self, exchange_id: E::ExchangeID, reply: R::E2R)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
-        let process_replay_action = |action| Self::process_replay_action(self.current_dt, action);
         self.replay.handle_exchange_reply(
-            MessageReceiver::new(&mut self.message_queue),
-            process_replay_action,
             reply,
             exchange_id,
             &mut self.rng,
@@ -502,10 +508,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
     fn handle_broker_to_replay(&mut self, broker_id: B::BrokerID, reply: B::B2R)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
-        let process_replay_action = |action| Self::process_replay_action(self.current_dt, action);
         self.replay.handle_broker_reply(
-            MessageReceiver::new(&mut self.message_queue),
-            process_replay_action,
             reply,
             broker_id,
             &mut self.rng,
@@ -596,16 +599,17 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
     }
 
     fn process_replay_action(
-        current_dt: DateTime,
+        &mut self,
         action: R::Item) -> Message<<Self as InnerMessage>::MessageContent>
     {
-        if action.datetime < current_dt {
+        if action.datetime < self.current_dt {
             panic!(
                 "Replay yielded action which DateTime ({}) \
-                is less than the Kernel current DateTime ({current_dt})",
-                action.datetime
+                is less than the Kernel current DateTime ({})",
+                action.datetime, self.current_dt
             )
         };
+        self.num_replay_messages += 1;
         Message {
             datetime: action.datetime,
             body: match action.content {

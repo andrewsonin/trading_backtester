@@ -8,7 +8,6 @@ use {
             ReplayToItself,
         },
         types::{DateTime, Id, TimeSync},
-        utils::queue::MessageReceiver,
     },
     rand::Rng,
     std::fmt::Debug,
@@ -40,27 +39,17 @@ pub trait Replay
     type R2E: ReplayToExchange<ExchangeID=Self::ExchangeID>;
     type R2B: ReplayToBroker<BrokerID=Self::BrokerID>;
 
-    fn wakeup<KerMsg: Ord>(
-        &mut self,
-        message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl Fn(Self::Item) -> KerMsg,
-        scheduled_action: Self::R2R,
-        rng: &mut impl Rng,
-    );
+    fn wakeup(&mut self, scheduled_action: Self::R2R, rng: &mut impl Rng);
 
-    fn handle_exchange_reply<KerMsg: Ord>(
+    fn handle_exchange_reply(
         &mut self,
-        message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl Fn(Self::Item) -> KerMsg,
         reply: Self::E2R,
         exchange_id: Self::ExchangeID,
         rng: &mut impl Rng,
     );
 
-    fn handle_broker_reply<KerMsg: Ord>(
+    fn handle_broker_reply(
         &mut self,
-        message_receiver: MessageReceiver<KerMsg>,
-        process_action: impl Fn(Self::Item) -> KerMsg,
         reply: Self::B2R,
         broker_id: Self::BrokerID,
         rng: &mut impl Rng,

@@ -1,8 +1,7 @@
 use {
     crate::{
         concrete::{
-            replay::settlement::GetSettlementLag,
-            traded_pair::TradedPair,
+            traded_pair::{settlement::GetSettlementLag, TradedPair},
             types::{Direction, ObState, OrderID, Price, PriceStep, Size},
         },
         interface::message::{ExchangeToBroker, ExchangeToReplay},
@@ -164,7 +163,7 @@ pub enum ExchangeEventNotification<Symbol: Id, Settlement: GetSettlementLag>
 {
     ExchangeOpen,
 
-    TradesStarted(TradedPair<Symbol, Settlement>, PriceStep),
+    TradesStarted { traded_pair: TradedPair<Symbol, Settlement>, price_step: PriceStep },
 
     OrderCancelled(LimitOrderEventInfo<Symbol, Settlement>),
 

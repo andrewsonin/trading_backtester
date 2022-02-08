@@ -1,10 +1,14 @@
-use crate::{
-    concrete::{replay::settlement::GetSettlementLag, types::Price},
-    enum_def,
-    types::{DateTime, Id, Named},
+use {
+    crate::{
+        concrete::types::Price,
+        enum_def,
+        types::{DateTime, Id, Named},
+    },
+    settlement::GetSettlementLag,
 };
 
 pub mod parser;
+pub mod settlement;
 
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct TradedPair<Name: Id, Settlement: GetSettlementLag> {

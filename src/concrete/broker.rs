@@ -2,7 +2,7 @@ use {
     crate::{
         concrete::{
             latency::ConstantLatency,
-            message::{
+            message_protocol::{
                 broker::{
                     reply::{
                         BasicBrokerReply,
@@ -30,8 +30,7 @@ use {
                 },
                 trader::request::{BasicTraderRequest, BasicTraderToBroker},
             },
-            replay::settlement::GetSettlementLag,
-            traded_pair::TradedPair,
+            traded_pair::{settlement::GetSettlementLag, TradedPair},
             trader::subscriptions::{SubscriptionConfig, SubscriptionList},
             types::OrderID,
         },
@@ -554,14 +553,14 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
                 );
                 message_receiver.extend(action_iterator.map(process_action))
             }
-            ExchangeEventNotification::TradesStarted(traded_pair, price_step) => {
+            ExchangeEventNotification::TradesStarted { traded_pair, price_step } => {
                 let action_iterator = self.trader_configs.keys().map(
                     |trader_id| Self::create_broker_reply(
                         *trader_id,
                         exchange_id,
                         exchange_dt,
                         BasicBrokerReply::ExchangeEventNotification(
-                            ExchangeEventNotification::TradesStarted(traded_pair, price_step)
+                            ExchangeEventNotification::TradesStarted { traded_pair, price_step }
                         ),
                     )
                 );

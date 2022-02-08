@@ -1,7 +1,7 @@
 use crate::{
     concrete::{
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
-        replay::settlement::GetSettlementLag,
+        traded_pair::settlement::GetSettlementLag,
     },
     interface::message::TraderToBroker,
     types::Id,

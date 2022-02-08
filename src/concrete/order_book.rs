@@ -425,14 +425,16 @@ impl OrderBook {
     }
 
     #[inline]
-    pub fn get_ob_side<const UPPER: bool>(&self) -> Vec<(Price, Vec<(Size, DateTime)>)>
+    pub fn get_ob_side<const UPPER: bool>(
+        &self,
+        max_levels: usize) -> Vec<(Price, Vec<(Size, DateTime)>)>
     {
         let (side, price) = if UPPER {
             (&self.asks, self.best_ask)
         } else {
             (&self.bids, self.best_bid)
         };
-        side.iter()
+        let it = side.iter()
             .map(
                 |level| -> Vec<(Size, DateTime)> {
                     level.iter()
@@ -457,15 +459,19 @@ impl OrderBook {
                     Some(result)
                 },
             )
-            .filter(|(_, level)| !level.is_empty())
-            .collect()
+            .filter(|(_, level)| !level.is_empty());
+        if max_levels != 0 {
+            it.take(max_levels).collect()
+        } else {
+            it.collect()
+        }
     }
 
     #[inline]
-    pub fn get_ob_state(&self) -> ObState {
+    pub fn get_ob_state(&self, max_levels: usize) -> ObState {
         ObState {
-            bids: self.get_ob_side::<false>(),
-            asks: self.get_ob_side::<true>(),
+            bids: self.get_ob_side::<false>(max_levels),
+            asks: self.get_ob_side::<true>(max_levels),
         }
     }
 }

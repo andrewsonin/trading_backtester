@@ -1,6 +1,6 @@
 use {
     crate::{
-        concrete::{replay::settlement::GetSettlementLag, traded_pair::TradedPair},
+        concrete::traded_pair::{settlement::GetSettlementLag, TradedPair},
         types::Id,
     },
     std::str::FromStr,
@@ -20,9 +20,12 @@ pub trait TradedPairParser<
 pub mod concrete {
     use {
         crate::{
-            concrete::{
-                replay::settlement::concrete::SpotSettlement,
-                traded_pair::{Asset, Base, parser::TradedPairParser, TradedPair},
+            concrete::traded_pair::{
+                Asset,
+                Base,
+                parser::TradedPairParser,
+                settlement::concrete::SpotSettlement,
+                TradedPair,
             },
             types::Id,
         },

@@ -2,7 +2,7 @@ use {
     crate::{
         concrete::{
             input::one_tick::OneTickTradedPairReader,
-            message::{
+            message_protocol::{
                 exchange::reply::{
                     BasicExchangeToReplay,
                     BasicExchangeToReplayReply,
@@ -10,7 +10,7 @@ use {
                 },
                 replay::request::{BasicReplayRequest, BasicReplayToExchange},
             },
-            traded_pair::TradedPair,
+            traded_pair::{settlement::GetSettlementLag, TradedPair},
             types::{OrderID, PriceStep},
         },
         interface::{
@@ -35,7 +35,6 @@ use {
         utils::queue::LessElementBinaryHeap,
     },
     rand::Rng,
-    settlement::GetSettlementLag,
     std::{
         cmp::Reverse,
         collections::{HashMap, HashSet},
@@ -44,8 +43,6 @@ use {
         num::NonZeroU64,
     },
 };
-
-pub mod settlement;
 
 pub trait GetNextObSnapshotDelay<
     ExchangeID: Id,
@@ -57,7 +54,7 @@ pub trait GetNextObSnapshotDelay<
         exchange_id: ExchangeID,
         traded_pair: TradedPair<Symbol, Settlement>,
         rng: &mut impl Rng,
-        current_dt: DateTime) -> Option<NonZeroU64>;
+        current_dt: DateTime) -> Option<(NonZeroU64, usize)>;
 }
 
 pub struct OneTickReplay<
@@ -184,7 +181,10 @@ OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                         content: ReplayActionKind::ReplayToExchange(
                             BasicReplayToExchange {
                                 exchange_id,
-                                content: BasicReplayRequest::StartTrades(traded_pair, price_step),
+                                content: BasicReplayRequest::StartTrades {
+                                    traded_pair,
+                                    price_step,
+                                },
                             }
                         ),
                     };
@@ -317,7 +317,7 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
         rng: &mut impl Rng,
     ) {
         let mut get_ob_snapshot_delay = |traded_pair| {
-            if let Some(delay) = self.ob_snapshot_delay_scheduler.get_ob_snapshot_delay(
+            if let Some((delay, max_levels)) = self.ob_snapshot_delay_scheduler.get_ob_snapshot_delay(
                 exchange_id, traded_pair, rng, self.current_dt,
             ) {
                 let action = ReplayAction {
@@ -325,7 +325,10 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                     content: ReplayActionKind::ReplayToExchange(
                         BasicReplayToExchange {
                             exchange_id,
-                            content: BasicReplayRequest::BroadcastObStateToBrokers(traded_pair),
+                            content: BasicReplayRequest::BroadcastObStateToBrokers {
+                                traded_pair,
+                                max_levels,
+                            },
                         }
                     ),
                 };
@@ -348,7 +351,7 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                         );
                         self.action_queue.extend(action_iterator.map(|action| (action, -1)))
                     }
-                    ExchangeEventNotification::TradesStarted(traded_pair, _price_step) => {
+                    ExchangeEventNotification::TradesStarted { traded_pair, .. } => {
                         if !self.active_traded_pairs.insert((exchange_id, traded_pair)) {
                             panic!(
                                 "Trades for traded pair already started: \

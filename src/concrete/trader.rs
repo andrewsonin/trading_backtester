@@ -2,12 +2,12 @@ use {
     crate::{
         concrete::{
             latency::ConstantLatency,
-            message::{
+            message_protocol::{
                 broker::reply::{BasicBrokerReply, BasicBrokerToTrader},
                 exchange::reply::ExchangeEventNotification,
                 trader::request::BasicTraderToBroker,
             },
-            replay::settlement::GetSettlementLag,
+            traded_pair::settlement::GetSettlementLag,
             types::{ObState, PriceStep, Size},
         },
         interface::{

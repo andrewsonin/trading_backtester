@@ -83,7 +83,7 @@ fn test_default_example()
 {
     let order_book = default_example::<true>();
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -134,7 +134,7 @@ fn test_default_example_bids()
     let mut order_book = OrderBook::new();
     default_example_bids(&mut order_book);
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -164,7 +164,7 @@ fn test_default_example_asks()
     let mut order_book = OrderBook::new();
     default_example_asks(&mut order_book);
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![],
             asks: vec![
@@ -202,7 +202,7 @@ fn test_default_example_equivalence()
     default_example_asks(&mut order_book1);
     default_example_bids(&mut order_book1);
     let order_book2 = default_example::<false>();
-    assert_eq!(order_book1.get_ob_state(), order_book2.get_ob_state())
+    assert_eq!(order_book1.get_ob_state(0), order_book2.get_ob_state(0))
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn test_default_example_dummies()
     let mut order_book_with_dummies = default_example::<false>();
     default_example_dummies(&mut order_book_with_dummies);
     let order_book = default_example::<false>();
-    assert_eq!(order_book.get_ob_state(), order_book_with_dummies.get_ob_state())
+    assert_eq!(order_book.get_ob_state(0), order_book_with_dummies.get_ob_state(0))
 }
 
 #[test]
@@ -219,7 +219,7 @@ fn test_clear()
 {
     let mut order_book = default_example::<false>();
     order_book.clear();
-    assert_eq!(order_book.get_ob_state(), ObState { bids: vec![], asks: vec![] })
+    assert_eq!(order_book.get_ob_state(0), ObState { bids: vec![], asks: vec![] })
 }
 
 #[test]
@@ -240,7 +240,7 @@ fn test_insert_real_sell_market_order()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -296,7 +296,7 @@ fn test_insert_real_sell_market_order_overflow()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![],
             asks: vec![
@@ -340,7 +340,7 @@ fn test_insert_real_sell_market_order_no_opposite_side()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![],
             asks: vec![
@@ -390,7 +390,7 @@ fn test_insert_real_buy_market_order()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -443,7 +443,7 @@ fn test_insert_real_buy_market_order_overflow()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -481,7 +481,7 @@ fn test_insert_real_buy_market_order_no_opposite_side()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -519,7 +519,7 @@ fn test_insert_dummy_sell_market_order()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -571,7 +571,7 @@ fn test_insert_dummy_sell_market_order_overflow()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -628,7 +628,7 @@ fn test_insert_dummy_sell_market_order_no_opposite_side()
         []
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![],
             asks: vec![
@@ -673,7 +673,7 @@ fn test_insert_dummy_buy_market_order()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -733,7 +733,7 @@ fn test_insert_dummy_buy_market_order_overflow()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -790,7 +790,7 @@ fn test_insert_dummy_buy_market_order_no_opposite_side()
         []
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -833,7 +833,7 @@ fn test_insert_real_sell_limit_order_bids_middle()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -900,7 +900,7 @@ fn test_insert_real_sell_limit_order_bid_overflow()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![],
             asks: vec![
@@ -953,7 +953,7 @@ fn test_insert_dummy_sell_limit_order_bids_middle()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -1016,7 +1016,7 @@ fn test_insert_dummy_sell_limit_order_bid_overflow()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -1083,7 +1083,7 @@ fn test_insert_real_buy_limit_order_bids_middle()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -1146,7 +1146,7 @@ fn test_insert_real_buy_limit_order_bid_overflow()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -1193,7 +1193,7 @@ fn test_insert_dummy_buy_limit_order_bids_middle()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (
@@ -1257,7 +1257,7 @@ fn test_insert_dummy_buy_limit_order_bid_overflow()
         ]
     );
     assert_eq!(
-        order_book.get_ob_state(),
+        order_book.get_ob_state(0),
         ObState {
             bids: vec![
                 (

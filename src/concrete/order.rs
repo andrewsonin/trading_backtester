@@ -1,7 +1,6 @@
 use crate::{
     concrete::{
-        replay::settlement::GetSettlementLag,
-        traded_pair::TradedPair,
+        traded_pair::{settlement::GetSettlementLag, TradedPair},
         types::{Direction, OrderID, Price, Size},
     },
     types::Id,

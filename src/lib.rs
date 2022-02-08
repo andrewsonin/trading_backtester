@@ -96,7 +96,7 @@ pub mod prelude {
             one_tick::OneTickTradedPairReader,
         },
         latency as latency_examples,
-        message::{
+        message_protocol::{
             broker::{reply as broker_reply, request as broker_request},
             exchange::reply as exchange_reply,
             replay::request as replay_request,
@@ -109,7 +109,6 @@ pub mod prelude {
         },
         order_book::{LimitOrder, OrderBook, OrderBookEvent, OrderBookEventKind},
         replay as replay_examples,
-        replay::settlement::{concrete as settlement_examples, GetSettlementLag},
         traded_pair::{
             Asset,
             Base,
@@ -117,6 +116,7 @@ pub mod prelude {
             OptionContract,
             OptionKind,
             parser::{concrete as traded_pair_parser_examples, TradedPairParser},
+            settlement::{concrete as settlement_examples, GetSettlementLag},
             TradedPair,
         },
         trader as trader_examples,
@@ -206,9 +206,9 @@ mod tests {
             _: ExchangeID,
             _: TradedPair<Symbol, Settlement>,
             _: &mut impl Rng,
-            _: DateTime) -> Option<NonZeroU64>
+            _: DateTime) -> Option<(NonZeroU64, usize)>
         {
-            Some(NonZeroU64::new(1_000_000_000).unwrap())
+            Some((NonZeroU64::new(1_000_000_000).unwrap(), 1))
         }
     }
 

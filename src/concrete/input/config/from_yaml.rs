@@ -11,10 +11,9 @@ use {
             replay::{
                 ExchangeSession,
                 GetNextObSnapshotDelay,
-                settlement::GetSettlementLag,
                 TradedPairLifetime,
             },
-            traded_pair::{parser::TradedPairParser, TradedPair},
+            traded_pair::{parser::TradedPairParser, settlement::GetSettlementLag, TradedPair},
             types::PriceStep,
         },
         types::{

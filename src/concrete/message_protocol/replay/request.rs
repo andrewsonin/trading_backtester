@@ -1,8 +1,7 @@
 use crate::{
     concrete::{
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
-        replay::settlement::GetSettlementLag,
-        traded_pair::TradedPair,
+        traded_pair::{settlement::GetSettlementLag, TradedPair},
         types::PriceStep,
     },
     interface::message::ReplayToExchange,
@@ -38,7 +37,7 @@ pub enum BasicReplayRequest<Symbol: Id, Settlement: GetSettlementLag>
 {
     ExchangeOpen,
 
-    StartTrades(TradedPair<Symbol, Settlement>, PriceStep),
+    StartTrades { traded_pair: TradedPair<Symbol, Settlement>, price_step: PriceStep },
 
     CancelLimitOrder(LimitOrderCancelRequest<Symbol, Settlement>),
 
@@ -46,7 +45,7 @@ pub enum BasicReplayRequest<Symbol: Id, Settlement: GetSettlementLag>
 
     PlaceLimitOrder(LimitOrderPlacingRequest<Symbol, Settlement>),
 
-    BroadcastObStateToBrokers(TradedPair<Symbol, Settlement>),
+    BroadcastObStateToBrokers { traded_pair: TradedPair<Symbol, Settlement>, max_levels: usize },
 
     StopTrades(TradedPair<Symbol, Settlement>),
 

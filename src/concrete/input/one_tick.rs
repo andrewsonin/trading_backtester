@@ -1,10 +1,9 @@
 use {
     crate::{
         concrete::{
-            message::replay::request::{BasicReplayRequest, BasicReplayToExchange},
+            message_protocol::replay::request::{BasicReplayRequest, BasicReplayToExchange},
             order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
-            replay::settlement::GetSettlementLag,
-            traded_pair::TradedPair,
+            traded_pair::{settlement::GetSettlementLag, TradedPair},
             types::{Direction, OrderID, Price, PriceStep, Size},
         },
         interface::replay::{ReplayAction, ReplayActionKind},

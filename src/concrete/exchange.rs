@@ -1,7 +1,7 @@
 use {
     crate::{
         concrete::{
-            message::{
+            message_protocol::{
                 broker::request::{BasicBrokerRequest, BasicBrokerToExchange},
                 exchange::reply::{
                     BasicExchangeToBroker,
@@ -37,8 +37,7 @@ use {
             },
             order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
             order_book::{OrderBook, OrderBookEvent, OrderBookEventKind},
-            replay::settlement::GetSettlementLag,
-            traded_pair::TradedPair,
+            traded_pair::{settlement::GetSettlementLag, TradedPair},
             types::{Direction, OrderID, PriceStep, Size},
         },
         interface::{
@@ -192,7 +191,7 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
             BasicReplayRequest::ExchangeOpen => {
                 self.try_open(message_receiver, process_action)
             }
-            BasicReplayRequest::StartTrades(traded_pair, price_step) => {
+            BasicReplayRequest::StartTrades { traded_pair, price_step } => {
                 self.try_start_trades(
                     message_receiver, process_action, traded_pair, price_step,
                 )
@@ -218,8 +217,10 @@ for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
             BasicReplayRequest::ExchangeClosed => {
                 self.try_close(message_receiver, process_action)
             }
-            BasicReplayRequest::BroadcastObStateToBrokers(traded_pair) => {
-                self.try_broadcast_ob_state(message_receiver, process_action, traded_pair)
+            BasicReplayRequest::BroadcastObStateToBrokers { traded_pair, max_levels } => {
+                self.try_broadcast_ob_state(
+                    message_receiver, process_action, traded_pair, max_levels,
+                )
             }
         }
     }
@@ -252,6 +253,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         mut message_receiver: MessageReceiver<KerMsg>,
         mut process_action: impl FnMut(<Self as Agent>::Action) -> KerMsg,
         traded_pair: TradedPair<Symbol, Settlement>,
+        max_levels: usize,
     ) {
         if !self.is_open {
             let reply = Self::create_replay_reply(
@@ -264,7 +266,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
             message_receiver.push(process_action(reply))
         } else if let Some((order_book, _price_step)) = self.order_books.get(&traded_pair) {
             let ob_snapshot = Rc::new(
-                ObSnapshot { traded_pair, state: order_book.get_ob_state() }
+                ObSnapshot { traded_pair, state: order_book.get_ob_state(max_levels) }
             );
             let action_iterator = once_with(
                 || Self::create_replay_reply(
@@ -657,14 +659,14 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                 |broker_id| self.create_broker_reply(
                     *broker_id,
                     BasicExchangeToBrokerReply::ExchangeEventNotification(
-                        ExchangeEventNotification::TradesStarted(traded_pair, price_step)
+                        ExchangeEventNotification::TradesStarted { traded_pair, price_step }
                     ),
                 )
             );
             let action_iterator = once_with(
                 || Self::create_replay_reply(
                     BasicExchangeToReplayReply::ExchangeEventNotification(
-                        ExchangeEventNotification::TradesStarted(traded_pair, price_step)
+                        ExchangeEventNotification::TradesStarted { traded_pair, price_step }
                     )
                 )
             )

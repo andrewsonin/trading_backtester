@@ -1,14 +1,13 @@
 use crate::{
     concrete::{
-        message::exchange::reply::{
+        message_protocol::exchange::reply::{
             ExchangeEventNotification,
             MarketOrderNotFullyExecuted,
             OrderAccepted,
             OrderExecuted,
             OrderPartiallyExecuted,
         },
-        replay::settlement::GetSettlementLag,
-        traded_pair::TradedPair,
+        traded_pair::{settlement::GetSettlementLag, TradedPair},
         types::OrderID,
     },
     interface::message::BrokerToTrader,
@@ -81,7 +80,7 @@ pub enum PlacementDiscardingReason
     TraderNotRegistered,
 }
 
-type ExchangePlacementDiscardingReason = crate::concrete::message::exchange::reply::PlacementDiscardingReason;
+type ExchangePlacementDiscardingReason = crate::concrete::message_protocol::exchange::reply::PlacementDiscardingReason;
 
 impl From<ExchangePlacementDiscardingReason> for PlacementDiscardingReason {
     fn from(reason: ExchangePlacementDiscardingReason) -> Self {
@@ -143,7 +142,7 @@ pub enum InabilityToCancelReason
     TraderNotRegistered,
 }
 
-type ExchangeInabilityToCancelReason = crate::concrete::message::exchange::reply::InabilityToCancelReason;
+type ExchangeInabilityToCancelReason = crate::concrete::message_protocol::exchange::reply::InabilityToCancelReason;
 
 impl From<ExchangeInabilityToCancelReason> for InabilityToCancelReason {
     fn from(reason: ExchangeInabilityToCancelReason) -> Self {

@@ -1,6 +1,6 @@
 use {
     bitflags::bitflags,
-    crate::{concrete::{replay::settlement::GetSettlementLag, traded_pair::TradedPair}, types::Id},
+    crate::{concrete::traded_pair::{settlement::GetSettlementLag, TradedPair}, types::Id},
 };
 
 bitflags! {

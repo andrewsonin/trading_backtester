@@ -5,7 +5,9 @@ pub use {chrono, rand};
 #[cfg(feature = "derive")]
 pub use derive;
 
+/// Useful constants.
 pub mod constants;
+/// Useful queue structures.
 pub mod queue;
 
 #[cfg(feature = "enum_def")]

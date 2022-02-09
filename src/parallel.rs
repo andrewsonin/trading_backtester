@@ -10,15 +10,26 @@ use {
 };
 
 #[derive(Clone)]
-pub struct ThreadConfig<ReplayConfig, TraderConfigs: IntoIterator> {
+/// Initializer struct that contain thread-unique information.
+/// Here it is the RNG seed, the initializer config for building possibly thread-unique
+/// [`Replay`](crate::interface::replay::Replay) and the initializer configs for building
+/// thread-unique [`Traders`](crate::interface::trader::Trader).
+pub struct ThreadConfig<ReplayConfig, TraderConfigs> {
     rng_seed: u64,
     replay_config: ReplayConfig,
     trader_configs: TraderConfigs,
 }
 
-impl<ReplayConfig, TraderConfigs: IntoIterator>
+impl<ReplayConfig, TraderConfigs>
 ThreadConfig<ReplayConfig, TraderConfigs>
 {
+    /// Creates a new instance of the [`ThreadConfig`].
+    ///
+    /// # Arguments
+    ///
+    /// * `rng_seed` — RNG seed.
+    /// * `replay_config` — [`Replay`] initializer config.
+    /// * `trader_configs` — [`Trader`] initializer configs.
     pub fn new(rng_seed: u64, replay_config: ReplayConfig, trader_configs: TraderConfigs) -> Self {
         Self {
             rng_seed,
@@ -28,6 +39,7 @@ ThreadConfig<ReplayConfig, TraderConfigs>
     }
 }
 
+/// Parallels simultaneous runs of multiple [`Kernels`](crate::kernel::Kernel).
 pub struct ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfs, RNG>
 {
     exchange_configs: ExchangeConfigs,
@@ -44,6 +56,14 @@ impl<B, E, T> ParallelBacktester<B, E, T, StdRng>
           E: IntoIterator,
           T: IntoIterator
 {
+    /// Creates a new instance of the [`ParallelBacktester`].
+    ///
+    /// # Arguments
+    ///
+    /// * `exchange_configs` — [`Exchange`] initializer config.
+    /// * `broker_configs` — [`Broker`] initializer configs.
+    /// * `per_thread_configs` — thread-unique initializer configs.
+    /// * `date_range` — tuple of start and stop [`DateTimes`](crate::types::DateTime).
     pub fn new(
         exchange_configs: E,
         broker_configs: B,
@@ -60,6 +80,7 @@ impl<B, E, T> ParallelBacktester<B, E, T, StdRng>
         }
     }
 
+    /// Sets non-default ([`StdRng`]) random number generator.
     pub fn with_rng<RNG: Rng + SeedableRng>(self) -> ParallelBacktester<B, E, T, RNG> {
         let Self {
             exchange_configs,
@@ -87,6 +108,11 @@ ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
           PerThreadConfigs: IntoIterator,
           RNG: Rng + SeedableRng
 {
+    /// Sets the number of threads in a thread pool.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_threads` — number of threads in a thread pool.
     pub fn with_num_threads(mut self, num_threads: usize) -> Self {
         self.num_threads = num_threads;
         self
@@ -114,6 +140,7 @@ ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
           SubscriptionConfigs: IntoIterator<Item=SubCfg>,
           RNG: Rng + SeedableRng
 {
+    /// Runs final simulation.
     pub fn run_simulation<T, B, E, R>(self)
         where
             T: for<'a> From<&'a TraderConfig>,

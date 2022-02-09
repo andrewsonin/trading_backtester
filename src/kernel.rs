@@ -18,10 +18,22 @@ use {
 
 mod action_processors;
 
+/// Agent action processor needed for latent agents (i.e. traders and brokers)
+/// to convert their actions into a format suitable
+/// for pushing into the [`Kernel`](crate::kernel::Kernel) event queue.
 pub trait LatentActionProcessor<Action, OuterID: Id>
 {
+    /// Kernel message queue format.
     type KerMsg: Ord;
 
+    /// Converts agent action into a format suitable for pushing into the
+    /// [`Kernel`](crate::kernel::Kernel) event queue.
+    ///
+    /// # Arguments
+    ///
+    /// * `action` — Agent action to be processed.
+    /// * `latency_generator` — Latency generator of the agent.
+    /// * `rng` — Random number generator needed for `latency_generator`.
     fn process_action(
         &mut self,
         action: Action,
@@ -29,6 +41,7 @@ pub trait LatentActionProcessor<Action, OuterID: Id>
         rng: &mut impl Rng) -> Self::KerMsg;
 }
 
+/// Runs and controls the simulation process for a single thread.
 pub struct Kernel<T, B, E, R, RNG>
     where
         T: Trader,
@@ -121,6 +134,7 @@ enum MessageContent<
     TraderToBroker { trader_id: TraderID, t2b: T2B },
 }
 
+/// Builder of the [`Kernel`].
 pub struct KernelBuilder<T, B, E, R, RNG>
     where
         T: Trader,
@@ -150,6 +164,38 @@ KernelBuilder<T, B, E, R, StdRng>
         E: Exchange<BrokerID=R::BrokerID, ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
         R: Replay,
 {
+    /// Creates a new instance of the [`KernelBuilder`].
+    ///
+    /// # Arguments
+    ///
+    /// * `exchanges` — [`exchanges`](crate::interface::exchange::Exchange)
+    /// to initialize [`Kernel`].
+    /// * `brokers` — iterable of pairs consisting of the
+    /// [`broker`](crate::interface::broker::Broker)
+    /// and the names of the exchanges it will connect to.
+    ///
+    /// Informal syntax is like the following:
+    ///
+    /// `[(Broker1, [ExchangeID_1, ExchangeID_2]), (Broker2, [...]), ...]`.
+    ///
+    /// * `traders` — iterable of pairs consisting of the
+    /// [`trader`](crate::interface::trader::Trader)
+    /// and the iterable of pairs of the broker names it will connect to
+    /// as well as the iterable
+    /// of subscription configs that could potentially define
+    /// [`trader`](crate::interface::trader::Trader)-to-[`broker`](crate::interface::broker::Broker)
+    /// interaction rules.
+    ///
+    /// Informal syntax is like the following:
+    ///
+    /// `(Trader, [(BrokerID_1, [SubCfg1, SubCfg2]),
+    /// (BrokerID_2, [SubCfg3]), (BrokerID_3, [...]), ...])`.
+    ///
+    /// For example, `SubCfg`s could be of the
+    /// [following type](crate::concrete::trader::subscriptions::SubscriptionList).
+    ///
+    /// * `replay` — [`replay`](crate::interface::replay::Replay) to initialize [`Kernel`].
+    /// * `date_range` — tuple of start and stop [`DateTimes`](crate::types::DateTime).
     pub fn new<CE, CB, SC>(exchanges: impl IntoIterator<Item=E>,
                            brokers: impl IntoIterator<Item=(B, CE)>,
                            traders: impl IntoIterator<Item=(T, CB)>,
@@ -238,6 +284,7 @@ KernelBuilder<T, B, E, R, StdRng>
         }
     }
 
+    /// Sets non-default ([`StdRng`]) random number generator.
     pub fn with_rng<RNG: Rng + SeedableRng>(self) -> KernelBuilder<T, B, E, R, RNG>
     {
         let KernelBuilder {
@@ -265,11 +312,13 @@ KernelBuilder<T, B, E, R, RNG>
         R: Replay,
         RNG: Rng + SeedableRng,
 {
+    /// Sets seed for the [`Kernel`] random number generator.
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = Some(seed);
         self
     }
 
+    /// Builds the [`Kernel`].
     pub fn build(self) -> Kernel<T, B, E, R, RNG>
     {
         let KernelBuilder {
@@ -308,7 +357,8 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         R: Replay,
         RNG: SeedableRng + Rng
 {
-    pub fn run_simulation(&mut self)
+    /// Runs final simulation.
+    pub fn run_simulation(mut self)
     {
         while let Some(message) = self.message_queue.pop()
         {

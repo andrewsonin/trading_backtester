@@ -6,7 +6,7 @@ pub mod exchange;
 pub mod input;
 /// Concrete implementors related to [`latency`](crate::interface::latency).
 pub mod latency;
-/// Concrete implementors related to [`message_protocol`](crate::interface::message_protocol).
+/// Concrete implementors related to [`message_protocol`](crate::interface::message).
 pub mod message_protocol;
 /// Order types for the [`message_protocol`].
 pub mod order;

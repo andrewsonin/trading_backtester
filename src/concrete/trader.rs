@@ -124,21 +124,21 @@ Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     type T2T = T2T;
     type T2B = T2B;
 
-    fn wakeup<KerMsg: Ord, RNG: Rng>(
+    fn wakeup<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: T2T,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {}
 
-    fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
+    fn process_broker_reply<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: B2T,
         _: BrokerID,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {}
 
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
@@ -228,23 +228,23 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     type T2T = Nothing;
     type T2B = BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>;
 
-    fn wakeup<KerMsg: Ord, RNG: Rng>(
+    fn wakeup<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         _: Self::T2T,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {
         unreachable!("Trader {} did not schedule any wakeups", self.get_name())
     }
 
-    fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
+    fn process_broker_reply<KerMsg: Ord>(
         &mut self,
         _: MessageReceiver<KerMsg>,
         _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         reply: Self::B2T,
         _: BrokerID,
-        _: &mut RNG,
+        _: &mut impl Rng,
     ) {
         if let BasicBrokerReply::ExchangeEventNotification(
             ExchangeEventNotification::ObSnapshot(snapshot)) = reply.content

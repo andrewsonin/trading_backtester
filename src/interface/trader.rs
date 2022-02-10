@@ -33,21 +33,21 @@ pub trait Trader
     type T2T: TraderToItself;
     type T2B: TraderToBroker<BrokerID=Self::BrokerID>;
 
-    fn wakeup<KerMsg: Ord, RNG: Rng>(
+    fn wakeup<KerMsg: Ord>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         action_processor: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         scheduled_action: Self::T2T,
-        rng: &mut RNG,
+        rng: &mut impl Rng,
     );
 
-    fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
+    fn process_broker_reply<KerMsg: Ord>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
         action_processor: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
         reply: Self::B2T,
         broker_id: Self::BrokerID,
-        rng: &mut RNG,
+        rng: &mut impl Rng,
     );
 
     fn upon_register_at_broker(&mut self, broker_id: Self::BrokerID);

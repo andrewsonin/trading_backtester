@@ -166,23 +166,23 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
             type T2T = #t2t;
             type T2B = #t2b;
 
-            fn wakeup<KerMsg: Ord, RNG: Rng>(
+            fn wakeup<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
                 action_processor: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
                 scheduled_action: Self::T2T,
-                rng: &mut RNG,
+                rng: &mut impl Rng,
             ) {
                 match self { #wakeup }
             }
 
-            fn process_broker_reply<KerMsg: Ord, RNG: Rng>(
+            fn process_broker_reply<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
                 action_processor: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
                 reply: Self::B2T,
                 broker_id: Self::BrokerID,
-                rng: &mut RNG,
+                rng: &mut impl Rng,
             ) {
                 match self { #process_broker_reply }
             }

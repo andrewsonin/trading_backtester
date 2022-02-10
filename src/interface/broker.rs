@@ -98,7 +98,7 @@ pub trait Broker
     /// * `action_processor` — Structure needed to preprocess the [`Broker`]'s `Self::Action`
     ///                        into a format suitable for pushing
     ///                        into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `scheduled_action` — scheduled message to be reacted to.
+    /// * `scheduled_action` — scheduled message to react to.
     /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn wakeup<KerMsg: Ord>(
         &mut self,
@@ -120,10 +120,11 @@ pub trait Broker
     /// * `action_processor` — Structure needed to preprocess the [`Broker`]'s `Self::Action`
     ///                        into a format suitable for pushing
     ///                        into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `request` — received message to be reacted to.
+    /// * `request` — received message to react to.
     /// * `trader_id` — unique id of the [`Trader`](crate::interface::trader::Trader)
-    /// who sent the message received.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    ///                 who sent the message received.
+    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel)
+    ///           random number generator.
     fn process_trader_request<KerMsg: Ord>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
@@ -134,19 +135,20 @@ pub trait Broker
     );
 
     /// Defines the [`Broker`] reaction
-    /// to an incoming request from [`Exchange`](crate::interface::exchange::Exchange).
+    /// to an incoming reply from [`Exchange`](crate::interface::exchange::Exchange).
     /// Called whenever the [`Kernel`](crate::kernel::Kernel)
     /// pops a [`Self::E2B`] message out of its event queue.
     ///
     /// # Arguments
     ///
     /// * `message_receiver` — Proxy providing pushing access
-    /// to the [`Kernel`](crate::kernel::Kernel) event queue.
+    ///                        to the [`Kernel`](crate::kernel::Kernel) event queue.
     /// * `action_processor` — Structure needed to preprocess the [`Broker`]'s `Self::Action`
-    /// into a format suitable for pushing into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `reply` — received message to be reacted to.
+    ///                        into a format suitable for pushing
+    ///                        into the [`Kernel`](crate::kernel::Kernel) event queue.
+    /// * `reply` — received message to react to.
     /// * `exchange_id` — unique id of the [`Exchange`](crate::interface::exchange::Exchange)
-    /// that sent the message received.
+    ///                   that sent the message received.
     /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn process_exchange_reply<KerMsg: Ord>(
         &mut self,
@@ -165,10 +167,11 @@ pub trait Broker
     /// # Arguments
     ///
     /// * `message_receiver` — Proxy providing pushing access
-    /// to the [`Kernel`](crate::kernel::Kernel) event queue.
+    ///                        to the [`Kernel`](crate::kernel::Kernel) event queue.
     /// * `action_processor` — Structure needed to preprocess the [`Broker`]'s `Self::Action`
-    /// into a format suitable for pushing into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `request` — received message to be reacted to.
+    ///                        into a format suitable for pushing
+    ///                        into the [`Kernel`](crate::kernel::Kernel) event queue.
+    /// * `request` — received message to react to.
     /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn process_replay_request<KerMsg: Ord>(
         &mut self,
@@ -184,7 +187,8 @@ pub trait Broker
     /// # Arguments
     ///
     /// * `exchange_id` — unique id
-    /// of the [`Exchange`](crate::interface::exchange::Exchange) to be connected to.
+    ///                   of the [`Exchange`](crate::interface::exchange::Exchange)
+    ///                   to be connected to.
     fn upon_connection_to_exchange(&mut self, exchange_id: Self::ExchangeID);
 
     /// Called whenever a [`Trader`](crate::interface::trader::Trader)

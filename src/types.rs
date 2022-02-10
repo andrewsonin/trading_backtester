@@ -21,7 +21,7 @@ pub trait Named<Name: Id> {
 
 /// Allows entities to be reported about current global time.
 pub trait TimeSync {
-    /// Allows entities to be reported about current global time.
+    /// Return reference to the `DateTime` of the current entity.
     fn current_datetime_mut(&mut self) -> &mut DateTime;
 }
 
@@ -37,7 +37,8 @@ pub trait Agent {
 /// to indicate that the given message bridge between agents is not used.
 pub struct NeverType<K>((Infallible, PhantomData<K>));
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 /// Non-parametrized type to marker code branches that will never happen.
 /// Can be used as a [message type](crate::interface::message)
 /// to indicate that the given message bridge between agents is not used.
-pub type Nothing = NeverType<()>;
+pub struct Nothing(Infallible);

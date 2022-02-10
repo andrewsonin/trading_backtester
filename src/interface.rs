@@ -2,8 +2,7 @@
 pub mod broker;
 /// Everything related to [`Exchange`](exchange::Exchange).
 pub mod exchange;
-/// Latency-related traits
-/// that are used by [`Trader`](trader::Trader) and [`Broker`](broker::Broker).
+/// Latency-related traits used by [`Trader`](trader::Trader) and [`Broker`](broker::Broker).
 pub mod latency;
 /// Everything related to [`Replay`](replay::Replay).
 pub mod replay;

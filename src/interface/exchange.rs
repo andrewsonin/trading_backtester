@@ -16,7 +16,7 @@ use {
 /// Defines [`Exchange`] reaction to anything.
 /// Supposed to be processed by `process_action` closures from the [`Exchange`] method signatures
 /// before pushing into the [`Kernel`](crate::kernel::Kernel) queue.
-#[derive(Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ExchangeAction<
     E2R: ExchangeToReplay,
     E2B: ExchangeToBroker,
@@ -31,7 +31,7 @@ pub struct ExchangeAction<
 }
 
 /// [`Exchange`] action content.
-#[derive(Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ExchangeActionKind<
     E2R: ExchangeToReplay,
     E2B: ExchangeToBroker,

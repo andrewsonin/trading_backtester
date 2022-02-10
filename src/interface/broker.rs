@@ -22,7 +22,7 @@ use {
 /// Defines [`Broker`] reaction to anything.
 /// Supposed to be processed by [`LatentActionProcessor`]
 /// before pushing into the [`Kernel`](crate::kernel::Kernel) queue.
-#[derive(Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct BrokerAction<B2R, B2E, B2T, B2B>
     where B2R: BrokerToReplay,
           B2E: BrokerToExchange,
@@ -39,7 +39,7 @@ pub struct BrokerAction<B2R, B2E, B2T, B2B>
 }
 
 /// [`Broker`] action content.
-#[derive(Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum BrokerActionKind<B2R, B2E, B2T, B2B>
     where B2R: BrokerToReplay,
           B2E: BrokerToExchange,

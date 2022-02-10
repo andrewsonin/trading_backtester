@@ -21,7 +21,6 @@ pub mod concrete {
     use {
         crate::{
             concrete::traded_pair::{
-                Asset,
                 Base,
                 parser::TradedPairParser,
                 settlement::concrete::SpotSettlement,
@@ -52,8 +51,8 @@ pub mod concrete {
                 |err| panic!("Cannot parse {quoted_symbol} to Symbol. Error: {err:?}")
             );
             const PATTERN: &str = "base :: spot";
-            let quoted_symbol = if let PATTERN = kind.to_lowercase().as_str() {
-                Asset::Base(Base::new(quoted_symbol))
+            let quoted_asset = if let PATTERN = kind.to_lowercase().as_str() {
+                Base::new(quoted_symbol).into()
             } else {
                 panic!(
                     "Cannot parse to TradedPair<Symbol, SpotSettlement>: \"{kind}\". \
@@ -64,10 +63,10 @@ pub mod concrete {
             let base_symbol = FromStr::from_str(base_symbol).unwrap_or_else(
                 |err| panic!("Cannot parse {base_symbol} to Symbol. Error: {err:?}")
             );
-            let base_symbol = Base::new(base_symbol);
+            let base_asset = Base::new(base_symbol).into();
             TradedPair {
-                quoted_asset: quoted_symbol,
-                base_asset: base_symbol,
+                quoted_asset,
+                base_asset,
                 settlement: SpotSettlement,
             }
         }

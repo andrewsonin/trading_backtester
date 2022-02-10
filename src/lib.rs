@@ -216,8 +216,8 @@ mod tests {
     fn test_parse_yaml()
     {
         let usd_rub = TradedPair {
-            quoted_asset: Asset::Base(Base::new(SymbolName::USD)),
-            base_asset: Base::new(SymbolName::RUB),
+            quoted_asset: Base::new(SymbolName::USD).into(),
+            base_asset: Base::new(SymbolName::RUB).into(),
             settlement: SpotSettlement,
         };
 
@@ -265,8 +265,8 @@ mod tests {
     fn test_parse_yaml_in_parallel()
     {
         let usd_rub = TradedPair {
-            quoted_asset: Asset::Base(Base::new(SymbolName::USD)),
-            base_asset: Base::new(SymbolName::RUB),
+            quoted_asset: Base::new(SymbolName::USD).into(),
+            base_asset: Base::new(SymbolName::RUB).into(),
             settlement: SpotSettlement,
         };
 

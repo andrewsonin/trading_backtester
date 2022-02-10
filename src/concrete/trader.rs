@@ -23,29 +23,38 @@ use {
     std::{fs::File, io::Write, marker::PhantomData, path::Path},
 };
 
+/// Defines trader subscription
+/// to pairs (`ExchangeID`, [`TradedPair`](crate::concrete::traded_pair::TradedPair)).
 pub mod subscriptions;
 
-pub struct VoidTrader<
-    TraderID: Id,
-    BrokerID: Id,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself
-> {
+/// [`Trader`] that is doing nothing.
+pub struct VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
+{
     name: TraderID,
     current_dt: DateTime,
     phantom: PhantomData<(BrokerID, B2T, T2B, T2T)>,
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself
->
+impl<TraderID, BrokerID, B2T, T2B, T2T>
 VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
 {
+    /// Creates a new instance of the [`VoidTrader`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` — ID of the [`VoidTrader`].
     pub fn new(name: TraderID) -> Self {
         VoidTrader {
             name,
@@ -55,50 +64,50 @@ VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     }
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself
->
+impl<TraderID, BrokerID, B2T, T2B, T2T>
 TimeSync for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime { &mut self.current_dt }
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself
->
+impl<TraderID, BrokerID, B2T, T2B, T2T>
 Named<TraderID> for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
 {
     fn get_name(&self) -> TraderID { self.name }
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself
->
+impl<TraderID, BrokerID, B2T, T2B, T2T>
 Agent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
 {
     type Action = TraderAction<T2B, T2T>;
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself
->
+impl<TraderID, BrokerID, B2T, T2B, T2T>
 Latent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
 {
     type OuterID = BrokerID;
     type LatencyGenerator = ConstantLatency<BrokerID, 0, 0>;
@@ -108,14 +117,14 @@ Latent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     }
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    T2T: TraderToItself
->
+impl<TraderID, BrokerID, B2T, T2B, T2T>
 Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
 {
     type TraderID = TraderID;
     type BrokerID = BrokerID;
@@ -144,13 +153,14 @@ Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }
 
-pub struct SpreadWriter<
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
-> {
+/// [`Trader`] that writes best bid-offer to a csv-file whenever it receives OB update.
+pub struct SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+    where TraderID: Id,
+          BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
+{
     name: TraderID,
     current_dt: DateTime,
     price_step: PriceStep,
@@ -158,9 +168,21 @@ pub struct SpreadWriter<
     phantom: PhantomData<(BrokerID, ExchangeID, Symbol, Settlement)>,
 }
 
-impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+    where TraderID: Id,
+          BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
+    /// Creates a new instance of the [`SpreadWriter`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` — ID of the [`SpreadWriter`].
+    /// * `price_step` — Price quotation step.
+    /// * `file` — path to the csv-file to create.
     pub fn new(name: TraderID, price_step: impl Into<PriceStep>, file: impl AsRef<Path>) -> Self {
         let file = file.as_ref();
         let file = File::create(file).unwrap_or_else(
@@ -178,20 +200,35 @@ SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     }
 }
 
-impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 TimeSync for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+    where TraderID: Id,
+          BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime { &mut self.current_dt }
 }
 
-impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 Named<TraderID> for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+    where TraderID: Id,
+          BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     fn get_name(&self) -> TraderID { self.name }
 }
 
-impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 Agent for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+    where TraderID: Id,
+          BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     type Action = TraderAction<
         BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
@@ -199,15 +236,14 @@ Agent for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     >;
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 Latent
 for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+    where TraderID: Id,
+          BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     type OuterID = BrokerID;
     type LatencyGenerator = ConstantLatency<BrokerID, 0, 0>;
@@ -217,9 +253,14 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     }
 }
 
-impl<TraderID: Id, BrokerID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 Trader
 for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+    where TraderID: Id,
+          BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     type TraderID = TraderID;
     type BrokerID = BrokerID;
@@ -278,6 +319,8 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }
 
+/// [`VoidTrader`] that communicates using the default
+/// [`message_protocol`](crate::concrete::message_protocol).
 pub type BasicVoidTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement> = VoidTrader<
     TraderID, BrokerID,
     BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,

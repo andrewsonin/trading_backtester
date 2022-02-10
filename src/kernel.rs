@@ -18,7 +18,8 @@ use {
 
 mod action_processors;
 
-/// Agent action processor needed for latent agents (i.e. traders and brokers)
+/// Agent action processor needed for latent agents
+/// (i.e. [traders](crate::interface::trader) and [brokers](crate::interface::broker))
 /// to convert their actions into a format suitable
 /// for pushing into the [`Kernel`](crate::kernel::Kernel) event queue.
 pub trait LatentActionProcessor<Action, OuterID: Id>

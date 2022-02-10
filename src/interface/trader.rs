@@ -40,7 +40,7 @@ pub trait Trader
 {
     /// [`Trader`] identifier type.
     type TraderID: Id;
-    /// [`Broker`] identifier type.
+    /// [`Broker`](crate::interface::broker::Broker) identifier type.
     type BrokerID: Id;
 
     /// [`Broker`](crate::interface::broker::Broker)-to-[`Trader`] query format.

@@ -62,8 +62,8 @@ impl<B, E, T> ParallelBacktester<B, E, T, StdRng>
     ///
     /// * `exchange_configs` — [`Exchange`] initializer config.
     /// * `broker_configs` — [`Broker`] initializer configs.
-    /// * `per_thread_configs` — thread-unique initializer configs.
-    /// * `date_range` — tuple of start and stop [`DateTimes`](crate::types::DateTime).
+    /// * `per_thread_configs` — Thread-unique initializer configs.
+    /// * `date_range` — Tuple of start and stop [`DateTimes`](crate::types::DateTime).
     pub fn new(
         exchange_configs: E,
         broker_configs: B,
@@ -112,7 +112,7 @@ ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
     ///
     /// # Arguments
     ///
-    /// * `num_threads` — number of threads in a thread pool.
+    /// * `num_threads` — Number of threads in a thread pool.
     pub fn with_num_threads(mut self, num_threads: usize) -> Self {
         self.num_threads = num_threads;
         self

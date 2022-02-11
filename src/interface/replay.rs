@@ -60,8 +60,8 @@ pub trait Replay
     ///
     /// # Arguments
     ///
-    /// * `scheduled_action` — scheduled message to react to.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `scheduled_action` — Scheduled message to react to.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn wakeup(&mut self, scheduled_action: Self::R2R, rng: &mut impl Rng);
 
     /// Defines the [`Replay`] reaction
@@ -71,10 +71,10 @@ pub trait Replay
     ///
     /// # Arguments
     ///
-    /// * `reply` — received message to react to.
-    /// * `exchange_id` — unique id of the [`Exchange`](crate::interface::exchange::Exchange)
+    /// * `reply` — Received message to react to.
+    /// * `exchange_id` — Unique id of the [`Exchange`](crate::interface::exchange::Exchange)
     ///                   that sent the message received.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn handle_exchange_reply(
         &mut self,
         reply: Self::E2R,
@@ -89,10 +89,10 @@ pub trait Replay
     ///
     /// # Arguments
     ///
-    /// * `reply` — received message to react to.
-    /// * `broker_id` — unique id of the [`Broker`](crate::interface::broker::Broker)
+    /// * `reply` — Received message to react to.
+    /// * `broker_id` — Unique id of the [`Broker`](crate::interface::broker::Broker)
     ///                 that sent the message received.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn handle_broker_reply(
         &mut self,
         reply: Self::B2R,

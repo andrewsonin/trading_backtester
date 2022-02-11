@@ -42,8 +42,7 @@ macro_rules! enum_def {
         $name:ident $(     < $(   $type:tt $( :   $bound:tt $(+   $other_bounds:tt )* )? ),+ >)?
                     $( where $( $w_type:tt $( : $w_bound:path )? ),+ )?
         {
-            $( $(#[$inner:ident $($args:tt)*])* $var_name:ident $(< $( $var_type:path ),+ >)?),+
-            $(,)?
+            $( $(#[$inner_meta:meta])* $var_name:ident $(< $( $var_type:path ),+ >)?),+ $(,)?
         }
     ) => {
         $(#[$meta])*
@@ -51,7 +50,7 @@ macro_rules! enum_def {
         enum $name $(     < $(   $type $( :   $bound $(+   $other_bounds )* )? ),+ >)?
                    $( where $( $w_type $( : $w_bound )? ),+ )?
         {
-            $( $(#[$inner $($args)*])* $var_name ($var_name $(< $( $var_type ),+ >)?) ),+
+            $( $(#[$inner_meta])* $var_name ($var_name $(< $( $var_type ),+ >)?) ),+
         }
     }
 }

@@ -1,12 +1,12 @@
-/// Everything related to [`Broker`](broker::Broker).
+/// Everything related to the [`Broker`](broker::Broker).
 pub mod broker;
-/// Everything related to [`Exchange`](exchange::Exchange).
+/// Everything related to the [`Exchange`](exchange::Exchange).
 pub mod exchange;
 /// Latency-related traits used by [`Trader`](trader::Trader) and [`Broker`](broker::Broker).
 pub mod latency;
-/// Everything related to [`Replay`](replay::Replay).
+/// Everything related to the [`Replay`](replay::Replay).
 pub mod replay;
-/// Everything related to [`Trader`](trader::Trader).
+/// Everything related to the [`Trader`](trader::Trader).
 pub mod trader;
 /// Inter-agent message protocol traits.
 pub mod message;

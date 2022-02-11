@@ -34,7 +34,7 @@ pub trait LatencyGenerator
     ///
     /// * `outer_id` — ID of the anchor agent against which the latent delay is sampled.
     /// * `event_dt` — [`DateTime`] at which the message was sent.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn outgoing_latency(
         &mut self,
         outer_id: Self::OuterID,
@@ -52,7 +52,7 @@ pub trait LatencyGenerator
     ///
     /// * `outer_id` — ID of the anchor agent against which the latent delay is sampled.
     /// * `event_dt` — [`DateTime`] at which the message was sent.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn incoming_latency(
         &mut self,
         outer_id: Self::OuterID,

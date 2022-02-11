@@ -17,10 +17,10 @@ pub mod settlement;
 pub struct TradedPair<Name: Id, Settlement: GetSettlementLag> {
     /// Quoted asset.
     pub quoted_asset: Asset<Name>,
-    /// Base asset.
-    pub base_asset: Asset<Name>,
+    /// Settlement asset.
+    pub settlement_asset: Asset<Name>,
     /// Settlement determinant.
-    pub settlement: Settlement,
+    pub settlement_determinant: Settlement,
 }
 
 enum_def! {
@@ -39,29 +39,14 @@ enum_def! {
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
 /// Base asset.
 pub struct Base<Name: Id> {
-    /// Unique ID of the [`Base`].
+    /// Unique ID of the `Base`.
     pub symbol: Name,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
 /// Futures contract.
 pub struct Futures<Name: Id> {
-    /// Unique ID of the [`Futures`].
-    pub symbol: Name,
-    /// Underlying symbol.
-    pub underlying_symbol: Name,
-    /// Settlement symbol.
-    pub settlement_symbol: Name,
-    /// Maturity [`DateTime`].
-    pub maturity: DateTime,
-    /// Strike [`Price`].
-    pub strike: Price,
-}
-
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
-/// Option contract.
-pub struct OptionContract<Name: Id> {
-    /// Unique ID of the [`OptionContract`].
+    /// Unique ID of the `Futures`.
     pub symbol: Name,
     /// Underlying symbol.
     pub underlying_symbol: Name,
@@ -69,9 +54,24 @@ pub struct OptionContract<Name: Id> {
     pub settlement_symbol: Name,
     /// Maturity datetime.
     pub maturity: DateTime,
-    /// Strike [`Price`].
+    /// Strike price.
     pub strike: Price,
-    /// Kind of [`OptionContract`].
+}
+
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
+/// Option contract.
+pub struct OptionContract<Name: Id> {
+    /// Unique ID of the `OptionContract`.
+    pub symbol: Name,
+    /// Underlying symbol.
+    pub underlying_symbol: Name,
+    /// Settlement symbol.
+    pub settlement_symbol: Name,
+    /// Maturity datetime.
+    pub maturity: DateTime,
+    /// Strike price.
+    pub strike: Price,
+    /// Kind of `OptionContract`.
     pub kind: OptionKind,
 }
 
@@ -85,26 +85,26 @@ pub enum OptionKind {
 }
 
 impl<Name: Id> Base<Name> {
-    /// Creates a new instance of [`Base`].
+    /// Creates a new instance of the `Base`.
     ///
     /// # Arguments
     ///
-    /// * `symbol` — Unique ID of the [`Base`].
+    /// * `symbol` — Unique ID of the `Base`.
     pub fn new(symbol: Name) -> Self {
         Self { symbol }
     }
 }
 
 impl<Name: Id> Futures<Name> {
-    /// Creates a new instance of [`Futures`].
+    /// Creates a new instance of the `Futures`.
     ///
     /// # Arguments
     ///
-    /// * `symbol` — unique ID of the [`Futures`].
+    /// * `symbol` — Unique ID of the `Futures`.
     /// * `underlying_symbol` — Underlying symbol.
     /// * `settlement_symbol` — Settlement symbol.
     /// * `maturity` — Maturity datetime.
-    /// * `strike` — Strike [`Price`].
+    /// * `strike` — Strike price.
     pub fn new(
         symbol: Name,
         underlying_symbol: Name,
@@ -117,16 +117,16 @@ impl<Name: Id> Futures<Name> {
 }
 
 impl<Name: Id> OptionContract<Name> {
-    /// Creates a new instance of [`OptionContract`].
+    /// Creates a new instance of the `OptionContract`.
     ///
     /// # Arguments
     ///
-    /// * `symbol` — unique ID of the [`OptionContract`].
+    /// * `symbol` — Unique ID of the `OptionContract`.
     /// * `underlying_symbol` — Underlying symbol.
     /// * `settlement_symbol` — Settlement symbol.
     /// * `maturity` — Maturity datetime.
-    /// * `strike` — Strike [`Price`].
-    /// * `kind` — Kind of [`OptionContract`].
+    /// * `strike` — Strike price.
+    /// * `kind` — Kind of `OptionContract`.
     pub fn new(
         symbol: Name,
         underlying_symbol: Name,

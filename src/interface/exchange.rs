@@ -75,11 +75,11 @@ pub trait Exchange
     ///
     /// * `message_receiver` — Proxy providing pushing access
     ///                        to the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `process_action` — closure needed to preprocess the [`Exchange`]'s `Self::Action`
+    /// * `process_action` — Closure needed to preprocess the [`Exchange`]'s `Self::Action`
     ///                      into a format suitable for pushing
     ///                      into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `scheduled_action` — scheduled message to react to.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `scheduled_action` — Scheduled message to react to.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn wakeup<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
@@ -97,11 +97,11 @@ pub trait Exchange
     ///
     /// * `message_receiver` — Proxy providing pushing access
     ///                        to the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `process_action` — closure needed to preprocess the [`Exchange`]'s `Self::Action`
+    /// * `process_action` — Closure needed to preprocess the [`Exchange`]'s `Self::Action`
     ///                      into a format suitable for pushing
     ///                      into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `request` — received message to react to.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `request` — Received message to react to.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn process_broker_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
@@ -120,11 +120,11 @@ pub trait Exchange
     ///
     /// * `message_receiver` — Proxy providing pushing access
     ///                        to the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `process_action` — closure needed to preprocess the [`Exchange`]'s `Self::Action`
+    /// * `process_action` — Closure needed to preprocess the [`Exchange`]'s `Self::Action`
     ///                      into a format suitable for pushing
     ///                      into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `request` — received message to react to.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `request` — Received message to react to.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn process_replay_request<KerMsg: Ord, RNG: Rng>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
@@ -138,6 +138,6 @@ pub trait Exchange
     ///
     /// # Arguments
     ///
-    /// * `broker_id` — unique id of the [`Broker`](crate::interface::broker::Broker) to connect.
+    /// * `broker_id` — Unique id of the [`Broker`](crate::interface::broker::Broker) to connect.
     fn connect_broker(&mut self, broker_id: Self::BrokerID);
 }

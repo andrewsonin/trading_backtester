@@ -171,7 +171,7 @@ KernelBuilder<T, B, E, R, StdRng>
     ///
     /// * `exchanges` — [`exchanges`](crate::interface::exchange::Exchange)
     /// to initialize [`Kernel`].
-    /// * `brokers` — iterable of pairs consisting of the
+    /// * `brokers` — Iterable of pairs consisting of the
     /// [`broker`](crate::interface::broker::Broker)
     /// and the names of the exchanges it will connect to.
     ///
@@ -179,7 +179,7 @@ KernelBuilder<T, B, E, R, StdRng>
     ///
     /// `[(Broker1, [ExchangeID_1, ExchangeID_2]), (Broker2, [...]), ...]`.
     ///
-    /// * `traders` — iterable of pairs consisting of the
+    /// * `traders` — Iterable of pairs consisting of the
     /// [`trader`](crate::interface::trader::Trader)
     /// and the iterable of pairs of the broker names it will connect to
     /// as well as the iterable
@@ -196,7 +196,7 @@ KernelBuilder<T, B, E, R, StdRng>
     /// [following type](crate::concrete::trader::subscriptions::SubscriptionList).
     ///
     /// * `replay` — [`replay`](crate::interface::replay::Replay) to initialize [`Kernel`].
-    /// * `date_range` — tuple of start and stop [`DateTimes`](crate::types::DateTime).
+    /// * `date_range` — Tuple of start and stop [`DateTimes`](crate::types::DateTime).
     pub fn new<CE, CB, SC>(exchanges: impl IntoIterator<Item=E>,
                            brokers: impl IntoIterator<Item=(B, CE)>,
                            traders: impl IntoIterator<Item=(T, CB)>,

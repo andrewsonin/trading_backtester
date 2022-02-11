@@ -44,11 +44,24 @@ use {
     },
 };
 
-pub trait GetNextObSnapshotDelay<
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
-> {
+/// Trait for OrderBook snapshot broadcasting schedulers.
+pub trait GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>
+    where ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
+{
+    /// Returns an optional delay in nanoseconds
+    /// between successive OB-broadcast events,
+    /// as well as the maximum number of order book levels to broadcast.
+    ///
+    /// # Arguments
+    ///
+    /// * `exchange_id` — Unique identifier
+    ///                   of the the [`Exchange`](crate::interface::exchange::Exchange)
+    ///                   for which the broadcast event is planned.
+    /// * `traded_pair` — Traded pair to broadcast OB snapshot for.
+    /// * `rng` — random number generator.
+    /// * `current_dt` — current DateTime.
     fn get_ob_snapshot_delay(
         &mut self,
         exchange_id: ExchangeID,
@@ -57,13 +70,14 @@ pub trait GetNextObSnapshotDelay<
         current_dt: DateTime) -> Option<(NonZeroU64, usize)>;
 }
 
-pub struct OneTickReplay<
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-    Settlement: GetSettlementLag
-> {
+/// Reads and processes OneTick csv-files for multiple traded pairs.
+pub struct OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+          Settlement: GetSettlementLag
+{
     current_dt: DateTime,
     traded_pair_readers: Vec<OneTickTradedPairReader<ExchangeID, Symbol, Settlement>>,
     action_queue: LessElementBinaryHeap<
@@ -82,11 +96,10 @@ pub struct OneTickReplay<
     next_order_id: OrderID,
 
     ob_snapshot_delay_scheduler: ObSnapshotDelay,
-
-    phantom: PhantomData<BrokerID>,
 }
 
 #[derive(Copy, Clone)]
+/// Exchange session lifetime.
 pub struct ExchangeSession<ExchangeID: Id> {
     pub exchange_id: ExchangeID,
     pub open_dt: DateTime,
@@ -94,10 +107,11 @@ pub struct ExchangeSession<ExchangeID: Id> {
 }
 
 #[derive(Copy, Clone)]
-pub struct TradedPairLifetime<
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag>
+/// Traded pair lifetime.
+pub struct TradedPairLifetime<ExchangeID, Symbol, Settlement>
+    where ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     pub exchange_id: ExchangeID,
     pub traded_pair: TradedPair<Symbol, Settlement>,
@@ -106,15 +120,23 @@ pub struct TradedPairLifetime<
     pub stop_dt: Option<DateTime>,
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-    Settlement: GetSettlementLag
->
+impl<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+          Settlement: GetSettlementLag
 {
+    /// Creates a new instance of the `OneTickReplay`.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_dt` — Starting DateTime.
+    /// * `traded_pair_readers` — Traded pair readers.
+    /// * `exchange_open_close_events` — Exchange session lifetimes.
+    /// * `traded_pair_creation_events` — Traded pair session lifetimes.
+    /// * `ob_snapshot_delay_scheduler` — OB-snapshot delay scheduler.
     pub fn new<TPR, EOC, TPC>(
         start_dt: DateTime,
         traded_pair_readers: TPR,
@@ -230,33 +252,32 @@ OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             ob_snapshot_delay_scheduler,
             active_traded_pairs: Default::default(),
             next_order_id,
-            phantom: Default::default(),
         }
     }
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-    Settlement: GetSettlementLag
->
-TimeSync for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+impl<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+TimeSync
+for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+          Settlement: GetSettlementLag
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime {
         &mut self.current_dt
     }
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-    Settlement: GetSettlementLag
->
-Iterator for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+impl<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+Iterator
+for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+          Settlement: GetSettlementLag
 {
     type Item = ReplayAction<
         Nothing,
@@ -283,15 +304,14 @@ Iterator for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settle
     }
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-    Settlement: GetSettlementLag
->
+impl<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 Replay
 for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+          Settlement: GetSettlementLag
 {
     type ExchangeID = ExchangeID;
     type BrokerID = BrokerID;
@@ -439,30 +459,31 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
     }
 }
 
-pub struct VoidReplay<
-    BrokerID: Id,
-    ExchangeID: Id,
-    E2R: ExchangeToReplay,
-    B2R: BrokerToReplay,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    R2B: ReplayToBroker<BrokerID=BrokerID>
-> {
+/// [`Replay`] that is doing nothing.
+pub struct VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          E2R: ExchangeToReplay,
+          B2R: BrokerToReplay,
+          R2R: ReplayToItself,
+          R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+          R2B: ReplayToBroker<BrokerID=BrokerID>
+{
     current_dt: DateTime,
     phantom: PhantomData<(ExchangeID, BrokerID, E2R, B2R, R2R, R2E, R2B)>,
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    E2R: ExchangeToReplay,
-    B2R: BrokerToReplay,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    R2B: ReplayToBroker<BrokerID=BrokerID>
->
+impl<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
 VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          E2R: ExchangeToReplay,
+          B2R: BrokerToReplay,
+          R2R: ReplayToItself,
+          R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+          R2B: ReplayToBroker<BrokerID=BrokerID>
 {
+    /// Creates a new instance of the `VoidReplay`.
     pub fn new() -> Self {
         Self {
             current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
@@ -471,32 +492,30 @@ VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
     }
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    E2R: ExchangeToReplay,
-    B2R: BrokerToReplay,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    R2B: ReplayToBroker<BrokerID=BrokerID>
->
+impl<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
 TimeSync for VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          E2R: ExchangeToReplay,
+          B2R: BrokerToReplay,
+          R2R: ReplayToItself,
+          R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+          R2B: ReplayToBroker<BrokerID=BrokerID>
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime {
         &mut self.current_dt
     }
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    E2R: ExchangeToReplay,
-    B2R: BrokerToReplay,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    R2B: ReplayToBroker<BrokerID=BrokerID>
->
+impl<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
 Iterator for VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          E2R: ExchangeToReplay,
+          B2R: BrokerToReplay,
+          R2R: ReplayToItself,
+          R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+          R2B: ReplayToBroker<BrokerID=BrokerID>
 {
     type Item = ReplayAction<R2R, R2E, R2B>;
 
@@ -505,16 +524,15 @@ Iterator for VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
     }
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    E2R: ExchangeToReplay,
-    B2R: BrokerToReplay,
-    R2R: ReplayToItself,
-    R2E: ReplayToExchange<ExchangeID=ExchangeID>,
-    R2B: ReplayToBroker<BrokerID=BrokerID>
->
+impl<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
 Replay for VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          E2R: ExchangeToReplay,
+          B2R: BrokerToReplay,
+          R2R: ReplayToItself,
+          R2E: ReplayToExchange<ExchangeID=ExchangeID>,
+          R2B: ReplayToBroker<BrokerID=BrokerID>
 {
     type ExchangeID = ExchangeID;
     type BrokerID = BrokerID;
@@ -548,6 +566,8 @@ Replay for VoidReplay<BrokerID, ExchangeID, E2R, B2R, R2R, R2E, R2B>
     {}
 }
 
+/// [`VoidReplay`] that communicates using the default
+/// [`message_protocol`](crate::concrete::message_protocol).
 pub type BasicVoidReplay<BrokerID, ExchangeID, Symbol, Settlement> = VoidReplay<
     BrokerID,
     ExchangeID,

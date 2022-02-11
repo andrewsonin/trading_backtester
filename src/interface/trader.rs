@@ -61,8 +61,8 @@ pub trait Trader
     /// * `action_processor` — Structure needed to preprocess the [`Trader`]'s `Self::Action`
     ///                        into a format suitable for pushing
     ///                        into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `scheduled_action` — scheduled message to react to.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
+    /// * `scheduled_action` — Scheduled message to react to.
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel) random number generator.
     fn wakeup<KerMsg: Ord>(
         &mut self,
         message_receiver: MessageReceiver<KerMsg>,
@@ -83,10 +83,10 @@ pub trait Trader
     /// * `action_processor` — Structure needed to preprocess the [`Trader`]'s `Self::Action`
     ///                        into a format suitable for pushing
     ///                        into the [`Kernel`](crate::kernel::Kernel) event queue.
-    /// * `reply` — received message to react to.
-    /// * `broker_id` — unique id of the [`Broker`](crate::interface::broker::Broker)
+    /// * `reply` — Received message to react to.
+    /// * `broker_id` — Unique id of the [`Broker`](crate::interface::broker::Broker)
     ///                 who sent the message received.
-    /// * `rng` — thread-unique [`Kernel`](crate::kernel::Kernel)
+    /// * `rng` — Thread-unique [`Kernel`](crate::kernel::Kernel)
     ///           random number generator.
     fn process_broker_reply<KerMsg: Ord>(
         &mut self,
@@ -101,7 +101,7 @@ pub trait Trader
     ///
     /// # Arguments
     ///
-    /// * `broker_id` — unique id of the [`Broker`](crate::interface::broker::Broker)
+    /// * `broker_id` — Unique id of the [`Broker`](crate::interface::broker::Broker)
     ///                 to register at.
     fn upon_register_at_broker(&mut self, broker_id: Self::BrokerID);
 }

@@ -66,8 +66,8 @@ pub mod concrete {
             let base_asset = Base::new(base_symbol).into();
             TradedPair {
                 quoted_asset,
-                base_asset,
-                settlement: SpotSettlement,
+                settlement_asset: base_asset,
+                settlement_determinant: SpotSettlement,
             }
         }
     }

@@ -217,8 +217,8 @@ mod tests {
     {
         let usd_rub = TradedPair {
             quoted_asset: Base::new(SymbolName::USD).into(),
-            base_asset: Base::new(SymbolName::RUB).into(),
-            settlement: SpotSettlement,
+            settlement_asset: Base::new(SymbolName::RUB).into(),
+            settlement_determinant: SpotSettlement,
         };
 
         let test_files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
@@ -266,8 +266,8 @@ mod tests {
     {
         let usd_rub = TradedPair {
             quoted_asset: Base::new(SymbolName::USD).into(),
-            base_asset: Base::new(SymbolName::RUB).into(),
-            settlement: SpotSettlement,
+            settlement_asset: Base::new(SymbolName::RUB).into(),
+            settlement_determinant: SpotSettlement,
         };
 
         let test_files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");

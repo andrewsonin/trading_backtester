@@ -50,11 +50,11 @@ VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
         T2B: TraderToBroker<BrokerID=BrokerID>,
         T2T: TraderToItself
 {
-    /// Creates a new instance of the [`VoidTrader`].
+    /// Creates a new instance of the `VoidTrader`.
     ///
     /// # Arguments
     ///
-    /// * `name` — ID of the [`VoidTrader`].
+    /// * `name` — ID of the `VoidTrader`.
     pub fn new(name: TraderID) -> Self {
         VoidTrader {
             name,
@@ -176,13 +176,13 @@ SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
           Symbol: Id,
           Settlement: GetSettlementLag
 {
-    /// Creates a new instance of the [`SpreadWriter`].
+    /// Creates a new instance of the `SpreadWriter`.
     ///
     /// # Arguments
     ///
-    /// * `name` — ID of the [`SpreadWriter`].
+    /// * `name` — ID of the `SpreadWriter`.
     /// * `price_step` — Price quotation step.
-    /// * `file` — path to the csv-file to create.
+    /// * `file` — Path to the csv-file to create.
     pub fn new(name: TraderID, price_step: impl Into<PriceStep>, file: impl AsRef<Path>) -> Self {
         let file = file.as_ref();
         let file = File::create(file).unwrap_or_else(

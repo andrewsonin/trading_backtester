@@ -11,33 +11,55 @@ use {
 mod tests;
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
+/// [`OrderBook`] internal limit order representation.
 pub struct LimitOrder {
+    /// Order unique identifier.
     pub id: OrderID,
+    /// Order remaining size.
     pub size: Size,
+    /// Indicates whether the order is dummy.
+    /// If the order is dummy,
+    /// it does not affect the size of the opposite orders with which it is executed.
     pub is_dummy: bool,
+    /// Order submission datetime.
     pub dt: DateTime,
 }
 
+/// Order book that only supports simple limit and market orders.
 pub struct OrderBook {
+    /// Bid levels.
     bids: VecDeque<VecDeque<LimitOrder>>,
+    /// Ask levels.
     asks: VecDeque<VecDeque<LimitOrder>>,
+    /// Best bid price.
     best_bid: Price,
+    /// Best ask price.
     best_ask: Price,
+    /// Map [OrderId -> (Price, Whether it is bid)]
     id_to_price_and_side: HashMap<OrderID, (Price, bool)>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
+/// Order book execution event.
 pub struct OrderBookEvent {
+    /// Size of the diff.
     pub size: Size,
+    /// Price of the diff.
     pub price: Price,
+    /// Order book event kind.
     pub kind: OrderBookEventKind,
 }
 
 #[derive(Debug, Eq, PartialEq)]
+/// Order book event.
 pub enum OrderBookEventKind {
+    /// New order executed.
     NewOrderExecuted,
+    /// New order partially executed for the given price.
     NewOrderPartiallyExecuted,
+    /// Old limit order fully executed.
     OldOrderExecuted(OrderID),
+    /// Old limit order partially executed.
     OldOrderPartiallyExecuted(OrderID),
 }
 
@@ -201,6 +223,7 @@ mod order_book_logic_macros {
 
 impl OrderBook {
     #[inline]
+    /// Creates a new instance of the `OrderBook`.
     pub fn new() -> Self {
         OrderBook {
             bids: Default::default(),
@@ -212,6 +235,7 @@ impl OrderBook {
     }
 
     #[inline]
+    /// Clears the `OrderBook`.
     pub fn clear(&mut self) {
         self.best_bid = Price(0);
         self.best_ask = Price(0);
@@ -221,21 +245,27 @@ impl OrderBook {
     }
 
     #[inline]
+    /// Yields all IDs of the active limit orders.
     pub fn get_all_ids(&self) -> impl IntoIterator<Item=OrderID> + '_ {
-        let get_filter_map_closure = || |order: &LimitOrder| {
+        let get_order_ids = |order: &LimitOrder| {
             if order.size != Size(0) { Some(order.id) } else { None }
         };
         self.asks.iter()
-            .map(move |level| level.iter().filter_map(get_filter_map_closure()))
+            .map(move |level| level.iter().filter_map(get_order_ids))
             .flatten()
             .chain(
-                self.bids.iter().map(
-                    move |level| level.iter().filter_map(get_filter_map_closure())
-                ).flatten()
+                self.bids.iter()
+                    .map(move |level| level.iter().filter_map(get_order_ids))
+                    .flatten()
             )
     }
 
     #[inline]
+    /// Cancels limit order, returning the cancelled limit order meta-information if successful.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — Order ID to cancel.
     pub fn cancel_limit_order(&mut self, id: OrderID) -> Option<(LimitOrder, Direction, Price)>
     {
         let (price, buy) = if let Occupied(e) = self.id_to_price_and_side.entry(id) {
@@ -272,6 +302,19 @@ impl OrderBook {
     }
 
     #[inline]
+    /// Inserts limit order.
+    ///
+    /// # Parameters
+    ///
+    /// * `DUMMY` — Whether the order is dummy.
+    /// * `BUY` — Whether the order is bid.
+    ///
+    /// # Arguments
+    ///
+    /// * `dt` — Submission datetime.
+    /// * `id` — ID of the order to insert.
+    /// * `price` — Order price.
+    /// * `size` — Order size.
     pub fn insert_limit_order<const DUMMY: bool, const BUY: bool>(
         &mut self,
         dt: DateTime,
@@ -383,6 +426,15 @@ impl OrderBook {
     }
 
     #[inline]
+    /// Inserts market order.
+    ///
+    /// # Parameters
+    /// * `DUMMY` — Whether the order is dummy.
+    /// * `BUY` — Whether the order is bid.
+    ///
+    /// # Arguments
+    ///
+    /// * `size` — Order size.
     pub fn insert_market_order<const DUMMY: bool, const BUY: bool>(
         &mut self,
         mut size: Size) -> Vec<OrderBookEvent>
@@ -425,6 +477,15 @@ impl OrderBook {
     }
 
     #[inline]
+    /// Gets the current state of the order book side.
+    ///
+    /// # Parameters
+    /// * `UPPER` — Whether the side is asks.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_levels` — Maximum number of non-empty price levels to get.
+    ///                  If zero, the number of levels is considered unlimited.
     pub fn get_ob_side<const UPPER: bool>(
         &self,
         max_levels: usize) -> Vec<(Price, Vec<(Size, DateTime)>)>
@@ -468,6 +529,12 @@ impl OrderBook {
     }
 
     #[inline]
+    /// Gets the current state of the order book.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_levels` — Maximum number of non-empty price levels per side to get.
+    ///                  If zero, full order book state is returned.
     pub fn get_ob_state(&self, max_levels: usize) -> ObState {
         ObState {
             bids: self.get_ob_side::<false>(max_levels),

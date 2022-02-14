@@ -67,7 +67,7 @@ pub enum OrderBookEventKind {
 mod order_book_logic_macros {
     macro_rules! match_dummy_with_level {
         (
-            $reports              : ident,
+            $callback             : ident,
             $level                : ident,
             $size                 : ident,
             $size_before_matching : ident,
@@ -78,14 +78,14 @@ mod order_book_logic_macros {
                 if $size > order.size {
                     $size -= order.size;
                 } else {
-                    $reports.push(
+                    $callback(
                         OrderBookEvent {
                             size: $size_before_matching,
                             price: $price,
                             kind: OrderBookEventKind::NewOrderExecuted,
                         }
                     );
-                    return $reports;
+                    return;
                 }
             }
         };
@@ -94,7 +94,7 @@ mod order_book_logic_macros {
         (
             $UPPER                :  expr,
             $ob                   : ident,
-            $reports              : ident,
+            $callback             : ident,
             $side                 : ident,
             $level                : ident,
             $size                 : ident,
@@ -106,45 +106,49 @@ mod order_book_logic_macros {
                     match $size.cmp(&order.size) {
                         Ordering::Less => {
                             // (OrderExecuted, OrderPartiallyExecuted)
-                            $reports.extend([
+                            $callback(
                                 OrderBookEvent {
                                     size: $size,
                                     price: $price,
                                     kind: OrderBookEventKind::OldOrderPartiallyExecuted(order.id),
-                                },
+                                }
+                            );
+                            $callback(
                                 OrderBookEvent {
                                     size: $size_before_matching,
                                     price: $price,
                                     kind: OrderBookEventKind::NewOrderExecuted,
                                 }
-                            ]);
+                            );
                             order.size -= $size;
                             shrink_level!($level);
                             shrink_side!($UPPER, $ob);
-                            return $reports;
+                            return;
                         }
                         Ordering::Equal => {
                             // (OrderExecuted, OrderExecuted)
-                            $reports.extend([
+                            $callback(
                                 OrderBookEvent {
                                     size: $size,
                                     price: $price,
                                     kind: OrderBookEventKind::OldOrderExecuted(order.id),
-                                },
+                                }
+                            );
+                            $callback(
                                 OrderBookEvent {
                                     size: $size_before_matching,
                                     price: $price,
                                     kind: OrderBookEventKind::NewOrderExecuted,
                                 }
-                            ]);
+                            );
                             order.size = Size(0);
                             shrink_level!($level);
                             shrink_side!($UPPER, $ob);
-                            return $reports;
+                            return;
                         }
                         Ordering::Greater => {
                             // (OrderPartiallyExecuted, OrderExecuted)
-                            $reports.push(
+                            $callback(
                                 OrderBookEvent {
                                     size: order.size,
                                     price: $price,
@@ -156,7 +160,7 @@ mod order_book_logic_macros {
                         }
                     }
                 } else if order.size > $size {
-                    $reports.push(
+                    $callback(
                         OrderBookEvent {
                             size: $size,
                             price: $price,
@@ -165,7 +169,7 @@ mod order_book_logic_macros {
                     );
                     order.size -= $size;
                 } else {
-                    $reports.push(
+                    $callback(
                         OrderBookEvent {
                             size: order.size,
                             price: $price,
@@ -246,7 +250,7 @@ impl OrderBook {
 
     #[inline]
     /// Yields all IDs of the active limit orders.
-    pub fn get_all_ids(&self) -> impl IntoIterator<Item=OrderID> + '_ {
+    pub fn get_all_ids(&self) -> impl Iterator<Item=OrderID> + '_ {
         let get_order_ids = |order: &LimitOrder| {
             if order.size != Size(0) { Some(order.id) } else { None }
         };
@@ -315,14 +319,15 @@ impl OrderBook {
     /// * `id` — ID of the order to insert.
     /// * `price` — Order price.
     /// * `size` — Order size.
-    pub fn insert_limit_order<const DUMMY: bool, const BUY: bool>(
+    /// * `callback` — Callback.
+    pub fn insert_limit_order<CallBack: FnMut(OrderBookEvent), const DUMMY: bool, const BUY: bool>(
         &mut self,
         dt: DateTime,
         id: OrderID,
         price: Price,
-        mut size: Size) -> Vec<OrderBookEvent>
-    {
-        let mut reports = Vec::new();
+        mut size: Size,
+        mut callback: CallBack,
+    ) {
         let opposite_side = if BUY {
             &mut self.asks
         } else {
@@ -348,16 +353,16 @@ impl OrderBook {
                 {
                     let size_before_matching = size;
                     if DUMMY {
-                        match_dummy_with_level!(reports, level, size, size_before_matching, price)
+                        match_dummy_with_level!(callback, level, size, size_before_matching, price)
                     } else {
                         match_real_with_level!(
                             BUY, self,
-                            reports, opposite_side, level, size, size_before_matching, price
+                            callback, opposite_side, level, size, size_before_matching, price
                         )
                     }
                     let exec_size = size_before_matching - size;
                     if exec_size != Size(0) {
-                        reports.push(
+                        callback(
                             OrderBookEvent {
                                 size: exec_size,
                                 price,
@@ -422,7 +427,6 @@ impl OrderBook {
                 }
             }
         }
-        reports
     }
 
     #[inline]
@@ -435,29 +439,30 @@ impl OrderBook {
     /// # Arguments
     ///
     /// * `size` — Order size.
-    pub fn insert_market_order<const DUMMY: bool, const BUY: bool>(
+    /// * `callback` — Callback.
+    pub fn insert_market_order<CallBack: FnMut(OrderBookEvent), const DUMMY: bool, const BUY: bool>(
         &mut self,
-        mut size: Size) -> Vec<OrderBookEvent>
-    {
+        mut size: Size,
+        mut callback: CallBack,
+    ) {
         let (side, mut price) = if BUY {
             (&mut self.asks, self.best_ask)
         } else {
             (&mut self.bids, self.best_bid)
         };
-        let mut reports = Vec::new();
         for level in side.iter_mut() {
             let size_before_matching = size;
             if DUMMY {
-                match_dummy_with_level!(reports, level, size, size_before_matching, price)
+                match_dummy_with_level!(callback, level, size, size_before_matching, price)
             } else {
                 match_real_with_level!(
                     BUY, self,
-                    reports, side, level, size, size_before_matching, price
+                    callback, side, level, size, size_before_matching, price
                 )
             }
             let exec_size = size_before_matching - size;
             if exec_size != Size(0) {
-                reports.push(
+                callback(
                     OrderBookEvent {
                         size: exec_size,
                         price,
@@ -473,7 +478,6 @@ impl OrderBook {
             }
         }
         shrink_side!(BUY, self);
-        reports
     }
 
     #[inline]

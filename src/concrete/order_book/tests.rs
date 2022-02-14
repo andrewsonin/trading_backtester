@@ -6,21 +6,27 @@ use crate::{
     types::{Date, DateTime},
 };
 
-fn insert_limit_order(
+fn insert_limit_order<const DUMMY: bool, const BID: bool>(
     ob: &mut OrderBook,
     dt: DateTime,
     id: OrderID,
     price: Price,
-    size: Size,
-    bid: bool,
-    dummy: bool) -> Vec<OrderBookEvent>
+    size: Size) -> Vec<OrderBookEvent>
 {
-    match (bid, dummy) {
-        (true, true) => { ob.insert_limit_order::<true, true>(dt, id, price, size) }
-        (true, false) => { ob.insert_limit_order::<false, true>(dt, id, price, size) }
-        (false, true) => { ob.insert_limit_order::<true, false>(dt, id, price, size) }
-        (false, false) => { ob.insert_limit_order::<false, false>(dt, id, price, size) }
-    }
+    let mut ob_events = Vec::new();
+    let callback = |event| ob_events.push(event);
+    ob.insert_limit_order::<_, DUMMY, BID>(dt, id, price, size, callback);
+    ob_events
+}
+
+fn insert_market_order<const DUMMY: bool, const BUY: bool>(
+    ob: &mut OrderBook,
+    size: Size) -> Vec<OrderBookEvent>
+{
+    let mut ob_events = Vec::new();
+    let callback = |event| ob_events.push(event);
+    ob.insert_market_order::<_, DUMMY, BUY>(size, callback);
+    ob_events
 }
 
 fn default_example<const TEST: bool>() -> OrderBook
@@ -36,7 +42,11 @@ fn default_example<const TEST: bool>() -> OrderBook
         (Date::from_ymd(2020, 02, 03).and_hms(12, 08, 11), OrderID(6), Price(29), Size(8), false),
         (Date::from_ymd(2020, 02, 03).and_hms(12, 08, 14), OrderID(7), Price(28), Size(3), false),
     ] {
-        let response = insert_limit_order(&mut order_book, dt, id, price, size, bid, false);
+        let response = if bid {
+            insert_limit_order::<false, true>(&mut order_book, dt, id, price, size)
+        } else {
+            insert_limit_order::<false, false>(&mut order_book, dt, id, price, size)
+        };
         if TEST {
             assert_eq!(response, [])
         }
@@ -51,7 +61,11 @@ fn default_example_bids(order_book: &mut OrderBook)
         (Date::from_ymd(2020, 02, 03).and_hms(12, 03, 05), OrderID(2), Price(26), Size(8), true),
         (Date::from_ymd(2020, 02, 03).and_hms(12, 08, 04), OrderID(3), Price(23), Size(44), true),
     ] {
-        insert_limit_order(order_book, dt, id, price, size, bid, false);
+        if bid {
+            insert_limit_order::<false, true>(order_book, dt, id, price, size)
+        } else {
+            insert_limit_order::<false, false>(order_book, dt, id, price, size)
+        };
     }
 }
 
@@ -64,7 +78,11 @@ fn default_example_asks(order_book: &mut OrderBook)
         (Date::from_ymd(2020, 02, 03).and_hms(12, 08, 11), OrderID(6), Price(29), Size(8), false),
         (Date::from_ymd(2020, 02, 03).and_hms(12, 08, 14), OrderID(7), Price(28), Size(3), false),
     ] {
-        insert_limit_order(order_book, dt, id, price, size, bid, false);
+        if bid {
+            insert_limit_order::<false, true>(order_book, dt, id, price, size)
+        } else {
+            insert_limit_order::<false, false>(order_book, dt, id, price, size)
+        };
     }
 }
 
@@ -74,7 +92,11 @@ fn default_example_dummies(order_book: &mut OrderBook)
         (Date::from_ymd(2020, 02, 04).and_hms(07, 00, 00), OrderID(8), Price(26), Size(3), true),
         (Date::from_ymd(2020, 02, 04).and_hms(08, 08, 09), OrderID(9), Price(27), Size(5535), false),
     ] {
-        insert_limit_order(order_book, dt, id, price, size, bid, true);
+        if bid {
+            insert_limit_order::<true, true>(order_book, dt, id, price, size)
+        } else {
+            insert_limit_order::<true, false>(order_book, dt, id, price, size)
+        };
     }
 }
 
@@ -229,7 +251,7 @@ fn test_insert_real_sell_market_order()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<false, false>(Size(20)),
+        insert_market_order::<false, false>(&mut order_book, Size(20)),
         [
             OrderBookEvent { size: Size(8), price: Price(26), kind: OldOrderExecuted(OrderID(2)) },
             OrderBookEvent { size: Size(3), price: Price(26), kind: OldOrderExecuted(OrderID(8)) },
@@ -285,7 +307,7 @@ fn test_insert_real_sell_market_order_overflow()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<false, false>(Size(100)),
+        insert_market_order::<false, false>(&mut order_book, Size(100)),
         [
             OrderBookEvent { size: Size(8), price: Price(26), kind: OldOrderExecuted(OrderID(2)) },
             OrderBookEvent { size: Size(3), price: Price(26), kind: OldOrderExecuted(OrderID(8)) },
@@ -334,7 +356,7 @@ fn test_insert_real_sell_market_order_no_opposite_side()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<false, false>(Size(100)),
+        insert_market_order::<false, false>(&mut order_book, Size(100)),
         [
             OrderBookEvent { size: Size(3), price: Price(26), kind: OldOrderExecuted(OrderID(8)) }
         ]
@@ -377,7 +399,7 @@ fn test_insert_real_buy_market_order()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<false, true>(Size(20)),
+        insert_market_order::<false, true>(&mut order_book, Size(20)),
         [
             OrderBookEvent { size: Size(3), price: Price(27), kind: OldOrderExecuted(OrderID(0)) },
             OrderBookEvent { size: Size(17), price: Price(27), kind: OldOrderPartiallyExecuted(OrderID(9)) },
@@ -429,7 +451,7 @@ fn test_insert_real_buy_market_order_overflow()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<false, true>(Size(1000)),
+        insert_market_order::<false, true>(&mut order_book, Size(1000)),
         [
             OrderBookEvent { size: Size(3), price: Price(27), kind: OldOrderExecuted(OrderID(0)) },
             OrderBookEvent { size: Size(997), price: Price(27), kind: OldOrderPartiallyExecuted(OrderID(9)) },
@@ -475,7 +497,7 @@ fn test_insert_real_buy_market_order_no_opposite_side()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<false, true>(Size(1000)),
+        insert_market_order::<false, true>(&mut order_book, Size(1000)),
         [
             OrderBookEvent { size: Size(1000), price: Price(27), kind: OldOrderPartiallyExecuted(OrderID(9)) }
         ]
@@ -512,7 +534,7 @@ fn test_insert_dummy_sell_market_order()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<true, false>(Size(20)),
+        insert_market_order::<true, false>(&mut order_book, Size(20)),
         [
             OrderBookEvent { size: Size(8), price: Price(26), kind: NewOrderPartiallyExecuted },
             OrderBookEvent { size: Size(12), price: Price(23), kind: NewOrderExecuted }
@@ -624,7 +646,7 @@ fn test_insert_dummy_sell_market_order_no_opposite_side()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<true, false>(Size(100)),
+        insert_market_order::<true, false>(&mut order_book, Size(100)),
         []
     );
     assert_eq!(
@@ -665,7 +687,7 @@ fn test_insert_dummy_buy_market_order()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<true, true>(Size(20)),
+        insert_market_order::<true, true>(&mut order_book, Size(20)),
         [
             OrderBookEvent { size: Size(3), price: Price(27), kind: NewOrderPartiallyExecuted },
             OrderBookEvent { size: Size(9), price: Price(28), kind: NewOrderPartiallyExecuted },
@@ -725,7 +747,7 @@ fn test_insert_dummy_buy_market_order_overflow()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<true, true>(Size(1000)),
+        insert_market_order::<true, true>(&mut order_book, Size(1000)),
         [
             OrderBookEvent { size: Size(3), price: Price(27), kind: NewOrderPartiallyExecuted },
             OrderBookEvent { size: Size(9), price: Price(28), kind: NewOrderPartiallyExecuted },
@@ -786,7 +808,7 @@ fn test_insert_dummy_buy_market_order_no_opposite_side()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_market_order::<true, true>(Size(1000)),
+        insert_market_order::<true, true>(&mut order_book, Size(1000)),
         []
     );
     assert_eq!(
@@ -821,7 +843,8 @@ fn test_insert_real_sell_limit_order_bids_middle()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_limit_order::<false, false>(
+        insert_limit_order::<false, false>(
+            &mut order_book,
             Date::from_ymd(2021, 01, 01).and_hms(01, 01, 01),
             OrderID(10), Price(24),
             Size(12),
@@ -885,7 +908,8 @@ fn test_insert_real_sell_limit_order_bid_overflow()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_limit_order::<false, false>(
+        insert_limit_order::<false, false>(
+            &mut order_book,
             Date::from_ymd(2021, 01, 01).and_hms(01, 01, 01),
             OrderID(10), Price(23),
             Size(78),
@@ -943,7 +967,8 @@ fn test_insert_dummy_sell_limit_order_bids_middle()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_limit_order::<true, false>(
+        insert_limit_order::<true, false>(
+            &mut order_book,
             Date::from_ymd(2021, 01, 01).and_hms(01, 01, 01),
             OrderID(10), Price(24),
             Size(12),
@@ -1005,7 +1030,8 @@ fn test_insert_dummy_sell_limit_order_bid_overflow()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_limit_order::<true, false>(
+        insert_limit_order::<true, false>(
+            &mut order_book,
             Date::from_ymd(2021, 01, 01).and_hms(01, 01, 01),
             OrderID(10), Price(23),
             Size(78),
@@ -1068,7 +1094,8 @@ fn test_insert_real_buy_limit_order_bids_middle()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_limit_order::<false, true>(
+        insert_limit_order::<false, true>(
+            &mut order_book,
             Date::from_ymd(2021, 01, 01).and_hms(01, 01, 01),
             OrderID(10), Price(28),
             Size(13),
@@ -1128,7 +1155,8 @@ fn test_insert_real_buy_limit_order_bid_overflow()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_limit_order::<false, true>(
+        insert_limit_order::<false, true>(
+            &mut order_book,
             Date::from_ymd(2021, 01, 01).and_hms(01, 01, 01),
             OrderID(10), Price(30),
             Size(10_000),
@@ -1182,7 +1210,8 @@ fn test_insert_dummy_buy_limit_order_bids_middle()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_limit_order::<true, true>(
+        insert_limit_order::<true, true>(
+            &mut order_book,
             Date::from_ymd(2021, 01, 01).and_hms(01, 01, 01),
             OrderID(10), Price(28),
             Size(13),
@@ -1245,7 +1274,8 @@ fn test_insert_dummy_buy_limit_order_bid_overflow()
     default_example_dummies(&mut order_book);
 
     assert_eq!(
-        order_book.insert_limit_order::<true, true>(
+        insert_limit_order::<true, true>(
+            &mut order_book,
             Date::from_ymd(2021, 01, 01).and_hms(01, 01, 01),
             OrderID(10), Price(30),
             Size(10_000),

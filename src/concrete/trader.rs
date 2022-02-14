@@ -27,132 +27,6 @@ use {
 /// to pairs (`ExchangeID`, [`TradedPair`](crate::concrete::traded_pair::TradedPair)).
 pub mod subscriptions;
 
-/// [`Trader`] that is doing nothing.
-pub struct VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
-    where
-        TraderID: Id,
-        BrokerID: Id,
-        B2T: BrokerToTrader<TraderID=TraderID>,
-        T2B: TraderToBroker<BrokerID=BrokerID>,
-        T2T: TraderToItself
-{
-    name: TraderID,
-    current_dt: DateTime,
-    phantom: PhantomData<(BrokerID, B2T, T2B, T2T)>,
-}
-
-impl<TraderID, BrokerID, B2T, T2B, T2T>
-VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
-    where
-        TraderID: Id,
-        BrokerID: Id,
-        B2T: BrokerToTrader<TraderID=TraderID>,
-        T2B: TraderToBroker<BrokerID=BrokerID>,
-        T2T: TraderToItself
-{
-    /// Creates a new instance of the `VoidTrader`.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` — ID of the `VoidTrader`.
-    pub fn new(name: TraderID) -> Self {
-        VoidTrader {
-            name,
-            current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<TraderID, BrokerID, B2T, T2B, T2T>
-TimeSync for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
-    where
-        TraderID: Id,
-        BrokerID: Id,
-        B2T: BrokerToTrader<TraderID=TraderID>,
-        T2B: TraderToBroker<BrokerID=BrokerID>,
-        T2T: TraderToItself
-{
-    fn current_datetime_mut(&mut self) -> &mut DateTime { &mut self.current_dt }
-}
-
-impl<TraderID, BrokerID, B2T, T2B, T2T>
-Named<TraderID> for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
-    where
-        TraderID: Id,
-        BrokerID: Id,
-        B2T: BrokerToTrader<TraderID=TraderID>,
-        T2B: TraderToBroker<BrokerID=BrokerID>,
-        T2T: TraderToItself
-{
-    fn get_name(&self) -> TraderID { self.name }
-}
-
-impl<TraderID, BrokerID, B2T, T2B, T2T>
-Agent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
-    where
-        TraderID: Id,
-        BrokerID: Id,
-        B2T: BrokerToTrader<TraderID=TraderID>,
-        T2B: TraderToBroker<BrokerID=BrokerID>,
-        T2T: TraderToItself
-{
-    type Action = TraderAction<T2B, T2T>;
-}
-
-impl<TraderID, BrokerID, B2T, T2B, T2T>
-Latent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
-    where
-        TraderID: Id,
-        BrokerID: Id,
-        B2T: BrokerToTrader<TraderID=TraderID>,
-        T2B: TraderToBroker<BrokerID=BrokerID>,
-        T2T: TraderToItself
-{
-    type OuterID = BrokerID;
-    type LatencyGenerator = ConstantLatency<BrokerID, 0, 0>;
-
-    fn get_latency_generator(&self) -> Self::LatencyGenerator {
-        ConstantLatency::<BrokerID, 0, 0>::new()
-    }
-}
-
-impl<TraderID, BrokerID, B2T, T2B, T2T>
-Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
-    where
-        TraderID: Id,
-        BrokerID: Id,
-        B2T: BrokerToTrader<TraderID=TraderID>,
-        T2B: TraderToBroker<BrokerID=BrokerID>,
-        T2T: TraderToItself
-{
-    type TraderID = TraderID;
-    type BrokerID = BrokerID;
-
-    type B2T = B2T;
-    type T2T = T2T;
-    type T2B = T2B;
-
-    fn wakeup<KerMsg: Ord>(
-        &mut self,
-        _: MessageReceiver<KerMsg>,
-        _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
-        _: T2T,
-        _: &mut impl Rng,
-    ) {}
-
-    fn process_broker_reply<KerMsg: Ord>(
-        &mut self,
-        _: MessageReceiver<KerMsg>,
-        _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
-        _: B2T,
-        _: BrokerID,
-        _: &mut impl Rng,
-    ) {}
-
-    fn upon_register_at_broker(&mut self, _: BrokerID) {}
-}
-
 /// [`Trader`] that writes best bid-offer to a csv-file whenever it receives OB update.
 pub struct SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     where TraderID: Id,
@@ -327,3 +201,129 @@ pub type BasicVoidTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement> = V
     BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
     Nothing
 >;
+
+/// [`Trader`] that is doing nothing.
+pub struct VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
+{
+    name: TraderID,
+    current_dt: DateTime,
+    phantom: PhantomData<(BrokerID, B2T, T2B, T2T)>,
+}
+
+impl<TraderID, BrokerID, B2T, T2B, T2T>
+VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
+{
+    /// Creates a new instance of the `VoidTrader`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` — ID of the `VoidTrader`.
+    pub fn new(name: TraderID) -> Self {
+        VoidTrader {
+            name,
+            current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
+            phantom: Default::default(),
+        }
+    }
+}
+
+impl<TraderID, BrokerID, B2T, T2B, T2T>
+TimeSync for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
+{
+    fn current_datetime_mut(&mut self) -> &mut DateTime { &mut self.current_dt }
+}
+
+impl<TraderID, BrokerID, B2T, T2B, T2T>
+Named<TraderID> for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
+{
+    fn get_name(&self) -> TraderID { self.name }
+}
+
+impl<TraderID, BrokerID, B2T, T2B, T2T>
+Agent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
+{
+    type Action = TraderAction<T2B, T2T>;
+}
+
+impl<TraderID, BrokerID, B2T, T2B, T2T>
+Latent for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
+{
+    type OuterID = BrokerID;
+    type LatencyGenerator = ConstantLatency<BrokerID, 0, 0>;
+
+    fn get_latency_generator(&self) -> Self::LatencyGenerator {
+        ConstantLatency::<BrokerID, 0, 0>::new()
+    }
+}
+
+impl<TraderID, BrokerID, B2T, T2B, T2T>
+Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
+    where
+        TraderID: Id,
+        BrokerID: Id,
+        B2T: BrokerToTrader<TraderID=TraderID>,
+        T2B: TraderToBroker<BrokerID=BrokerID>,
+        T2T: TraderToItself
+{
+    type TraderID = TraderID;
+    type BrokerID = BrokerID;
+
+    type B2T = B2T;
+    type T2T = T2T;
+    type T2B = T2B;
+
+    fn wakeup<KerMsg: Ord>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
+        _: T2T,
+        _: &mut impl Rng,
+    ) {}
+
+    fn process_broker_reply<KerMsg: Ord>(
+        &mut self,
+        _: MessageReceiver<KerMsg>,
+        _: impl LatentActionProcessor<Self::Action, Self::BrokerID, KerMsg=KerMsg>,
+        _: B2T,
+        _: BrokerID,
+        _: &mut impl Rng,
+    ) {}
+
+    fn upon_register_at_broker(&mut self, _: BrokerID) {}
+}

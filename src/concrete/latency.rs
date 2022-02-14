@@ -4,12 +4,14 @@ use {
     std::marker::PhantomData,
 };
 
+/// Constant [`LatencyGenerator`].
 pub struct ConstantLatency<OuterID: Id, const OUTGOING: u64, const INCOMING: u64>
 (PhantomData<OuterID>);
 
 impl<OuterID: Id, const OUTGOING: u64, const INCOMING: u64>
 ConstantLatency<OuterID, OUTGOING, INCOMING>
 {
+    /// Creates a new instance of the `ConstantLatency`.
     pub fn new() -> Self {
         ConstantLatency(PhantomData::default())
     }

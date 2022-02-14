@@ -6,10 +6,18 @@ use {
     std::str::FromStr,
 };
 
+/// Parsers that can interpret [`TradedPair`] from the input arguments.
 pub trait TradedPairParser<
     Symbol: Id + FromStr,
     Settlement: GetSettlementLag
 > {
+    /// Parses [`TradedPair`] from the input parameters.
+    ///
+    /// # Arguments
+    /// * `exchange_id` — Exchange ID.
+    /// * `kind` — kind of traded pair written in a string format.
+    /// * `quoted_symbol` — kind of quoted symbol written in a string format.
+    /// * `base_symbol` — kind of base symbol written in a string format.
     fn parse<ExchangeID: Id>(
         exchange_id: ExchangeID,
         kind: impl AsRef<str>,
@@ -31,6 +39,8 @@ pub mod concrete {
         std::{fmt::Debug, str::FromStr},
     };
 
+    /// Parser that can only parse spot base traded pairs written in a specific format.
+    /// See the concrete implementation of `<Self as TradedPairParser>::parse` for clarification.
     pub struct SpotBaseTradedPairParser;
 
     impl<Symbol: Id + FromStr<Err=Err>, Err: Debug>

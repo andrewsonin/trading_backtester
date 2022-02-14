@@ -55,13 +55,14 @@ use {
     std::{collections::{HashMap, HashSet}, marker::PhantomData, rc::Rc},
 };
 
-pub struct BasicBroker<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
-> {
+/// [`Broker`] that supports basic operations.
+pub struct BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
+{
     current_dt: DateTime,
     name: BrokerID,
 
@@ -86,26 +87,42 @@ pub struct BasicBroker<
     next_internal_order_id: OrderID,
 }
 
-impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 TimeSync
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime {
         &mut self.current_dt
     }
 }
 
-impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 Named<BrokerID>
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     fn get_name(&self) -> BrokerID {
         self.name
     }
 }
 
-impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
-Agent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+impl<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+Agent
+for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     type Action = BrokerAction<
         Nothing,
@@ -115,8 +132,14 @@ Agent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     >;
 }
 
-impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
-Latent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+impl<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+Latent
+for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     type OuterID = ExchangeID;
     type LatencyGenerator = ConstantLatency<ExchangeID, 0, 0>;
@@ -126,9 +149,14 @@ Latent for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     }
 }
 
-impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 Broker
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     type BrokerID = BrokerID;
     type TraderID = TraderID;
@@ -508,9 +536,19 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     }
 }
 
-impl<BrokerID: Id, TraderID: Id, ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
+    /// Creates a new instance of the `BasicBroker`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` — ID of the `BasicBroker`.
     pub fn new(name: BrokerID) -> Self {
         BasicBroker {
             current_dt: Date::from_ymd(1970, 01, 01).and_hms(0, 0, 0),
@@ -716,83 +754,83 @@ BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
     }
 }
 
-pub struct VoidBroker<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    R2B: ReplayToBroker<BrokerID=BrokerID>,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    B2R: BrokerToReplay,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    SubCfg
-> {
+/// [`Broker`] that is doing nothing.
+pub struct VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          R2B: ReplayToBroker<BrokerID=BrokerID>,
+          E2B: ExchangeToBroker<BrokerID=BrokerID>,
+          T2B: TraderToBroker<BrokerID=BrokerID>,
+          B2R: BrokerToReplay,
+          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+          B2T: BrokerToTrader<TraderID=TraderID>,
+          B2B: BrokerToItself
+{
     current_dt: DateTime,
     broker_id: BrokerID,
     phantom: PhantomData<(TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg)>,
 }
 
-impl<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    R2B: ReplayToBroker<BrokerID=BrokerID>,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    B2R: BrokerToReplay,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    SubCfg
->
+impl<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          R2B: ReplayToBroker<BrokerID=BrokerID>,
+          E2B: ExchangeToBroker<BrokerID=BrokerID>,
+          T2B: TraderToBroker<BrokerID=BrokerID>,
+          B2R: BrokerToReplay,
+          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+          B2T: BrokerToTrader<TraderID=TraderID>,
+          B2B: BrokerToItself
 {
-    pub fn new(broker_id: BrokerID) -> Self {
+    /// Creates a new instance of the `VoidBroker`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` — ID of the `VoidBroker`.
+    pub fn new(name: BrokerID) -> Self {
         Self {
             current_dt: Date::from_ymd(1970, 1, 1).and_hms(0, 0, 0),
-            broker_id,
+            broker_id: name,
             phantom: Default::default(),
         }
     }
 }
 
-impl<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    R2B: ReplayToBroker<BrokerID=BrokerID>,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    B2R: BrokerToReplay,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    SubCfg
->
-TimeSync for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+impl<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+TimeSync
+for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          R2B: ReplayToBroker<BrokerID=BrokerID>,
+          E2B: ExchangeToBroker<BrokerID=BrokerID>,
+          T2B: TraderToBroker<BrokerID=BrokerID>,
+          B2R: BrokerToReplay,
+          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+          B2T: BrokerToTrader<TraderID=TraderID>,
+          B2B: BrokerToItself
 {
     fn current_datetime_mut(&mut self) -> &mut DateTime {
         &mut self.current_dt
     }
 }
 
-impl<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    R2B: ReplayToBroker<BrokerID=BrokerID>,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    B2R: BrokerToReplay,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    SubCfg
->
+impl<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 Latent
 for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          R2B: ReplayToBroker<BrokerID=BrokerID>,
+          E2B: ExchangeToBroker<BrokerID=BrokerID>,
+          T2B: TraderToBroker<BrokerID=BrokerID>,
+          B2R: BrokerToReplay,
+          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+          B2T: BrokerToTrader<TraderID=TraderID>,
+          B2B: BrokerToItself
 {
     type OuterID = ExchangeID;
     type LatencyGenerator = ConstantLatency<ExchangeID, 0, 0>;
@@ -802,58 +840,55 @@ for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B
     }
 }
 
-impl<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    R2B: ReplayToBroker<BrokerID=BrokerID>,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    B2R: BrokerToReplay,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    SubCfg
->
+impl<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 Named<BrokerID>
 for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          R2B: ReplayToBroker<BrokerID=BrokerID>,
+          E2B: ExchangeToBroker<BrokerID=BrokerID>,
+          T2B: TraderToBroker<BrokerID=BrokerID>,
+          B2R: BrokerToReplay,
+          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+          B2T: BrokerToTrader<TraderID=TraderID>,
+          B2B: BrokerToItself
 {
     fn get_name(&self) -> BrokerID {
         self.broker_id
     }
 }
 
-impl<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    R2B: ReplayToBroker<BrokerID=BrokerID>,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    B2R: BrokerToReplay,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself, SubCfg
->
+impl<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
 Agent
-for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg> {
+for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          R2B: ReplayToBroker<BrokerID=BrokerID>,
+          E2B: ExchangeToBroker<BrokerID=BrokerID>,
+          T2B: TraderToBroker<BrokerID=BrokerID>,
+          B2R: BrokerToReplay,
+          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+          B2T: BrokerToTrader<TraderID=TraderID>,
+          B2B: BrokerToItself
+{
     type Action = BrokerAction<B2R, B2E, B2T, B2B>;
 }
 
-impl<
-    BrokerID: Id,
-    TraderID: Id,
-    ExchangeID: Id,
-    R2B: ReplayToBroker<BrokerID=BrokerID>,
-    E2B: ExchangeToBroker<BrokerID=BrokerID>,
-    T2B: TraderToBroker<BrokerID=BrokerID>,
-    B2R: BrokerToReplay,
-    B2E: BrokerToExchange<ExchangeID=ExchangeID>,
-    B2T: BrokerToTrader<TraderID=TraderID>,
-    B2B: BrokerToItself,
-    SubCfg
->
-Broker for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+impl<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+Broker
+for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B2T, B2B, SubCfg>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          R2B: ReplayToBroker<BrokerID=BrokerID>,
+          E2B: ExchangeToBroker<BrokerID=BrokerID>,
+          T2B: TraderToBroker<BrokerID=BrokerID>,
+          B2R: BrokerToReplay,
+          B2E: BrokerToExchange<ExchangeID=ExchangeID>,
+          B2T: BrokerToTrader<TraderID=TraderID>,
+          B2B: BrokerToItself
 {
     type BrokerID = BrokerID;
     type TraderID = TraderID;
@@ -909,6 +944,8 @@ Broker for VoidBroker<BrokerID, TraderID, ExchangeID, R2B, E2B, T2B, B2R, B2E, B
     fn register_trader(&mut self, _: Self::TraderID, _: impl IntoIterator<Item=Self::SubCfg>) {}
 }
 
+/// [`VoidBroker`] that communicates using the default
+/// [`message_protocol`](crate::concrete::message_protocol).
 pub type BasicVoidBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement> = VoidBroker<
     BrokerID, TraderID, ExchangeID,
     NeverType<BrokerID>,

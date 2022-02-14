@@ -1510,6 +1510,8 @@ Exchange for VoidExchange<ExchangeID, BrokerID, R2E, B2E, E2R, E2B, E2E>
     fn connect_broker(&mut self, _: Self::BrokerID) {}
 }
 
+/// [`VoidExchange`] that communicates using the default
+/// [`message_protocol`](crate::concrete::message_protocol).
 pub type BasicVoidExchange<ExchangeID, BrokerID, Symbol, Settlement> = VoidExchange<
     ExchangeID,
     BrokerID,

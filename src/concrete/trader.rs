@@ -193,15 +193,6 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }
 
-/// [`VoidTrader`] that communicates using the default
-/// [`message_protocol`](crate::concrete::message_protocol).
-pub type BasicVoidTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement> = VoidTrader<
-    TraderID, BrokerID,
-    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
-    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
-    Nothing
->;
-
 /// [`Trader`] that is doing nothing.
 pub struct VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
     where
@@ -327,3 +318,12 @@ Trader for VoidTrader<TraderID, BrokerID, B2T, T2B, T2T>
 
     fn upon_register_at_broker(&mut self, _: BrokerID) {}
 }
+
+/// [`VoidTrader`] that communicates using the default
+/// [`message_protocol`](crate::concrete::message_protocol).
+pub type BasicVoidTrader<TraderID, BrokerID, ExchangeID, Symbol, Settlement> = VoidTrader<
+    TraderID, BrokerID,
+    BasicBrokerToTrader<TraderID, ExchangeID, Symbol, Settlement>,
+    BasicTraderToBroker<BrokerID, ExchangeID, Symbol, Settlement>,
+    Nothing
+>;

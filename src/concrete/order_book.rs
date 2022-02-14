@@ -305,7 +305,6 @@ impl OrderBook {
         None
     }
 
-    #[inline]
     /// Inserts limit order.
     ///
     /// # Parameters
@@ -429,7 +428,6 @@ impl OrderBook {
         }
     }
 
-    #[inline]
     /// Inserts market order.
     ///
     /// # Parameters

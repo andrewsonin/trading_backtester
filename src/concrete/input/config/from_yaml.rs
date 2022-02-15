@@ -274,9 +274,11 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
     let parent_dir = path.parent().unwrap_or_else(
         || panic!("Cannot get parent directory of the {path:?}")
     );
-    std::env::set_current_dir(parent_dir).unwrap_or_else(
-        |err| panic!("Cannot set current working directory to {parent_dir:?}. Error: {err}")
-    );
+    if parent_dir.components().next().is_some() {
+        std::env::set_current_dir(parent_dir).unwrap_or_else(
+            |err| panic!("Cannot set current working directory to {parent_dir:?}. Error: {err}")
+        )
+    }
 
     const GET_CURRENT_SECTION: fn() -> String = || "~".into();
     expect_yaml_hashmap(yml, path, GET_CURRENT_SECTION).keys().for_each(

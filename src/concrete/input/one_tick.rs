@@ -144,7 +144,7 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         self.limit_submitted_to_internal.clear()
     }
 
-    /// Produces next [`RelayAction`] based on the history information.
+    /// Produces next [`RelayAction`](crate::interface::replay) based on the history information.
     ///
     /// # Arguments
     ///

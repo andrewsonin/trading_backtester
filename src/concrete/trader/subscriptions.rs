@@ -45,30 +45,30 @@ impl SubscriptionList {
         self
     }
     #[inline]
-    /// Subscribes to everything.
+    /// Adds subscription to everything.
     pub fn to_everything(self) -> Self {
         SubscriptionList::all()
     }
     #[inline]
-    /// Subscribes to trades.
+    /// Adds subscription to trades.
     pub fn to_trades(mut self) -> Self {
         self |= SubscriptionList::TRADES;
         self
     }
     #[inline]
-    /// Subscribes to new limit orders.
+    /// Adds subscription to new limit orders.
     pub fn to_new_limit_orders(mut self) -> Self {
         self |= SubscriptionList::NEW_LIMIT_ORDERS;
         self
     }
     #[inline]
-    /// Subscribes to cancelled limit orders.
+    /// Adds subscription to cancelled limit orders.
     pub fn to_cancelled_limit_orders(mut self) -> Self {
         self |= SubscriptionList::CANCELLED_LIMIT_ORDERS;
         self
     }
     #[inline]
-    /// Subscribes to order book snapshots.
+    /// Adds subscription to order book snapshots.
     pub fn to_ob_snapshots(mut self) -> Self {
         self |= SubscriptionList::OB_SNAPSHOTS;
         self

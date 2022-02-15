@@ -20,23 +20,34 @@ use {
 };
 
 #[derive(Clone)]
-pub struct OneTickTradedPairReaderConfig<
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
-> {
+/// OneTick traded pair reader config.
+pub struct OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>
+    where ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
+{
+    /// Exchange ID.
     pub exchange_id: ExchangeID,
+    /// Traded pair.
     pub traded_pair: TradedPair<Symbol, Settlement>,
+    /// Path to file containing paths to files with PRL-ticks.
     pub prl_files: PathBuf,
+    /// PRL-reader configuration.
     pub prl_args: OneTickTrdPrlConfig,
+    /// Path to file containing paths to files with TRD-ticks.
     pub trd_files: PathBuf,
+    /// TRD-reader configuration.
     pub trd_args: OneTickTrdPrlConfig,
+    /// File for logging errors.
     pub err_log_file: Option<PathBuf>,
 }
 
-impl<ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<ExchangeID, Symbol, Settlement>
 From<&OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>>
 for OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
+    where ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     fn from(config: &OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>) -> Self {
         OneTickTradedPairReader::new(
@@ -52,67 +63,66 @@ for OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
 }
 
 #[derive(Clone)]
-pub struct OneTickReplayConfig<
-    ExchangeID: Id,
-    Symbol: Id,
-    ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-    Settlement: GetSettlementLag
-> {
+/// Initializer-config for [`OneTickReplay`].
+pub struct OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+    where ExchangeID: Id,
+          Symbol: Id,
+          ObSnapshotDelay: GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+          Settlement: GetSettlementLag
+{
+    /// Start datetime.
     pub start_dt: DateTime,
+    /// Traded pair configs.
     pub traded_pair_configs: Vec<OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>>,
+    /// Exchange sessions.
     pub exchange_open_close_events: Vec<ExchangeSession<ExchangeID>>,
-    pub traded_pair_creation_events: Vec<TradedPairLifetime<ExchangeID, Symbol, Settlement>>,
+    /// Traded pair lifetimes.
+    pub traded_pair_lifetimes: Vec<TradedPairLifetime<ExchangeID, Symbol, Settlement>>,
+    /// OB-snapshot delay scheduler.
     pub ob_snapshot_delay_scheduler: ObSnapshotDelay,
 }
 
-impl<
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
-    Settlement: GetSettlementLag
->
+impl<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
 From<&OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>>
 for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
+    where BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          ObSnapshotDelay: Clone + GetNextObSnapshotDelay<ExchangeID, Symbol, Settlement>,
+          Settlement: GetSettlementLag
 {
     fn from(cfg: &OneTickReplayConfig<ExchangeID, Symbol, ObSnapshotDelay, Settlement>) -> Self {
         Self::new(
             cfg.start_dt,
             cfg.traded_pair_configs.iter().map(From::from),
             cfg.exchange_open_close_events.iter().cloned(),
-            cfg.traded_pair_creation_events.iter().cloned(),
+            cfg.traded_pair_lifetimes.iter().cloned(),
             cfg.ob_snapshot_delay_scheduler.clone(),
         )
     }
 }
 
-pub trait InitBasicExchange {}
-
-impl<
-    ExchangeID: Id + InitBasicExchange,
-    BrokerID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<ExchangeID, BrokerID, Symbol, Settlement>
 From<&ExchangeID>
 for BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
+    where ExchangeID: Id,
+          BrokerID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     fn from(exchange_id: &ExchangeID) -> Self {
         Self::new(*exchange_id)
     }
 }
 
-pub trait InitBasicBroker {}
-
-impl<
-    BrokerID: Id + InitBasicBroker,
-    TraderID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
->
+impl<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 From<&BrokerID>
 for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
+    where BrokerID: Id,
+          TraderID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
     fn from(broker_id: &BrokerID) -> Self {
         Self::new(*broker_id)
@@ -120,31 +130,48 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 }
 
 #[derive(Clone, Copy)]
-pub struct SpreadWriterConfig<TraderID: Id, PS: Into<PriceStep> + Copy, F: AsRef<Path>> {
+/// Initializer-config for [`SpreadWriter`].
+pub struct SpreadWriterConfig<TraderID, PS, F>
+    where TraderID: Id,
+          PS: Into<PriceStep> + Copy,
+          F: AsRef<Path>
+{
+    /// ID of the `SpreadWriter`.
     pub name: TraderID,
+    /// File to write spread into.
     pub file: F,
+    /// Quoting price step.
     pub price_step: PS,
 }
 
-impl<TraderID: Id, PS: Into<PriceStep> + Copy, F: AsRef<Path>>
+impl<TraderID, PS, F>
 SpreadWriterConfig<TraderID, PS, F>
+    where TraderID: Id,
+          PS: Into<PriceStep> + Copy,
+          F: AsRef<Path>
 {
+    /// Creates a new instance of the [`SpreadWriterConfig`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` — ID of the `SpreadWriter`.
+    /// * `file` — File to write spread into.
+    /// * `price_step` — Price quotation step.
     pub fn new(name: TraderID, file: F, price_step: PS) -> Self {
         Self { name, file, price_step }
     }
 }
 
-impl<
-    TraderID: Id,
-    BrokerID: Id,
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag,
-    PS: Into<PriceStep> + Copy,
-    F: AsRef<Path>
->
+impl<TraderID, BrokerID, ExchangeID, Symbol, Settlement, PS, F>
 From<&SpreadWriterConfig<TraderID, PS, F>>
 for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
+    where TraderID: Id,
+          BrokerID: Id,
+          ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag,
+          PS: Into<PriceStep> + Copy,
+          F: AsRef<Path>
 {
     fn from(cfg: &SpreadWriterConfig<TraderID, PS, F>) -> Self {
         Self::new(cfg.name, cfg.price_step, &cfg.file)

@@ -20,12 +20,15 @@ use {
     },
 };
 
-pub struct OneTickTradedPairReader<
-    ExchangeID: Id,
-    Symbol: Id,
-    Settlement: GetSettlementLag
-> {
+/// OneTick traded pair reader.
+pub struct OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
+    where ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
+{
+    /// Exchange ID
     pub exchange_id: ExchangeID,
+    /// Traded pair.
     pub traded_pair: TradedPair<Symbol, Settlement>,
 
     trd_reader: OneTickHistoryReader,
@@ -35,8 +38,10 @@ pub struct OneTickTradedPairReader<
     next_prl: Option<HistoryEntry>,
 
     active_limit_orders: HashMap<OrderID, (OrderID, Size)>,
+    /// Map between submitted limit order IDs and their internal IDs.
     pub limit_submitted_to_internal: HashMap<OrderID, OrderID>,
 
+    /// File for logging errors.
     pub err_log_file: Option<File>,
 }
 
@@ -57,14 +62,23 @@ pub(crate) struct HistoryEntry {
 }
 
 #[derive(Clone)]
+/// Structure containing OneTick reader configuration.
 pub struct OneTickTrdPrlConfig {
+    /// Name of the datetime column.
     pub datetime_colname: String,
+    /// Order ID colname.
     pub order_id_colname: String,
+    /// Entry price colname.
     pub price_colname: String,
+    /// Entry size colname.
     pub size_colname: String,
+    /// Entry buy_sell_flag colname.
     pub buy_sell_flag_colname: String,
+    /// Datetime format.
     pub datetime_format: String,
+    /// CSV-separator.
     pub csv_sep: char,
+    /// Price step to use.
     pub price_step: f64,
 }
 
@@ -76,9 +90,23 @@ pub(crate) struct OneTickHistoryEntryColumnIndexer {
     pub order_id_idx: usize,
 }
 
-impl<ExchangeID: Id, Symbol: Id, Settlement: GetSettlementLag>
+impl<ExchangeID, Symbol, Settlement>
 OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
+    where ExchangeID: Id,
+          Symbol: Id,
+          Settlement: GetSettlementLag
 {
+    /// Creates a new instance of the `OneTickTradedPairReader`.
+    ///
+    /// # Arguments
+    ///
+    /// * `exchange_id` — Exchange ID.
+    /// * `traded_pair` — Traded pair.
+    /// * `prl_files` — Path to file containing paths to files with PRL-ticks.
+    /// * `prl_args` — PRL-reader configuration.
+    /// * `trd_files` — Path to file containing paths to files with TRD-ticks.
+    /// * `trd_args` — TRD-reader configuration.
+    /// * `err_log_file` — File for logging errors.
     pub fn new(
         exchange_id: ExchangeID,
         traded_pair: TradedPair<Symbol, Settlement>,
@@ -110,11 +138,17 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         }
     }
 
+    /// Forgets information about recently submitted limit orders.
     pub fn clear(&mut self) {
         self.active_limit_orders.clear();
         self.limit_submitted_to_internal.clear()
     }
 
+    /// Produces next [`RelayAction`] based on the history information.
+    ///
+    /// # Arguments
+    ///
+    /// * `next_order_id` — Next ID of the new order.
     pub fn next<BrokerID: Id>(&mut self, next_order_id: &mut OrderID) -> Option<
         ReplayAction<
             Nothing,

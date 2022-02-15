@@ -155,14 +155,10 @@ mod tests {
         NYSE,
     }
 
-    impl InitBasicExchange for ExchangeName {}
-
     #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
     enum BrokerName {
         Broker1
     }
-
-    impl InitBasicBroker for BrokerName {}
 
     #[derive(derive_more::Display, Debug, Hash, Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
     enum SymbolName {

@@ -40,7 +40,8 @@ pub mod concrete {
     };
 
     /// Parser that can only parse spot base traded pairs written in a specific format.
-    /// See the concrete implementation of `<Self as TradedPairParser>::parse` for clarification.
+    /// See the concrete implementation of the `<Self as TradedPairParser>::parse`
+    /// for clarification.
     pub struct SpotBaseTradedPairParser;
 
     impl<Symbol: Id + FromStr<Err=Err>, Err: Debug>

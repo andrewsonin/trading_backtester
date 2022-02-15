@@ -42,7 +42,7 @@ mod yaml_utils
     pub fn expect_yaml_hashmap<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: impl Fn() -> String) -> &'a Hash
+        get_current_section: impl FnOnce() -> String) -> &'a Hash
     {
         match yml {
             Yaml::Hash(map) => map,
@@ -60,7 +60,7 @@ mod yaml_utils
     pub fn try_expect_yaml_hashmap<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: impl Fn() -> String) -> Option<&'a Hash>
+        get_current_section: impl FnOnce() -> String) -> Option<&'a Hash>
     {
         match yml {
             Yaml::Hash(map) => Some(map),
@@ -76,7 +76,7 @@ mod yaml_utils
     pub fn expect_yaml_array<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: impl Fn() -> String) -> &'a Array
+        get_current_section: impl FnOnce() -> String) -> &'a Array
     {
         match yml {
             Yaml::Array(arr) => arr,
@@ -94,7 +94,7 @@ mod yaml_utils
     pub fn expect_yaml_string<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: impl Fn() -> String) -> &'a String
+        get_current_section: impl FnOnce() -> String) -> &'a String
     {
         match yml {
             Yaml::String(string) => string,
@@ -111,7 +111,7 @@ mod yaml_utils
     pub fn expect_yaml_real<'a>(
         yml: &'a Yaml,
         path: &Path,
-        get_current_section: impl Fn() -> String) -> &'a String
+        get_current_section: impl FnOnce() -> String) -> &'a String
     {
         match yml {
             Yaml::Real(real) => real,
@@ -129,7 +129,7 @@ mod yaml_utils
         map: &'a Hash,
         field: &str,
         path: &Path,
-        get_current_section: impl Fn() -> String) -> &'a Yaml
+        get_current_section: impl FnOnce() -> String) -> &'a Yaml
     {
         try_read_yaml_hashmap_field(map, field).unwrap_or_else(
             || panic!(
@@ -158,7 +158,7 @@ mod yaml_utils
         fn from(s: &String) -> Self { YamlValue::String(s.to_string()) }
     }
 
-    pub fn expect_yaml_value(yml: &Yaml, get_current_section: impl Fn() -> String) -> YamlValue
+    pub fn expect_yaml_value(yml: &Yaml, get_current_section: impl FnOnce() -> String) -> YamlValue
     {
         match yml {
             Yaml::Real(real) => f64::from_str(real)
@@ -231,6 +231,14 @@ mod defaults {
     pub const CSV_SEP: &str = ",";
 }
 
+/// Parses YAML-config, generating Exchange IDs, [`OneTickReplay`] initializer configs as well as
+/// the simulation start and stop datetimes.
+///
+/// # Arguments
+///
+/// * `path` — Path to YAML-config.
+/// * `_traded_pair_parser` — Traded pair parser.
+/// * `ob_snapshot_delay_scheduler` — OB-snapshot delay scheduler to use by [`OneTickReplay`].
 pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
     path: impl AsRef<Path>,
     _traded_pair_parser: TPP,
@@ -292,10 +300,9 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
         .into_iter()
         .unzip();
 
-    let (traded_pair_readers, start_stop_events): (Vec<_>, Vec<_>) = parse_traded_pairs_section::<
-        ExchangeID, Symbol, Settlement, TPP>(yml, path, defaults)
-        .into_iter()
-        .unzip();
+    let (traded_pair_readers, start_stop_events): (Vec<_>, Vec<_>) =
+        parse_traded_pairs_section::<ExchangeID, Symbol, Settlement, TPP>(yml, path, defaults)
+            .unzip();
 
     std::env::set_current_dir(&cwd).unwrap_or_else(
         |err| panic!("Cannot set current working directory to {cwd:?}. Error: {err}")
@@ -307,7 +314,7 @@ pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
             start_dt: start,
             traded_pair_configs: traded_pair_readers,
             exchange_open_close_events: sessions.into_iter().flatten().collect(),
-            traded_pair_creation_events: start_stop_events.into_iter().flatten().collect(),
+            traded_pair_lifetimes: start_stop_events.into_iter().flatten().collect(),
             ob_snapshot_delay_scheduler,
         },
         start,
@@ -712,7 +719,7 @@ fn parse_traded_pairs_section<
 >(
     yaml: &'a Yaml,
     path: &'a Path,
-    env: Env) -> impl 'a + IntoIterator<
+    env: Env) -> impl 'a + Iterator<
     Item=(
         OneTickTradedPairReaderConfig<ExchangeID, Symbol, Settlement>,
         Vec<TradedPairLifetime<ExchangeID, Symbol, Settlement>>

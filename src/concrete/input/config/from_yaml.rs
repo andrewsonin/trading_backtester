@@ -232,13 +232,13 @@ mod defaults {
 }
 
 /// Parses YAML-config, generating Exchange IDs, [`OneTickReplay`](crate::concrete::replay)
-/// initializer configs as well as the simulation start and stop datetimes.
+/// initializer config as well as the simulation start and stop datetimes.
 ///
 /// # Arguments
 ///
 /// * `path` — Path to YAML-config.
 /// * `_traded_pair_parser` — Traded pair parser.
-/// * `ob_snapshot_delay_scheduler` — OB-snapshot delay scheduler to use by
+/// * `ob_snapshot_delay_scheduler` — OB-snapshot delay scheduler to use by the
 ///                                   [`OneTickReplay`](crate::concrete::replay).
 pub fn parse_yaml<ExchangeID, Symbol, TPP, ObSnapshotDelay, Settlement>(
     path: impl AsRef<Path>,

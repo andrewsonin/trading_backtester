@@ -1,6 +1,6 @@
 use crate::{
     concrete::{
-        order_book::{LimitOrder, OrderBook, OrderBookEvent, OrderBookEventKind::*},
+        order_book::{LimitOrder, NoSuchID, OrderBook, OrderBookEvent, OrderBookEventKind::*},
         types::{Direction::*, ObState, OrderID, Price, Size},
     },
     types::{Date, DateTime},
@@ -1340,7 +1340,7 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(7)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(7),
                 size: Size(3),
@@ -1355,12 +1355,12 @@ fn test_cancel_limit_order()
     assert_eq!(order_book.best_ask, Price(27));
     assert_eq!(
         order_book.cancel_limit_order(OrderID(7)),
-        None
+        Err(NoSuchID)
     );
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(0)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(0),
                 size: Size(3),
@@ -1375,7 +1375,7 @@ fn test_cancel_limit_order()
     assert_eq!(order_book.best_ask, Price(27));
     assert_eq!(
         order_book.cancel_limit_order(OrderID(9)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(9),
                 size: Size(5535),
@@ -1391,7 +1391,7 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(2)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(2),
                 size: Size(8),
@@ -1407,7 +1407,7 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(8)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(8),
                 size: Size(3),
@@ -1423,7 +1423,7 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(1)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(1),
                 size: Size(4),
@@ -1439,7 +1439,7 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(3)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(3),
                 size: Size(44),
@@ -1454,7 +1454,7 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(4)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(4),
                 size: Size(126),
@@ -1469,7 +1469,7 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(6)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(6),
                 size: Size(8),
@@ -1484,7 +1484,7 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(5)),
-        Some((
+        Ok((
             LimitOrder {
                 id: OrderID(5),
                 size: Size(6),
@@ -1498,11 +1498,11 @@ fn test_cancel_limit_order()
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(7)),
-        None
+        Err(NoSuchID)
     );
 
     assert_eq!(
         order_book.cancel_limit_order(OrderID(52557)),
-        None
+        Err(NoSuchID)
     );
 }

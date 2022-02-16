@@ -378,7 +378,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         ) {
             if let Some((order_book, _price_step)) = self.order_books.get_mut(&request.traded_pair)
             {
-                if let Some((limit_order, direction, price)) = order_book.cancel_limit_order(
+                if let Ok((limit_order, direction, price)) = order_book.cancel_limit_order(
                     *internal_order_id
                 ) {
                     let order_cancelled = OrderCancelled {

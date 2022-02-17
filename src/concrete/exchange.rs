@@ -93,7 +93,7 @@ pub struct BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     internal_to_submitted: HashMap<OrderID, (OrderID, Option<BrokerID>)>,
 
     next_order_id: OrderID,
-    order_books: HashMap<TradedPair<Symbol, Settlement>, (OrderBook, PriceStep)>,
+    order_books: HashMap<TradedPair<Symbol, Settlement>, (OrderBook<false>, PriceStep)>,
     is_open: bool,
 }
 
@@ -484,7 +484,8 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                         .get(&internal_order_id)
                         .unwrap_or_else(
                             || unreachable!(
-                                "Cannot find limit order with internal ID: {internal_order_id}"
+                                "Cannot find limit order with internal ID: {}",
+                                internal_order_id
                             )
                         );
                     let order_cancelled = OrderCancelled {

@@ -291,7 +291,7 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
             if reader_idx != -1 {
                 if let Some(next_action) = self.traded_pair_readers
                     .get_mut(reader_idx as usize)
-                    .unwrap_or_else(|| unreachable!("Index {reader_idx} is out of bounds"))
+                    .unwrap_or_else(|| unreachable!("Index {} is out of bounds", reader_idx))
                     .next(&mut self.next_order_id)
                 {
                     self.action_queue.push((next_action, reader_idx))
@@ -409,7 +409,8 @@ for OneTickReplay<BrokerID, ExchangeID, Symbol, ObSnapshotDelay, Settlement>
                     .next()
                     .unwrap_or_else(
                         || unreachable!(
-                            "Cannot find corresponding traded pair reader for {cannot_cancel:?}"
+                            "Cannot find corresponding traded pair reader for {:?}",
+                            cannot_cancel
                         )
                     );
                 if let Some(err_log_file) = &mut reader.err_log_file {

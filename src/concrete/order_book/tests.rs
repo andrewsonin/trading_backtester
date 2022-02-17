@@ -7,7 +7,7 @@ use crate::{
 };
 
 fn insert_limit_order<const DUMMY: bool, const BID: bool>(
-    ob: &mut OrderBook,
+    ob: &mut OrderBook<false>,
     dt: DateTime,
     id: OrderID,
     price: Price,
@@ -20,7 +20,7 @@ fn insert_limit_order<const DUMMY: bool, const BID: bool>(
 }
 
 fn insert_market_order<const DUMMY: bool, const BUY: bool>(
-    ob: &mut OrderBook,
+    ob: &mut OrderBook<false>,
     size: Size) -> Vec<OrderBookEvent>
 {
     let mut ob_events = Vec::new();
@@ -29,7 +29,7 @@ fn insert_market_order<const DUMMY: bool, const BUY: bool>(
     ob_events
 }
 
-fn default_example<const TEST: bool>() -> OrderBook
+fn default_example<const TEST: bool>() -> OrderBook<false>
 {
     let mut order_book = OrderBook::new();
     for (dt, id, price, size, bid) in [
@@ -54,7 +54,7 @@ fn default_example<const TEST: bool>() -> OrderBook
     order_book
 }
 
-fn default_example_bids(order_book: &mut OrderBook)
+fn default_example_bids(order_book: &mut OrderBook<false>)
 {
     for (dt, id, price, size, bid) in [
         (Date::from_ymd(2020, 02, 03).and_hms(12, 03, 04), OrderID(1), Price(23), Size(4), true),
@@ -69,7 +69,7 @@ fn default_example_bids(order_book: &mut OrderBook)
     }
 }
 
-fn default_example_asks(order_book: &mut OrderBook)
+fn default_example_asks(order_book: &mut OrderBook<false>)
 {
     for (dt, id, price, size, bid) in [
         (Date::from_ymd(2020, 02, 03).and_hms(07, 00, 00), OrderID(0), Price(27), Size(3), false),
@@ -86,7 +86,7 @@ fn default_example_asks(order_book: &mut OrderBook)
     }
 }
 
-fn default_example_dummies(order_book: &mut OrderBook)
+fn default_example_dummies(order_book: &mut OrderBook<false>)
 {
     for (dt, id, price, size, bid) in [
         (Date::from_ymd(2020, 02, 04).and_hms(07, 00, 00), OrderID(8), Price(26), Size(3), true),

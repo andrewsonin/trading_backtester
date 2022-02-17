@@ -91,6 +91,12 @@ impl Price
     }
 }
 
+impl From<Price> for isize {
+    fn from(price: Price) -> Self {
+        price.0 as isize
+    }
+}
+
 impl PartialEq for PriceStep {
     #[inline]
     fn eq(&self, other: &Self) -> bool {

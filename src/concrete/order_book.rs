@@ -27,7 +27,12 @@ pub struct LimitOrder {
 }
 
 /// Order book that only supports simple limit and market orders.
-pub struct OrderBook {
+///
+/// # Parameters
+///
+/// * `MATCH_DUMMY_WITH_DUMMY` — whether to match incoming dummy orders
+/// with already submitted dummy orders.
+pub struct OrderBook<const MATCH_DUMMY_WITH_DUMMY: bool> {
     /// Bid levels.
     bids: VecDeque<VecDeque<LimitOrder>>,
     /// Ask levels.
@@ -38,6 +43,93 @@ pub struct OrderBook {
     best_ask: Price,
     /// Map [OrderId -> (Price, Whether it is bid)]
     id_to_price_and_side: HashMap<OrderID, (Price, bool)>,
+}
+
+/// Borrows [`OrderBook`] side and performs cleanup on drop.
+struct SideWrapper<'a, const UPPER: bool, const FROM_BOTH_ENDS: bool> {
+    side: &'a mut VecDeque<VecDeque<LimitOrder>>,
+    best_price: &'a mut Price,
+}
+
+impl<const UPPER: bool, const SHRINK_BOTH_ENDS: bool>
+SideWrapper<'_, UPPER, SHRINK_BOTH_ENDS>
+{
+    #[inline]
+    fn get_side_and_price(&mut self) -> (&mut VecDeque<VecDeque<LimitOrder>>, Price) {
+        (self.side, *self.best_price)
+    }
+
+    #[inline]
+    fn shrink_side(&mut self)
+    {
+        while let Some(level) = self.side.front() {
+            if !level.is_empty() {
+                break;
+            }
+            self.side.pop_front();
+            if UPPER {
+                *self.best_price += Price(1)
+            } else {
+                *self.best_price -= Price(1)
+            }
+        }
+        if SHRINK_BOTH_ENDS {
+            while let Some(level) = self.side.back() {
+                if !level.is_empty() {
+                    break;
+                }
+                self.side.pop_back();
+            }
+        }
+    }
+}
+
+impl<const UPPER: bool, const SHRINK_BOTH_ENDS: bool>
+Drop for SideWrapper<'_, UPPER, SHRINK_BOTH_ENDS>
+{
+    #[inline]
+    fn drop(&mut self) {
+        self.shrink_side()
+    }
+}
+
+/// Borrows [`OrderBook`] side level and performs cleanup on drop.
+struct LevelWrapper<'a, const SHRINK_BOTH_ENDS: bool> (&'a mut VecDeque<LimitOrder>);
+
+impl<const SHRINK_BOTH_ENDS: bool> LevelWrapper<'_, SHRINK_BOTH_ENDS>
+{
+    #[inline]
+    pub fn get_level(&mut self) -> &mut VecDeque<LimitOrder> {
+        self.0
+    }
+
+    #[inline]
+    pub fn shrink_level(&mut self)
+    {
+        while let Some(order) = self.0.front() {
+            if order.size != Size(0) {
+                break;
+            }
+            self.0.pop_front();
+        }
+        if SHRINK_BOTH_ENDS {
+            while let Some(order) = self.0.back() {
+                if order.size != Size(0) {
+                    break;
+                }
+                self.0.pop_back();
+            }
+        }
+    }
+}
+
+impl<const SHRINK_BOTH_ENDS: bool>
+Drop for LevelWrapper<'_, SHRINK_BOTH_ENDS>
+{
+    #[inline]
+    fn drop(&mut self) {
+        self.shrink_level()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -64,114 +156,6 @@ pub enum OrderBookEventKind {
     OldOrderPartiallyExecuted(OrderID),
 }
 
-#[macro_use]
-mod order_book_logic_macros {
-    macro_rules! match_real_with_level {
-        (
-            $UPPER                :  expr,
-            $ob                   : ident,
-            $callback             : ident,
-            $side                 : ident,
-            $level                : ident,
-            $size                 : ident,
-            $size_before_matching : ident,
-            $price                : ident,
-            $id_to_price_and_side : ident
-        ) => {
-            for order in $level.iter_mut().filter(|order| order.size != Size(0)) {
-                if !order.is_dummy {
-                    match $size.cmp(&order.size) {
-                        Ordering::Less => {
-                            // (OrderExecuted, OrderPartiallyExecuted)
-                            $callback(
-                                OrderBookEvent {
-                                    size: $size,
-                                    price: $price,
-                                    kind: OrderBookEventKind::OldOrderPartiallyExecuted(order.id),
-                                }
-                            );
-                            $callback(
-                                OrderBookEvent {
-                                    size: $size_before_matching,
-                                    price: $price,
-                                    kind: OrderBookEventKind::NewOrderExecuted,
-                                }
-                            );
-                            order.size -= $size;
-                            Self::shrink_level::<false>($level);
-                            $ob.shrink_side::<$UPPER, false>();
-                            return;
-                        }
-                        Ordering::Equal => {
-                            // (OrderExecuted, OrderExecuted)
-                            $id_to_price_and_side.remove(&order.id).unwrap_or_else(
-                                || unreachable!(
-                                    "id_to_price_and_side does not contain {}",
-                                    order.id
-                                )
-                            );
-                            $callback(
-                                OrderBookEvent {
-                                    size: $size,
-                                    price: $price,
-                                    kind: OrderBookEventKind::OldOrderExecuted(order.id),
-                                }
-                            );
-                            $callback(
-                                OrderBookEvent {
-                                    size: $size_before_matching,
-                                    price: $price,
-                                    kind: OrderBookEventKind::NewOrderExecuted,
-                                }
-                            );
-                            order.size = Size(0);
-                            Self::shrink_level::<false>($level);
-                            $ob.shrink_side::<$UPPER, false>();
-                            return;
-                        }
-                        Ordering::Greater => {
-                            // (OrderPartiallyExecuted, OrderExecuted)
-                            $id_to_price_and_side.remove(&order.id).unwrap_or_else(
-                                || unreachable!(
-                                    "id_to_price_and_side does not contain {}",
-                                    order.id
-                                )
-                            );
-                            $callback(
-                                OrderBookEvent {
-                                    size: order.size,
-                                    price: $price,
-                                    kind: OrderBookEventKind::OldOrderExecuted(order.id),
-                                }
-                            );
-                            $size -= order.size;
-                            order.size = Size(0);
-                        }
-                    }
-                } else if order.size > $size {
-                    $callback(
-                        OrderBookEvent {
-                            size: $size,
-                            price: $price,
-                            kind: OrderBookEventKind::OldOrderPartiallyExecuted(order.id),
-                        }
-                    );
-                    order.size -= $size;
-                } else {
-                    $callback(
-                        OrderBookEvent {
-                            size: order.size,
-                            price: $price,
-                            kind: OrderBookEventKind::OldOrderExecuted(order.id),
-                        }
-                    );
-                    order.size = Size(0);
-                }
-            }
-        };
-    }
-}
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 /// Error struct indicating that there is no order with such ID.
 pub struct NoSuchID;
@@ -185,10 +169,11 @@ impl Display for NoSuchID {
 
 enum MatchingStatus {
     FullyExecuted,
-    NotFullyExecuted,
+    PartiallyExecuted(Size),
 }
 
-impl OrderBook {
+impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
+{
     #[inline]
     /// Creates a new instance of the `OrderBook`.
     pub fn new() -> Self {
@@ -242,10 +227,30 @@ impl OrderBook {
         } else {
             return Err(NoSuchID);
         };
-        let (side, offset) = if buy {
-            (&mut self.bids, i64::from(self.best_bid - price))
+        let res = if buy {
+            self.cancel_limit_order_::<false>(id, price)
         } else {
-            (&mut self.asks, i64::from(price - self.best_ask))
+            self.cancel_limit_order_::<true>(id, price)
+        };
+        Ok(res)
+    }
+
+    #[inline]
+    fn cancel_limit_order_<const UPPER: bool>(
+        &mut self,
+        id: OrderID,
+        price: Price) -> (LimitOrder, Direction, Price)
+    {
+        let mut opposite_side = if UPPER {
+            SideWrapper::<UPPER, true> { side: &mut self.asks, best_price: &mut self.best_ask }
+        } else {
+            SideWrapper::<UPPER, true> { side: &mut self.bids, best_price: &mut self.best_bid }
+        };
+        let (side, best_price) = opposite_side.get_side_and_price();
+        let offset = if UPPER {
+            isize::from(price - best_price)
+        } else {
+            isize::from(best_price - price)
         };
         if offset >= 0 {
             if let Some(level) = side.get_mut(offset as usize) {
@@ -255,15 +260,13 @@ impl OrderBook {
                 {
                     let cancelled_order = *order;
                     order.size = Size(0);
-                    Self::shrink_level::<true>(level);
-                    let direction = if buy {
-                        self.shrink_side::<false, true>();
-                        Direction::Buy
-                    } else {
-                        self.shrink_side::<true, true>();
+                    let direction = if UPPER {
                         Direction::Sell
+                    } else {
+                        Direction::Buy
                     };
-                    Ok((cancelled_order, direction, price))
+                    LevelWrapper::<true>(level);
+                    (cancelled_order, direction, price)
                 } else {
                     unreachable!("No active order with such ID {} was found at the level", id)
                 }
@@ -280,23 +283,30 @@ impl OrderBook {
     }
 
     #[inline]
-    /// Updates size of the limit order.
+    /// Updates size of the limit order and places it to the end of the current price queue.
     ///
     /// # Arguments
     ///
     /// * `id` — Order ID to update.
     /// * `new_size` — New size of the limit order.
-    pub fn update_limit_order(&mut self, id: OrderID, new_size: Size) -> Result<(), NoSuchID>
+    pub fn update_limit_order_moving_to_end(
+        &mut self,
+        id: OrderID,
+        new_size: Size) -> Result<(), NoSuchID>
     {
+        if new_size == Size(0) {
+            self.cancel_limit_order(id)?;
+            return Ok(());
+        }
         let (price, buy) = if let Some(v) = self.id_to_price_and_side.get(&id) {
             *v
         } else {
             return Err(NoSuchID);
         };
         let (side, offset) = if buy {
-            (&mut self.bids, i64::from(self.best_bid - price))
+            (&mut self.bids, isize::from(self.best_bid - price))
         } else {
-            (&mut self.asks, i64::from(price - self.best_ask))
+            (&mut self.asks, isize::from(price - self.best_ask))
         };
         if offset >= 0 {
             if let Some(level) = side.get_mut(offset as usize) {
@@ -304,8 +314,10 @@ impl OrderBook {
                     .filter(|order| order.id == id && order.size != Size(0))
                     .next()
                 {
-                    order.size = new_size;
-                    Ok(())
+                    order.size = Size(0);
+                    let LimitOrder { is_dummy, dt, .. } = *order;
+                    LevelWrapper::<true>(level);
+                    level.push_back(LimitOrder { id, size: new_size, is_dummy, dt })
                 } else {
                     unreachable!("No active order with such ID {} was found at the level", id)
                 }
@@ -319,6 +331,53 @@ impl OrderBook {
         } else {
             unreachable!("Offset from the best price appeared to be negative: {}", offset)
         }
+        Ok(())
+    }
+
+    #[inline]
+    /// Updates size of the limit order.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` — Order ID to update.
+    /// * `new_size` — New size of the limit order.
+    pub fn update_limit_order(&mut self, id: OrderID, new_size: Size) -> Result<(), NoSuchID>
+    {
+        if new_size == Size(0) {
+            self.cancel_limit_order(id)?;
+            return Ok(());
+        }
+        let (price, buy) = if let Some(v) = self.id_to_price_and_side.get(&id) {
+            *v
+        } else {
+            return Err(NoSuchID);
+        };
+        let (side, offset) = if buy {
+            (&mut self.bids, isize::from(self.best_bid - price))
+        } else {
+            (&mut self.asks, isize::from(price - self.best_ask))
+        };
+        if offset >= 0 {
+            if let Some(level) = side.get_mut(offset as usize) {
+                if let Some(order) = level.iter_mut()
+                    .filter(|order| order.id == id && order.size != Size(0))
+                    .next()
+                {
+                    order.size = new_size
+                } else {
+                    unreachable!("No active order with such ID {} was found at the level", id)
+                }
+            } else {
+                unreachable!(
+                    "No non-empty level was found for the given offset {} \
+                    from the best price",
+                    offset
+                )
+            }
+        } else {
+            unreachable!("Offset from the best price appeared to be negative: {}", offset)
+        }
+        Ok(())
     }
 
     /// Inserts limit order that is cancelled immediately after insertion.
@@ -341,66 +400,64 @@ impl OrderBook {
         const BUY: bool
     >(
         &mut self,
-        price: Price,
+        mut price: Price,
         mut size: Size,
         mut callback: CallBack,
     ) {
-        let opposite_side = if BUY {
-            &mut self.asks
+        let mut opposite_side = if BUY {
+            SideWrapper::<BUY, false> { side: &mut self.asks, best_price: &mut self.best_ask }
         } else {
-            &mut self.bids
+            SideWrapper::<BUY, false> { side: &mut self.bids, best_price: &mut self.best_bid }
         };
+        let (opposite_side, best_price) = opposite_side.get_side_and_price();
         // Match the new limit order
         // with already submitted limit orders from the opposite side of the order book
         if !opposite_side.is_empty() {
             let intersection_depth = if BUY {
-                i64::from(price - self.best_ask)
+                isize::from(price - best_price)
             } else {
-                i64::from(self.best_bid - price)
+                isize::from(best_price - price)
             };
             // Nearly the same logic as in the insert_market_order method
             if intersection_depth >= 0 {
-                let mut price = if BUY {
-                    self.best_ask
-                } else {
-                    self.best_bid
-                };
-                for level in opposite_side.iter_mut()
+                price = best_price;
+                for mut level in opposite_side.iter_mut()
                     .take((1 + intersection_depth) as usize)
+                    .map(LevelWrapper::<false>)
                 {
-                    let size_before_matching = size;
-                    if DUMMY {
-                        if let MatchingStatus::FullyExecuted = Self::match_dummy_with_level(
-                            level, &mut callback, &size_before_matching, &mut size, price,
-                        ) {
+                    let level = level.get_level();
+                    match Self::match_with_level::<_, DUMMY>(
+                        level, price, size, &mut callback, &mut self.id_to_price_and_side,
+                    ) {
+                        MatchingStatus::FullyExecuted => {
+                            callback(
+                                OrderBookEvent {
+                                    size,
+                                    price,
+                                    kind: OrderBookEventKind::NewOrderExecuted,
+                                }
+                            );
                             return;
                         }
-                    } else {
-                        let id_to_price_and_side = &mut self.id_to_price_and_side;
-                        match_real_with_level!(
-                            BUY, self,
-                            callback, opposite_side, level, size, size_before_matching, price,
-                            id_to_price_and_side
-                        )
-                    }
-                    let exec_size = size_before_matching - size;
-                    if exec_size != Size(0) {
-                        callback(
-                            OrderBookEvent {
-                                size: exec_size,
-                                price,
-                                kind: OrderBookEventKind::NewOrderPartiallyExecuted,
+                        MatchingStatus::PartiallyExecuted(exec_size) => {
+                            if exec_size != Size(0) {
+                                size -= exec_size;
+                                callback(
+                                    OrderBookEvent {
+                                        size: exec_size,
+                                        price,
+                                        kind: OrderBookEventKind::NewOrderPartiallyExecuted,
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
-                    Self::shrink_level::<false>(level);
                     if BUY {
                         price += Price(1)
                     } else {
                         price -= Price(1)
                     }
                 }
-                self.shrink_side::<BUY, false>()
             }
         }
     }
@@ -427,64 +484,65 @@ impl OrderBook {
         mut size: Size,
         mut callback: CallBack,
     ) {
-        let opposite_side = if BUY {
-            &mut self.asks
-        } else {
-            &mut self.bids
-        };
-        // Match the new limit order
-        // with already submitted limit orders from the opposite side of the order book
-        if !opposite_side.is_empty() {
-            let intersection_depth = if BUY {
-                i64::from(price - self.best_ask)
+        {
+            let mut opposite_side = if BUY {
+                SideWrapper::<BUY, false> { side: &mut self.asks, best_price: &mut self.best_ask }
             } else {
-                i64::from(self.best_bid - price)
+                SideWrapper::<BUY, false> { side: &mut self.bids, best_price: &mut self.best_bid }
             };
-            // Nearly the same logic as in the insert_market_order method
-            if intersection_depth >= 0 {
-                let mut price = if BUY {
-                    self.best_ask
+            // Match the new limit order
+            // with already submitted limit orders from the opposite side of the order book
+            let (opposite_side, best_price) = opposite_side.get_side_and_price();
+            if !opposite_side.is_empty() {
+                let intersection_depth = if BUY {
+                    isize::from(price - best_price)
                 } else {
-                    self.best_bid
+                    isize::from(best_price - price)
                 };
-                for level in opposite_side.iter_mut()
-                    .take((1 + intersection_depth) as usize)
-                {
-                    let size_before_matching = size;
-                    if DUMMY {
-                        if let MatchingStatus::FullyExecuted = Self::match_dummy_with_level(
-                            level, &mut callback, &size_before_matching, &mut size, price,
+                let mut price = best_price;
+                // Nearly the same logic as in the insert_market_order method
+                if intersection_depth >= 0 {
+                    for mut level in opposite_side.iter_mut()
+                        .take((1 + intersection_depth) as usize)
+                        .map(LevelWrapper::<false>)
+                    {
+                        let level = level.get_level();
+                        match Self::match_with_level::<_, DUMMY>(
+                            level, price, size, &mut callback, &mut self.id_to_price_and_side,
                         ) {
-                            return;
-                        }
-                    } else {
-                        let id_to_price_and_side = &mut self.id_to_price_and_side;
-                        match_real_with_level!(
-                            BUY, self,
-                            callback, opposite_side, level, size, size_before_matching, price,
-                            id_to_price_and_side
-                        )
-                    }
-                    let exec_size = size_before_matching - size;
-                    if exec_size != Size(0) {
-                        callback(
-                            OrderBookEvent {
-                                size: exec_size,
-                                price,
-                                kind: OrderBookEventKind::NewOrderPartiallyExecuted,
+                            MatchingStatus::FullyExecuted => {
+                                callback(
+                                    OrderBookEvent {
+                                        size,
+                                        price,
+                                        kind: OrderBookEventKind::NewOrderExecuted,
+                                    }
+                                );
+                                return;
                             }
-                        )
-                    }
-                    Self::shrink_level::<false>(level);
-                    if BUY {
-                        price += Price(1)
-                    } else {
-                        price -= Price(1)
+                            MatchingStatus::PartiallyExecuted(exec_size) => {
+                                if exec_size != Size(0) {
+                                    size -= exec_size;
+                                    callback(
+                                        OrderBookEvent {
+                                            size: exec_size,
+                                            price,
+                                            kind: OrderBookEventKind::NewOrderPartiallyExecuted,
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        if BUY {
+                            price += Price(1)
+                        } else {
+                            price -= Price(1)
+                        }
                     }
                 }
-                self.shrink_side::<BUY, false>()
             }
         }
+
         // Insert the remaining size of the new limit order into the order book
         self.id_to_price_and_side.insert(id, (price, BUY));
         let side = if BUY {
@@ -503,9 +561,9 @@ impl OrderBook {
         } else {
             // Check whether the new limit order lies inside the spread
             let offset = if BUY {
-                i64::from(self.best_bid - price)
+                isize::from(self.best_bid - price)
             } else {
-                i64::from(price - self.best_ask)
+                isize::from(price - self.best_ask)
             };
             if offset < 0 {
                 // If actually lies, modify front of the corresponding side
@@ -549,45 +607,47 @@ impl OrderBook {
         mut size: Size,
         mut callback: CallBack,
     ) {
-        let (side, mut price) = if BUY {
-            (&mut self.asks, self.best_ask)
+        let mut opposite_side = if BUY {
+            SideWrapper::<BUY, false> { side: &mut self.asks, best_price: &mut self.best_ask }
         } else {
-            (&mut self.bids, self.best_bid)
+            SideWrapper::<BUY, false> { side: &mut self.bids, best_price: &mut self.best_bid }
         };
-        for level in side.iter_mut() {
-            let size_before_matching = size;
-            if DUMMY {
-                if let MatchingStatus::FullyExecuted = Self::match_dummy_with_level(
-                    level, &mut callback, &size_before_matching, &mut size, price,
-                ) {
+        let (side, mut price) = opposite_side.get_side_and_price();
+        for mut level in side.iter_mut().map(LevelWrapper::<false>)
+        {
+            let level = level.get_level();
+            match Self::match_with_level::<_, DUMMY>(
+                level, price, size, &mut callback, &mut self.id_to_price_and_side,
+            ) {
+                MatchingStatus::FullyExecuted => {
+                    callback(
+                        OrderBookEvent {
+                            size,
+                            price,
+                            kind: OrderBookEventKind::NewOrderExecuted,
+                        }
+                    );
                     return;
                 }
-            } else {
-                let id_to_price_and_side = &mut self.id_to_price_and_side;
-                match_real_with_level!(
-                    BUY, self,
-                    callback, side, level, size, size_before_matching, price,
-                    id_to_price_and_side
-                )
-            }
-            let exec_size = size_before_matching - size;
-            if exec_size != Size(0) {
-                callback(
-                    OrderBookEvent {
-                        size: exec_size,
-                        price,
-                        kind: OrderBookEventKind::NewOrderPartiallyExecuted,
+                MatchingStatus::PartiallyExecuted(exec_size) => {
+                    if exec_size != Size(0) {
+                        size -= exec_size;
+                        callback(
+                            OrderBookEvent {
+                                size: exec_size,
+                                price,
+                                kind: OrderBookEventKind::NewOrderPartiallyExecuted,
+                            }
+                        )
                     }
-                )
+                }
             }
-            Self::shrink_level::<false>(level);
             if BUY {
                 price += Price(1)
             } else {
                 price -= Price(1)
             }
         }
-        self.shrink_side::<BUY, false>()
     }
 
     #[inline]
@@ -656,76 +716,177 @@ impl OrderBook {
         }
     }
 
-    #[inline]
-    fn shrink_level<const FROM_BOTH_SIDES: bool>(level: &mut VecDeque<LimitOrder>)
+    fn match_with_level<Callback: FnMut(OrderBookEvent), const DUMMY: bool>(
+        level: &mut VecDeque<LimitOrder>,
+        price: Price,
+        size: Size,
+        callback: &mut Callback,
+        id_to_price_and_side: &mut HashMap<OrderID, (Price, bool)>) -> MatchingStatus
     {
-        while let Some(order) = level.front() {
-            if order.size != Size(0) {
-                break;
-            }
-            level.pop_front();
-        }
-        if FROM_BOTH_SIDES {
-            while let Some(order) = level.back() {
-                if order.size != Size(0) {
-                    break;
-                }
-                level.pop_back();
-            }
-        }
-    }
-
-    #[inline]
-    fn shrink_side<const UPPER: bool, const FROM_BOTH_ENDS: bool>(&mut self)
-    {
-        let side = if UPPER {
-            &mut self.asks
+        if DUMMY {
+            Self::match_dummy_with_level(level, price, size, callback, id_to_price_and_side)
         } else {
-            &mut self.bids
-        };
-        while let Some(level) = side.front() {
-            if !level.is_empty() {
-                break;
-            }
-            side.pop_front();
-            if UPPER {
-                self.best_ask += Price(1)
-            } else {
-                self.best_bid -= Price(1)
-            }
-        }
-        if FROM_BOTH_ENDS {
-            while let Some(level) = side.back() {
-                if !level.is_empty() {
-                    break;
-                }
-                side.pop_back();
-            }
+            Self::match_real_with_level(level, price, size, callback, id_to_price_and_side)
         }
     }
 
     fn match_dummy_with_level(
-        level: &VecDeque<LimitOrder>,
+        level: &mut VecDeque<LimitOrder>,
+        price: Price,
+        mut size: Size,
         callback: &mut impl FnMut(OrderBookEvent),
-        size_before_matching: &Size,
-        remaining_size: &mut Size,
-        price: Price) -> MatchingStatus
+        id_to_price_and_side: &mut HashMap<OrderID, (Price, bool)>) -> MatchingStatus
     {
-        for order in level.iter().filter(|order| order.size != Size(0) && !order.is_dummy)
-        {
-            if *remaining_size > order.size {
-                *remaining_size -= order.size;
-            } else {
-                callback(
-                    OrderBookEvent {
-                        size: *size_before_matching,
-                        price,
-                        kind: OrderBookEventKind::NewOrderExecuted,
+        let size_before_matching = size;
+        for order in level.iter_mut().filter(|order| order.size != Size(0)) {
+            if order.is_dummy {
+                if MATCH_DUMMY_WITH_DUMMY {
+                    match size.cmp(&order.size) {
+                        Ordering::Less => {
+                            // (OrderExecuted, OrderPartiallyExecuted)
+                            callback(
+                                OrderBookEvent {
+                                    size,
+                                    price,
+                                    kind: OrderBookEventKind::OldOrderPartiallyExecuted(order.id),
+                                }
+                            );
+                            order.size -= size;
+                            return MatchingStatus::FullyExecuted;
+                        }
+                        Ordering::Equal => {
+                            // (OrderExecuted, OrderExecuted)
+                            id_to_price_and_side.remove(&order.id).unwrap_or_else(
+                                || unreachable!(
+                                    "id_to_price_and_side does not contain {}",
+                                    order.id
+                                )
+                            );
+                            callback(
+                                OrderBookEvent {
+                                    size,
+                                    price,
+                                    kind: OrderBookEventKind::OldOrderExecuted(order.id),
+                                }
+                            );
+                            order.size = Size(0);
+                            return MatchingStatus::FullyExecuted;
+                        }
+                        Ordering::Greater => {
+                            // (OrderPartiallyExecuted, OrderExecuted)
+                            id_to_price_and_side.remove(&order.id).unwrap_or_else(
+                                || unreachable!(
+                                    "id_to_price_and_side does not contain {}",
+                                    order.id
+                                )
+                            );
+                            callback(
+                                OrderBookEvent {
+                                    size: order.size,
+                                    price,
+                                    kind: OrderBookEventKind::OldOrderExecuted(order.id),
+                                }
+                            );
+                            size -= order.size;
+                            order.size = Size(0);
+                        }
                     }
-                );
+                }
+            } else if size > order.size {
+                size -= order.size;
+            } else {
                 return MatchingStatus::FullyExecuted;
             }
         }
-        MatchingStatus::NotFullyExecuted
+        MatchingStatus::PartiallyExecuted(size_before_matching - size)
+    }
+
+    fn match_real_with_level(
+        level: &mut VecDeque<LimitOrder>,
+        price: Price,
+        mut size: Size,
+        callback: &mut impl FnMut(OrderBookEvent),
+        id_to_price_and_side: &mut HashMap<OrderID, (Price, bool)>) -> MatchingStatus
+    {
+        let size_before_matching = size;
+        for order in level.iter_mut().filter(|order| order.size != Size(0)) {
+            if !order.is_dummy {
+                match size.cmp(&order.size) {
+                    Ordering::Less => {
+                        // (OrderExecuted, OrderPartiallyExecuted)
+                        callback(
+                            OrderBookEvent {
+                                size,
+                                price,
+                                kind: OrderBookEventKind::OldOrderPartiallyExecuted(order.id),
+                            }
+                        );
+                        order.size -= size;
+                        return MatchingStatus::FullyExecuted;
+                    }
+                    Ordering::Equal => {
+                        // (OrderExecuted, OrderExecuted)
+                        id_to_price_and_side.remove(&order.id).unwrap_or_else(
+                            || unreachable!(
+                                "id_to_price_and_side does not contain {}",
+                                order.id
+                            )
+                        );
+                        callback(
+                            OrderBookEvent {
+                                size,
+                                price,
+                                kind: OrderBookEventKind::OldOrderExecuted(order.id),
+                            }
+                        );
+                        order.size = Size(0);
+                        return MatchingStatus::FullyExecuted;
+                    }
+                    Ordering::Greater => {
+                        // (OrderPartiallyExecuted, OrderExecuted)
+                        id_to_price_and_side.remove(&order.id).unwrap_or_else(
+                            || unreachable!(
+                                "id_to_price_and_side does not contain {}",
+                                order.id
+                            )
+                        );
+                        callback(
+                            OrderBookEvent {
+                                size: order.size,
+                                price,
+                                kind: OrderBookEventKind::OldOrderExecuted(order.id),
+                            }
+                        );
+                        size -= order.size;
+                        order.size = Size(0);
+                    }
+                }
+            } else if order.size > size {
+                callback(
+                    OrderBookEvent {
+                        size,
+                        price,
+                        kind: OrderBookEventKind::OldOrderPartiallyExecuted(order.id),
+                    }
+                );
+                order.size -= size;
+            } else {
+                id_to_price_and_side.remove(&order.id).unwrap_or_else(
+                    || unreachable!(
+                        "id_to_price_and_side does not contain {}",
+                        order.id
+                    )
+                );
+                callback(
+                    OrderBookEvent {
+                        size: order.size,
+                        price,
+                        kind: OrderBookEventKind::OldOrderExecuted(order.id),
+                    }
+                );
+                order.size = Size(0);
+            }
+        }
+        MatchingStatus::PartiallyExecuted(size_before_matching - size)
     }
 }

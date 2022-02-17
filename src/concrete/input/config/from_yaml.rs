@@ -409,7 +409,9 @@ fn parse_simulation_time_section(
     let field = DATETIME_FORMAT;
     let datetime_format = env
         .get(field)
-        .unwrap_or_else(|| unreachable!("Section \"{SECTION}\" should contain \"{field}\" value"));
+        .unwrap_or_else(
+            || unreachable!("Section \"{}\" should contain \"{}\" value", SECTION, field)
+        );
 
     let get_current_section = || format!("{SECTION} :: {field}");
     let datetime_format = if let YamlValue::String(v) = datetime_format {
@@ -800,7 +802,7 @@ fn parse_traded_pairs_section<
                 let result = if err_log_file.is_relative() {
                     path.parent()
                         .unwrap_or_else(
-                            || unreachable!("Cannot get parent directory of the {path:?}")
+                            || unreachable!("Cannot get parent directory of the {:?}", path)
                         )
                         .join(err_log_file)
                 } else {
@@ -1263,7 +1265,7 @@ fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     let path_list = if path_list.is_relative() {
         path.parent()
             .unwrap_or_else(
-                || unreachable!("Cannot get parent directory of the {path:?}. Error: {err}")
+                || unreachable!("Cannot get parent directory of the {:?}", path)
             )
             .join(path_list)
     } else {

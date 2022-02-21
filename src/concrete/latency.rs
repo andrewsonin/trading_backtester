@@ -5,6 +5,7 @@ use {
 };
 
 /// Constant [`LatencyGenerator`].
+#[derive(Copy, Clone, Default)]
 pub struct ConstantLatency<OuterID: Id, const OUTGOING: u64, const INCOMING: u64>
 (PhantomData<OuterID>);
 

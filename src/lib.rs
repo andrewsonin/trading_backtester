@@ -458,14 +458,14 @@ mod tests {
         type OneNSLatency<OuterID> = ConstantLatency<OuterID, 1, 1>;
 
         enum_def! {
-            #[derive(LatencyGenerator)]
+            #[derive(LatencyGenerator, Copy, Clone)]
             LatencyGenEnum<OuterID: Id> {
                 ZeroLatency<OuterID>,
                 OneNSLatency<OuterID>
             }
         }
 
-        #[derive(LatencyGenerator)]
+        #[derive(LatencyGenerator, Copy, Clone)]
         enum AnotherLatencyGenEnum<OuterID: Id> {
             Var1(ConstantLatency<OuterID, 0, 0>),
             Var2(ConstantLatency<OuterID, 1, 0>),

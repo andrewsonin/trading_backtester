@@ -4,7 +4,7 @@ use {
     std::{cmp::Ordering, str::FromStr},
 };
 
-#[derive(Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Default, PartialOrd, PartialEq, Ord, Eq, Hash, Clone, Copy)]
 #[derive(derive_more::Display, FromStr, Add, Sub, AddAssign, SubAssign, From, Into)]
 /// Order ID newtype.
 pub struct OrderID(pub u64);

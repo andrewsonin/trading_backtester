@@ -172,6 +172,13 @@ enum MatchingStatus {
     PartiallyExecuted(Size),
 }
 
+impl<const MATCH_DUMMY_WITH_DUMMY: bool> Default for OrderBook<MATCH_DUMMY_WITH_DUMMY> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
 {
     #[inline]

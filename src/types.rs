@@ -1,4 +1,4 @@
-use std::{convert::Infallible, fmt::{Debug, Display}, hash::Hash, marker::PhantomData};
+use std::{convert::Infallible, fmt::{Debug, Display, Formatter}, hash::Hash, marker::PhantomData};
 
 pub use chrono::{
     Duration,
@@ -37,8 +37,20 @@ pub trait Agent {
 /// to indicate that the given message bridge between agents is not used.
 pub struct NeverType<K>((Infallible, PhantomData<K>));
 
+impl<K> std::fmt::Display for NeverType<K> {
+    fn fmt(&self, _: &mut Formatter<'_>) -> std::fmt::Result {
+        unreachable!("Cannot be called for the NeverType")
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 /// Non-parametrized type to marker code branches that will never happen.
 /// Can be used as a [message type](crate::interface::message)
 /// to indicate that the given message bridge between agents is not used.
 pub struct Nothing(Infallible);
+
+impl std::fmt::Display for Nothing {
+    fn fmt(&self, _: &mut Formatter<'_>) -> std::fmt::Result {
+        unreachable!("Cannot be called for the Nothing type")
+    }
+}

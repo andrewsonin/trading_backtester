@@ -18,7 +18,7 @@ pub trait Latent
 }
 
 /// Describes a probabilistic model of latency.
-pub trait LatencyGenerator
+pub trait LatencyGenerator: Copy
 {
     /// ID type of the anchor agent against which the latent delay is sampled.
     type OuterID: Id;

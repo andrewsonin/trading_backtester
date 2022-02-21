@@ -123,6 +123,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
         .unwrap();
 
     let tokens = quote! {
+        #[derive(Copy, Clone)]
         #vis enum #latency_generator_name #impl_generics
         #where_clause
         {
@@ -371,6 +372,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         .unwrap();
 
     let tokens = quote! {
+        #[derive(Copy, Clone)]
         #vis enum #latency_generator_name #impl_generics
         #where_clause
         {

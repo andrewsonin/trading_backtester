@@ -292,6 +292,8 @@ mod tests {
         let first_thread_config = ThreadConfig::new(
             42,
             replay_config.clone(),
+            exchange_names.clone(),
+            broker_configs,
             [
                 (
                     SpreadWriterConfig::new(
@@ -306,6 +308,8 @@ mod tests {
         let second_thread_config = ThreadConfig::new(
             4122,
             replay_config.clone(),
+            exchange_names,
+            broker_configs,
             [
                 (
                     SpreadWriterConfig::new(
@@ -330,8 +334,6 @@ mod tests {
         >;
 
         ParallelBacktester::new(
-            exchange_names.clone(),
-            broker_configs,
             per_thread_configs,
             (start_dt, end_dt),
         )
@@ -344,8 +346,6 @@ mod tests {
         ];
 
         ParallelBacktester::new(
-            exchange_names,
-            broker_configs,
             per_thread_configs,
             (start_dt, end_dt),
         )

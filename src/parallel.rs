@@ -12,16 +12,17 @@ use {
 #[derive(Clone)]
 /// Initializer struct that contain thread-unique information.
 /// Here it is the RNG seed, the initializer config for building possibly thread-unique
-/// [`Replay`](crate::interface::replay::Replay) and the initializer configs for building
-/// thread-unique [`Traders`](crate::interface::trader::Trader).
-pub struct ThreadConfig<ReplayConfig, TraderConfigs> {
+/// entities.
+pub struct ThreadConfig<ReplayConfig, ExchangeConfigs, BrokerConfigs, TraderConfigs> {
     rng_seed: u64,
     replay_config: ReplayConfig,
     trader_configs: TraderConfigs,
+    broker_configs: BrokerConfigs,
+    exchange_configs: ExchangeConfigs,
 }
 
-impl<ReplayConfig, TraderConfigs>
-ThreadConfig<ReplayConfig, TraderConfigs>
+impl<ReplayConfig, ExchangeConfigs, BrokerConfigs, TraderConfigs>
+ThreadConfig<ReplayConfig, ExchangeConfigs, BrokerConfigs, TraderConfigs>
 {
     /// Creates a new instance of the [`ThreadConfig`].
     ///
@@ -29,21 +30,29 @@ ThreadConfig<ReplayConfig, TraderConfigs>
     ///
     /// * `rng_seed` — RNG seed.
     /// * `replay_config` — [`Replay`] initializer config.
+    /// * `exchange_configs` — [`Exchange`] initializer configs.
+    /// * `broker_configs` — [`Broker`] initializer configs.
     /// * `trader_configs` — [`Trader`] initializer configs.
-    pub fn new(rng_seed: u64, replay_config: ReplayConfig, trader_configs: TraderConfigs) -> Self {
+    pub fn new(
+        rng_seed: u64,
+        replay_config: ReplayConfig,
+        exchange_configs: ExchangeConfigs,
+        broker_configs: BrokerConfigs,
+        trader_configs: TraderConfigs) -> Self
+    {
         Self {
             rng_seed,
             replay_config,
             trader_configs,
+            broker_configs,
+            exchange_configs,
         }
     }
 }
 
 /// Parallels simultaneous runs of multiple [`Kernels`](crate::kernel::Kernel).
-pub struct ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfs, RNG>
+pub struct ParallelBacktester<PerThreadConfs, RNG>
 {
-    exchange_configs: ExchangeConfigs,
-    broker_configs: BrokerConfigs,
     per_thread_configs: PerThreadConfs,
     date_range: (DateTime, DateTime),
 
@@ -51,28 +60,20 @@ pub struct ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfs, RN
     phantom: PhantomData<RNG>,
 }
 
-impl<B, E, T> ParallelBacktester<B, E, T, StdRng>
-    where B: IntoIterator,
-          E: IntoIterator,
-          T: IntoIterator
+impl<T> ParallelBacktester<T, StdRng>
+    where T: IntoIterator
 {
     /// Creates a new instance of the [`ParallelBacktester`].
     ///
     /// # Arguments
     ///
-    /// * `exchange_configs` — [`Exchange`] initializer config.
-    /// * `broker_configs` — [`Broker`] initializer configs.
     /// * `per_thread_configs` — Thread-unique initializer configs.
     /// * `date_range` — Tuple of start and stop [`DateTimes`](crate::types::DateTime).
     pub fn new(
-        exchange_configs: E,
-        broker_configs: B,
         per_thread_configs: T,
         date_range: (DateTime, DateTime)) -> Self
     {
         ParallelBacktester {
-            exchange_configs,
-            broker_configs,
             per_thread_configs,
             date_range,
             num_threads: 0,
@@ -81,18 +82,14 @@ impl<B, E, T> ParallelBacktester<B, E, T, StdRng>
     }
 
     /// Sets non-default ([`StdRng`]) random number generator.
-    pub fn with_rng<RNG: Rng + SeedableRng>(self) -> ParallelBacktester<B, E, T, RNG> {
+    pub fn with_rng<RNG: Rng + SeedableRng>(self) -> ParallelBacktester<T, RNG> {
         let Self {
-            exchange_configs,
-            broker_configs,
             per_thread_configs,
             date_range,
             num_threads,
             ..
         } = self;
         ParallelBacktester {
-            exchange_configs,
-            broker_configs,
             per_thread_configs,
             date_range,
             num_threads,
@@ -101,11 +98,9 @@ impl<B, E, T> ParallelBacktester<B, E, T, StdRng>
     }
 }
 
-impl<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
-ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
-    where BrokerConfigs: IntoIterator,
-          ExchangeConfigs: IntoIterator,
-          PerThreadConfigs: IntoIterator,
+impl<PerThreadConfigs, RNG>
+ParallelBacktester<PerThreadConfigs, RNG>
+    where PerThreadConfigs: IntoIterator,
           RNG: Rng + SeedableRng
 {
     /// Sets the number of threads in a thread pool.
@@ -124,19 +119,19 @@ impl<
     TraderConfigs, BrokerConfigs, ExchangeConfigs, PerThreadConfigs, ConnectedBrokers,
     ConnectedExchanges, SubscriptionConfigs, RNG, SubCfg,
 >
-ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
+ParallelBacktester<PerThreadConfigs, RNG>
     where BrokerID: Id,
           ExchangeID: Id,
           TraderConfig: Send,
-          BrokerConfig: Sync,
-          ExchangeConfig: Sync,
+          BrokerConfig: Send,
+          ExchangeConfig: Send,
           ReplayConfig: Send,
           TraderConfigs: IntoIterator<Item=(TraderConfig, ConnectedBrokers)>,
           BrokerConfigs: IntoIterator<Item=(BrokerConfig, ConnectedExchanges)>,
           ExchangeConfigs: IntoIterator<Item=ExchangeConfig>,
-          PerThreadConfigs: IntoIterator<Item=ThreadConfig<ReplayConfig, TraderConfigs>>,
+          PerThreadConfigs: IntoIterator<Item=ThreadConfig<ReplayConfig, ExchangeConfigs, BrokerConfigs, TraderConfigs>>,
           ConnectedBrokers: Send + IntoIterator<Item=(BrokerID, SubscriptionConfigs)>,
-          ConnectedExchanges: IntoIterator<Item=ExchangeID>,
+          ConnectedExchanges: Send + IntoIterator<Item=ExchangeID>,
           SubscriptionConfigs: IntoIterator<Item=SubCfg>,
           RNG: Rng + SeedableRng
 {
@@ -152,34 +147,29 @@ ParallelBacktester<BrokerConfigs, ExchangeConfigs, PerThreadConfigs, RNG>
             E: Exchange<BrokerID=BrokerID, ExchangeID=ExchangeID, E2R=R::E2R, R2E=R::R2E, B2E=B::B2E, E2B=B::E2B>,
             R: Replay<BrokerID=BrokerID, ExchangeID=ExchangeID>
     {
-        let Self {
-            num_threads,
-            exchange_configs,
-            broker_configs,
-            per_thread_configs,
-            date_range,
-            ..
-        } = self;
-        let exchange_configs: Vec<_> = exchange_configs.into_iter().collect();
-        let broker_configs: Vec<(_, Vec<_>)> = broker_configs.into_iter()
+        let Self { num_threads, per_thread_configs, date_range, .. } = self;
+        let per_thread_configs: Vec<(_, _, Vec<_>, Vec<_>, Vec<_>)> = per_thread_configs.into_iter()
             .map(
-                |(broker_cfg, connected_exchanges)|
-                    (broker_cfg, connected_exchanges.into_iter().collect())
-            )
-            .collect();
-        let per_thread_configs: Vec<(_, _, Vec<_>)> = per_thread_configs.into_iter()
-            .map(
-                |ThreadConfig { rng_seed, replay_config, trader_configs, .. }|
-                    (rng_seed, replay_config, trader_configs.into_iter().collect())
+                |ThreadConfig {
+                     rng_seed, replay_config, trader_configs,
+                     broker_configs, exchange_configs
+                 }|
+                    (
+                        rng_seed,
+                        replay_config,
+                        exchange_configs.into_iter().collect(),
+                        broker_configs.into_iter().collect(),
+                        trader_configs.into_iter().collect()
+                    )
             )
             .collect();
 
         let job = || per_thread_configs.into_par_iter().for_each(
-            |(rng_seed, replay_config, trader_configs)| {
+            |(rng_seed, replay_config, exchange_configs, broker_configs, trader_configs)| {
                 let exchanges = exchange_configs.iter().map(E::from);
-                let brokers = broker_configs.iter().map(
+                let brokers = broker_configs.into_iter().map(
                     |(broker_cfg, connected_exchanges)|
-                        (B::from(broker_cfg), connected_exchanges.iter().cloned())
+                        (B::from(&broker_cfg), connected_exchanges)
                 );
                 let traders = trader_configs.into_iter().map(
                     |(trader_config, connected_brokers)|

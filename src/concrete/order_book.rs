@@ -658,36 +658,31 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     }
 
     #[inline]
-    /// Gets the current state of the order book side.
+    /// Returns an iterator over the order book side.
     ///
     /// # Parameters
     /// * `UPPER` — Whether the side is asks.
     ///
-    /// # Arguments
-    ///
-    /// * `max_levels` — Maximum number of non-empty price levels to get.
-    ///                  If zero, the number of levels is considered unlimited.
-    pub fn get_ob_side<const UPPER: bool>(
-        &self,
-        max_levels: usize) -> Vec<(Price, Vec<(Size, DateTime)>)>
+    pub fn get_ob_side_iter<const UPPER: bool>(
+        &self
+    ) -> impl Iterator<Item=(Price, impl Iterator<Item=(OrderID, Size, DateTime)> + '_)> + '_
     {
         let (side, price) = if UPPER {
             (&self.asks, self.best_ask)
         } else {
             (&self.bids, self.best_bid)
         };
-        let it = side.iter()
+        side.iter()
             .map(
-                |level| -> Vec<(Size, DateTime)> {
-                    level.iter()
-                        .filter_map(
-                            |order| if order.size != Size(0) && !order.is_dummy {
-                                Some((order.size, order.dt))
-                            } else {
-                                None
-                            }
-                        ).collect()
-                }
+                |level| level
+                    .iter()
+                    .filter_map(
+                        |order| if order.size != Size(0) && !order.is_dummy {
+                            Some((order.id, order.size, order.dt))
+                        } else {
+                            None
+                        }
+                    )
             )
             .scan(
                 price,
@@ -701,7 +696,56 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                     Some(result)
                 },
             )
-            .filter(|(_, level)| !level.is_empty());
+            .filter_map(
+                |(price, mut level)| {
+                    if let Some(first_elem) = level.next() {
+                        Some((price, once(first_elem).chain(level)))
+                    } else {
+                        None
+                    }
+                }
+            )
+    }
+
+    #[inline]
+    /// Gets the current state of the order book side.
+    ///
+    /// # Parameters
+    /// * `UPPER` — Whether the side is asks.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_levels` — Maximum number of non-empty price levels to get.
+    ///                  If zero, the number of levels is considered unlimited.
+    pub fn get_ob_side<const UPPER: bool>(
+        &self,
+        max_levels: usize) -> Vec<(Price, Vec<(OrderID, Size, DateTime)>)>
+    {
+        let it = self.get_ob_side_iter::<UPPER>()
+            .map(|(price, level)| (price, level.collect()));
+        if max_levels != 0 {
+            it.take(max_levels).collect()
+        } else {
+            it.collect()
+        }
+    }
+
+    #[inline]
+    /// Gets the current state of the order book side hiding internal order IDs.
+    ///
+    /// # Parameters
+    /// * `UPPER` — Whether the side is asks.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_levels` — Maximum number of non-empty price levels to get.
+    ///                  If zero, the number of levels is considered unlimited.
+    pub fn get_ob_side_with_no_id<const UPPER: bool>(
+        &self,
+        max_levels: usize) -> Vec<(Price, Vec<(Size, DateTime)>)>
+    {
+        let it = self.get_ob_side_iter::<UPPER>()
+            .map(|(price, level)| (price, level.map(|(_, size, dt)| (size, dt)).collect()));
         if max_levels != 0 {
             it.take(max_levels).collect()
         } else {
@@ -718,8 +762,8 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     ///                  If zero, full order book state is returned.
     pub fn get_ob_state(&self, max_levels: usize) -> ObState {
         ObState {
-            bids: self.get_ob_side::<false>(max_levels),
-            asks: self.get_ob_side::<true>(max_levels),
+            bids: self.get_ob_side_with_no_id::<false>(max_levels),
+            asks: self.get_ob_side_with_no_id::<true>(max_levels),
         }
     }
 

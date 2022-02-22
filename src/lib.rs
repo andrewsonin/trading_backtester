@@ -274,13 +274,16 @@ mod tests {
             DelayScheduler,
         );
 
+        let broker_name = BrokerName::Broker1;
         let broker_configs = [
-            (
-                BrokerName::Broker1,
-                [ExchangeName::MOEX]
-            )
+            (&broker_name, [ExchangeName::MOEX])
         ];
 
+        let spread_writer_config = SpreadWriterConfig::new(
+            0,
+            test_files.join("example_01").join("simulated_spread_par_01.csv"),
+            PriceStep(0.0025),
+        );
         let subscription_config = SubscriptionConfig::new(
             ExchangeName::MOEX,
             usd_rub,
@@ -289,41 +292,34 @@ mod tests {
         let trader_subscriptions = [
             (BrokerName::Broker1, [subscription_config])
         ];
+
         let first_thread_config = ThreadConfig::new(
             42,
-            replay_config.clone(),
-            exchange_names.clone(),
+            &replay_config,
+            &exchange_names,
             broker_configs,
             [
-                (
-                    SpreadWriterConfig::new(
-                        0,
-                        test_files.join("example_01").join("simulated_spread_par_01.csv"),
-                        PriceStep(0.0025),
-                    ),
-                    trader_subscriptions
-                )
+                (&spread_writer_config, trader_subscriptions)
             ],
+        );
+
+        let spread_writer_config = SpreadWriterConfig::new(
+            1,
+            test_files.join("example_01").join("simulated_spread_par_02.csv"),
+            PriceStep(0.0025),
         );
         let second_thread_config = ThreadConfig::new(
             4122,
-            replay_config.clone(),
-            exchange_names,
+            &replay_config,
+            &exchange_names,
             broker_configs,
             [
-                (
-                    SpreadWriterConfig::new(
-                        1,
-                        test_files.join("example_01").join("simulated_spread_par_02.csv"),
-                        PriceStep(0.0025),
-                    ),
-                    trader_subscriptions
-                )
+                (&spread_writer_config, trader_subscriptions)
             ],
         );
         let per_thread_configs = [
-            first_thread_config.clone(),
-            second_thread_config.clone()
+            first_thread_config,
+            second_thread_config
         ];
 
         type Trader = SpreadWriter<u8, BrokerName, ExchangeName, SymbolName, SpotSettlement>;
@@ -340,8 +336,8 @@ mod tests {
             .run_simulation::<Trader, Broker, Exchange, Replay>();
 
         let per_thread_configs = [
-            first_thread_config.clone(),
-            second_thread_config.clone(),
+            first_thread_config,
+            second_thread_config,
             second_thread_config
         ];
 

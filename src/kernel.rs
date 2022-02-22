@@ -165,6 +165,7 @@ KernelBuilder<T, B, E, R, StdRng>
         E: Exchange<BrokerID=R::BrokerID, ExchangeID=R::ExchangeID, E2R=R::E2R, R2E=R::R2E>,
         R: Replay,
 {
+    #[inline]
     /// Creates a new instance of the [`KernelBuilder`].
     ///
     /// # Arguments
@@ -285,6 +286,7 @@ KernelBuilder<T, B, E, R, StdRng>
         }
     }
 
+    #[inline]
     /// Sets non-default ([`StdRng`]) random number generator.
     pub fn with_rng<RNG: Rng + SeedableRng>(self) -> KernelBuilder<T, B, E, R, RNG>
     {
@@ -313,12 +315,14 @@ KernelBuilder<T, B, E, R, RNG>
         R: Replay,
         RNG: Rng + SeedableRng,
 {
+    #[inline]
     /// Sets seed for the [`Kernel`] random number generator.
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = Some(seed);
         self
     }
 
+    #[inline]
     /// Builds the [`Kernel`].
     pub fn build(self) -> Kernel<T, B, E, R, RNG>
     {
@@ -358,6 +362,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         R: Replay,
         RNG: SeedableRng + Rng
 {
+    #[inline]
     /// Runs final simulation.
     pub fn run_simulation(mut self)
     {
@@ -371,6 +376,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         }
     }
 
+    #[inline]
     fn handle_message(&mut self, message: <Self as InnerMessage>::MessageContent)
     {
         match message
@@ -428,6 +434,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         }
     }
 
+    #[inline]
     fn pop_next_replay_message(&mut self) {
         if let Some(action) = self.replay.next() {
             let message = self.process_replay_action(action);
@@ -435,12 +442,14 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         }
     }
 
+    #[inline]
     fn handle_replay_wakeup(&mut self, scheduled_action: R::R2R)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
         self.replay.wakeup(scheduled_action, &mut self.rng)
     }
 
+    #[inline]
     fn handle_replay_to_exchange(&mut self, request: R::R2E)
     {
         let exchange_id = request.get_exchange_id();
@@ -464,6 +473,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_replay_to_broker(&mut self, request: B::R2B)
     {
         let broker_id = request.get_broker_id();
@@ -484,6 +494,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_exchange_wakeup(&mut self, exchange_id: E::ExchangeID, scheduled_action: E::E2E)
     {
         let exchange = self.exchanges.get_mut(&exchange_id).unwrap_or_else(
@@ -506,6 +517,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_exchange_to_replay(&mut self, exchange_id: E::ExchangeID, reply: R::E2R)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
@@ -516,6 +528,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_exchange_to_broker(&mut self, exchange_id: E::ExchangeID, reply: B::E2B)
     {
         let broker_id = reply.get_broker_id();
@@ -537,6 +550,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_broker_wakeup(&mut self, broker_id: B::BrokerID, scheduled_action: B::B2B)
     {
         let broker = self.brokers.get_mut(&broker_id).unwrap_or_else(
@@ -556,6 +570,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_broker_to_replay(&mut self, broker_id: B::BrokerID, reply: B::B2R)
     {
         *self.replay.current_datetime_mut() = self.current_dt;
@@ -566,6 +581,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_broker_to_exchange(&mut self, broker_id: B::BrokerID, request: E::B2E)
     {
         let exchange_id = request.get_exchange_id();
@@ -590,6 +606,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_broker_to_trader(&mut self, broker_id: B::BrokerID, reply: B::B2T)
     {
         let trader_id = reply.get_trader_id();
@@ -610,6 +627,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_trader_wakeup(&mut self, trader_id: T::TraderID, scheduled_action: T::T2T)
     {
         let trader = self.traders.get_mut(&trader_id).unwrap_or_else(
@@ -628,6 +646,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn handle_trader_to_broker(&mut self, trader_id: T::TraderID, request: B::T2B)
     {
         let broker_id = request.get_broker_id();
@@ -649,6 +668,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         )
     }
 
+    #[inline]
     fn process_replay_action(
         &mut self,
         action: R::Item) -> Message<<Self as InnerMessage>::MessageContent>
@@ -677,6 +697,7 @@ impl<T, B, E, R, RNG> Kernel<T, B, E, R, RNG>
         }
     }
 
+    #[inline]
     fn process_exchange_action(
         current_dt: DateTime,
         brokers: &mut HashMap<B::BrokerID, B>,

@@ -49,6 +49,7 @@ impl<
 >
 BrokerActionProcessor<'a, BrokerID, BrokerAction, T, E, R>
 {
+    #[inline]
     pub fn new(
         current_dt: DateTime,
         broker_id: BrokerID,
@@ -69,6 +70,7 @@ impl<
 >
 TraderActionProcessor<TraderID, TraderAction, B, E, R>
 {
+    #[inline]
     pub fn new(current_dt: DateTime, trader_id: TraderID) -> Self {
         Self {
             current_dt,
@@ -102,6 +104,7 @@ for BrokerActionProcessor<'a, BrokerID, BrokerAction<B2R, B2E, B2T, B2B>, T, E, 
         >
     >;
 
+    #[inline]
     fn process_action(
         &mut self,
         action: BrokerAction<B2R, B2E, B2T, B2B>,
@@ -171,6 +174,7 @@ for TraderActionProcessor<TraderID, TraderAction<T2B, T2T>, B, E, R>
         >
     >;
 
+    #[inline]
     fn process_action(
         &mut self,
         action: TraderAction<T2B, T2T>,

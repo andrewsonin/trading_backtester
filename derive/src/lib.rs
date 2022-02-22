@@ -137,6 +137,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
         {
             type OuterID = #outer_id;
 
+            #[inline]
             fn outgoing_latency(
                 &mut self,
                 outer_id: Self::OuterID,
@@ -146,6 +147,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
                 match self { #outgoing_latency }
             }
 
+            #[inline]
             fn incoming_latency(
                 &mut self,
                 outer_id: Self::OuterID,
@@ -167,6 +169,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
             type T2T = #t2t;
             type T2B = #t2b;
 
+            #[inline]
             fn wakeup<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -177,6 +180,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
                 match self { #wakeup }
             }
 
+            #[inline]
             fn process_broker_reply<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -188,6 +192,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
                 match self { #process_broker_reply }
             }
 
+            #[inline]
             fn upon_register_at_broker(&mut self, broker_id: Self::BrokerID) {
                 match self { #upon_register_at_broker }
             }
@@ -196,6 +201,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
         impl #impl_generics TimeSync
         for #name #ty_generics
         #where_clause {
+            #[inline]
             fn current_datetime_mut(&mut self) -> &mut DateTime {
                 match self { #time_sync }
             }
@@ -207,6 +213,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
             type OuterID = #outer_id;
             type LatencyGenerator = #latency_generator_name #ty_generics;
 
+            #[inline]
             fn get_latency_generator(&self) -> Self::LatencyGenerator {
                 match self { #get_latency_generator }
             }
@@ -215,6 +222,7 @@ pub fn derive_trader(input: TokenStream) -> TokenStream
         impl #impl_generics Named<#trader_id>
         for #name #ty_generics
         #where_clause {
+            #[inline]
             fn get_name(&self) -> #trader_id {
                 match self { #named }
             }
@@ -386,6 +394,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         {
             type OuterID = #outer_id;
 
+            #[inline]
             fn outgoing_latency(
                 &mut self,
                 outer_id: Self::OuterID,
@@ -395,6 +404,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
                 match self { #outgoing_latency }
             }
 
+            #[inline]
             fn incoming_latency(
                 &mut self,
                 outer_id: Self::OuterID,
@@ -422,6 +432,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
             type B2B = #b2b;
             type SubCfg = #sub_cfg;
 
+            #[inline]
             fn wakeup<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -432,6 +443,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
                 match self { #wakeup }
             }
 
+            #[inline]
             fn process_trader_request<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -443,6 +455,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
                 match self { #process_trader_request }
             }
 
+            #[inline]
             fn process_exchange_reply<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -454,6 +467,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
                 match self { #process_exchange_reply }
             }
 
+            #[inline]
             fn process_replay_request<KerMsg: Ord>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -464,10 +478,12 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
                 match self { #process_replay_request }
             }
 
+            #[inline]
             fn upon_connection_to_exchange(&mut self, exchange_id: Self::ExchangeID) {
                 match self { #upon_connection_to_exchange }
             }
 
+            #[inline]
             fn register_trader(
                 &mut self,
                 trader_id: Self::TraderID,
@@ -480,6 +496,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         impl #impl_generics TimeSync
         for #name #ty_generics
         #where_clause {
+            #[inline]
             fn current_datetime_mut(&mut self) -> &mut DateTime {
                 match self { #time_sync }
             }
@@ -491,6 +508,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
             type OuterID = #outer_id;
             type LatencyGenerator = #latency_generator_name #ty_generics;
 
+            #[inline]
             fn get_latency_generator(&self) -> Self::LatencyGenerator {
                 match self { #get_latency_generator }
             }
@@ -499,6 +517,7 @@ pub fn derive_broker(input: TokenStream) -> TokenStream
         impl #impl_generics Named<#broker_id>
         for #name #ty_generics
         #where_clause {
+            #[inline]
             fn get_name(&self) -> #broker_id {
                 match self { #named }
             }
@@ -625,6 +644,7 @@ pub fn derive_exchange(input: TokenStream) -> TokenStream
             type E2B = #e2b;
             type E2E = #e2e;
 
+            #[inline]
             fn wakeup<KerMsg: Ord, RNG: Rng>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -635,6 +655,7 @@ pub fn derive_exchange(input: TokenStream) -> TokenStream
                 match self { #wakeup }
             }
 
+            #[inline]
             fn process_broker_request<KerMsg: Ord, RNG: Rng>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -646,6 +667,7 @@ pub fn derive_exchange(input: TokenStream) -> TokenStream
                 match self { #process_broker_request }
             }
 
+            #[inline]
             fn process_replay_request<KerMsg: Ord, RNG: Rng>(
                 &mut self,
                 message_receiver: MessageReceiver<KerMsg>,
@@ -656,6 +678,7 @@ pub fn derive_exchange(input: TokenStream) -> TokenStream
                 match self { #process_replay_request }
             }
 
+            #[inline]
             fn connect_broker(&mut self, broker: Self::BrokerID) {
                 match self { #connect_broker }
             }
@@ -664,6 +687,7 @@ pub fn derive_exchange(input: TokenStream) -> TokenStream
         impl #impl_generics TimeSync
         for #name #ty_generics
         #where_clause {
+            #[inline]
             fn current_datetime_mut(&mut self) -> &mut DateTime {
                 match self { #time_sync }
             }
@@ -672,6 +696,7 @@ pub fn derive_exchange(input: TokenStream) -> TokenStream
         impl #impl_generics Named<#exchange_id>
         for #name #ty_generics
         #where_clause {
+            #[inline]
             fn get_name(&self) -> #exchange_id {
                 match self { #named }
             }
@@ -791,6 +816,7 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
             type R2E = #r2e;
             type R2B = #r2b;
 
+            #[inline]
             fn wakeup(
                 &mut self,
                 scheduled_action: Self::R2R,
@@ -799,6 +825,7 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
                 match self { #wakeup }
             }
 
+            #[inline]
             fn handle_exchange_reply(
                 &mut self,
                 reply: Self::E2R,
@@ -808,6 +835,7 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
                 match self { #handle_exchange_reply }
             }
 
+            #[inline]
             fn handle_broker_reply(
                 &mut self,
                 reply: Self::B2R,
@@ -821,6 +849,7 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
         impl #impl_generics TimeSync
         for #name #ty_generics
         #where_clause {
+            #[inline]
             fn current_datetime_mut(&mut self) -> &mut DateTime {
                 match self { #time_sync }
             }
@@ -830,6 +859,7 @@ pub fn derive_replay(input: TokenStream) -> TokenStream
         for #name #ty_generics
         #where_clause {
             type Item = #item;
+            #[inline]
             fn next(&mut self) -> Option<Self::Item> {
                 match self { #next }
             }
@@ -907,6 +937,7 @@ pub fn derive_latency_generator(input: TokenStream) -> TokenStream
         {
             type OuterID = #outer_id;
 
+            #[inline]
             fn outgoing_latency(
                 &mut self,
                 outer_id: Self::OuterID,
@@ -916,6 +947,7 @@ pub fn derive_latency_generator(input: TokenStream) -> TokenStream
                 match self { #outgoing_latency }
             }
 
+            #[inline]
             fn incoming_latency(
                 &mut self,
                 outer_id: Self::OuterID,
@@ -959,6 +991,7 @@ pub fn derive_get_settlement_lag(input: TokenStream) -> TokenStream
                     impl #impl_generics From<#field_type>
                     for #name #ty_generics
                     #where_clause {
+                        #[inline]
                         fn from(value: #field_type) -> Self {
                             Self::#ident(value)
                         }
@@ -973,6 +1006,7 @@ pub fn derive_get_settlement_lag(input: TokenStream) -> TokenStream
         for #name #ty_generics
         #where_clause
         {
+            #[inline]
             fn get_settlement_lag(&self, transaction_dt: DateTime) -> u64 {
                 match self { #get_settlement_lag }
             }

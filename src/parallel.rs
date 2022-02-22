@@ -9,21 +9,22 @@ use {
     std::marker::PhantomData,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 /// Initializer struct that contain thread-unique information.
-/// Here it is the RNG seed, the initializer config for building possibly thread-unique
+/// Here it is the RNG seed and the initializer configs for building possibly thread-unique
 /// entities.
 pub struct ThreadConfig<ReplayConfig, ExchangeConfigs, BrokerConfigs, TraderConfigs> {
     rng_seed: u64,
     replay_config: ReplayConfig,
-    trader_configs: TraderConfigs,
-    broker_configs: BrokerConfigs,
     exchange_configs: ExchangeConfigs,
+    broker_configs: BrokerConfigs,
+    trader_configs: TraderConfigs,
 }
 
 impl<ReplayConfig, ExchangeConfigs, BrokerConfigs, TraderConfigs>
 ThreadConfig<ReplayConfig, ExchangeConfigs, BrokerConfigs, TraderConfigs>
 {
+    #[inline]
     /// Creates a new instance of the [`ThreadConfig`].
     ///
     /// # Arguments
@@ -43,9 +44,9 @@ ThreadConfig<ReplayConfig, ExchangeConfigs, BrokerConfigs, TraderConfigs>
         Self {
             rng_seed,
             replay_config,
-            trader_configs,
-            broker_configs,
             exchange_configs,
+            broker_configs,
+            trader_configs,
         }
     }
 }
@@ -63,6 +64,7 @@ pub struct ParallelBacktester<PerThreadConfs, RNG>
 impl<T> ParallelBacktester<T, StdRng>
     where T: IntoIterator
 {
+    #[inline]
     /// Creates a new instance of the [`ParallelBacktester`].
     ///
     /// # Arguments
@@ -81,6 +83,7 @@ impl<T> ParallelBacktester<T, StdRng>
         }
     }
 
+    #[inline]
     /// Sets non-default ([`StdRng`]) random number generator.
     pub fn with_rng<RNG: Rng + SeedableRng>(self) -> ParallelBacktester<T, RNG> {
         let Self {
@@ -103,6 +106,7 @@ ParallelBacktester<PerThreadConfigs, RNG>
     where PerThreadConfigs: IntoIterator,
           RNG: Rng + SeedableRng
 {
+    #[inline]
     /// Sets the number of threads in a thread pool.
     ///
     /// # Arguments
@@ -135,13 +139,14 @@ ParallelBacktester<PerThreadConfigs, RNG>
           SubscriptionConfigs: IntoIterator<Item=SubCfg>,
           RNG: Rng + SeedableRng
 {
+    #[inline]
     /// Runs final simulation.
     pub fn run_simulation<T, B, E, R>(self)
         where
-            T: for<'a> From<&'a TraderConfig>,
-            B: for<'a> From<&'a BrokerConfig>,
-            E: for<'a> From<&'a ExchangeConfig>,
-            R: for<'a> From<&'a ReplayConfig>,
+            T: From<TraderConfig>,
+            B: From<BrokerConfig>,
+            E: From<ExchangeConfig>,
+            R: From<ReplayConfig>,
             T: Trader<TraderID=B::TraderID, BrokerID=BrokerID, T2B=B::T2B, B2T=B::B2T>,
             B: Broker<BrokerID=BrokerID, ExchangeID=ExchangeID, B2R=R::B2R, R2B=R::R2B, SubCfg=SubCfg>,
             E: Exchange<BrokerID=BrokerID, ExchangeID=ExchangeID, E2R=R::E2R, R2E=R::R2E, B2E=B::B2E, E2B=B::E2B>,
@@ -166,16 +171,16 @@ ParallelBacktester<PerThreadConfigs, RNG>
 
         let job = || per_thread_configs.into_par_iter().for_each(
             |(rng_seed, replay_config, exchange_configs, broker_configs, trader_configs)| {
-                let exchanges = exchange_configs.iter().map(E::from);
+                let exchanges = exchange_configs.into_iter().map(E::from);
                 let brokers = broker_configs.into_iter().map(
                     |(broker_cfg, connected_exchanges)|
-                        (B::from(&broker_cfg), connected_exchanges)
+                        (B::from(broker_cfg), connected_exchanges)
                 );
                 let traders = trader_configs.into_iter().map(
                     |(trader_config, connected_brokers)|
-                        (T::from(&trader_config), connected_brokers)
+                        (T::from(trader_config), connected_brokers)
                 );
-                let replay = R::from(&replay_config);
+                let replay = R::from(replay_config);
                 KernelBuilder::new(exchanges, brokers, traders, replay, date_range)
                     .with_rng::<RNG>()
                     .with_seed(rng_seed)

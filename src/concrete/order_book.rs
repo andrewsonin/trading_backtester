@@ -220,6 +220,22 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     }
 
     #[inline]
+    /// Yields all IDs and remaining sizes of the active limit orders.
+    pub fn get_all_ids_and_sizes(&self) -> impl Iterator<Item=(OrderID, Size)> + '_ {
+        let get_order_ids = |order: &LimitOrder| {
+            if order.size != Size(0) { Some((order.id, order.size)) } else { None }
+        };
+        self.asks.iter()
+            .map(move |level| level.iter().filter_map(get_order_ids))
+            .flatten()
+            .chain(
+                self.bids.iter()
+                    .map(move |level| level.iter().filter_map(get_order_ids))
+                    .flatten()
+            )
+    }
+
+    #[inline]
     /// Cancels limit order, returning the cancelled limit order meta-information if successful.
     ///
     /// # Arguments

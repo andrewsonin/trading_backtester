@@ -256,6 +256,54 @@ mod tests {
             .run_simulation()
     }
 
+    #[test]
+    fn test_parse_yaml_2()
+    {
+        let usd_rub = TradedPair {
+            quoted_asset: Base::new(SymbolName::USD).into(),
+            settlement_asset: Base::new(SymbolName::RUB).into(),
+            settlement_determinant: SpotSettlement,
+        };
+
+        let test_files = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");
+        let simulated_spreads_file_path = test_files
+            .join("example_02")
+            .join("simulated_spread.csv");
+
+        let (exchange_names, replay_config, start_dt, end_dt) = parse_yaml(
+            test_files.join("example_02.yml"),
+            SpotBaseTradedPairParser,
+            DelayScheduler,
+        );
+
+        let exchanges = exchange_names.iter().map(BasicExchange::from);
+        let replay = OneTickReplay::from(&replay_config);
+        let brokers = [
+            (
+                BasicBroker::new(BrokerName::Broker1),
+                [ExchangeName::MOEX]
+            )
+        ];
+        let subscription_config = SubscriptionConfig::new(
+            ExchangeName::MOEX,
+            usd_rub,
+            SubscriptionList::subscribe(),
+        );
+        let traders = [
+            (
+                SpreadWriter::new(0, 0.0025, simulated_spreads_file_path),
+                [
+                    (BrokerName::Broker1, [subscription_config])
+                ]
+            )
+        ];
+        KernelBuilder::new(exchanges, brokers, traders, replay, (start_dt, end_dt))
+            .with_seed(3344)
+            .with_rng::<StdRng>()
+            .build()
+            .run_simulation()
+    }
+
     #[cfg(feature = "multithread")]
     #[test]
     fn test_parse_yaml_in_parallel()

@@ -566,6 +566,35 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
             }
         }
 
+        unsafe { self.insert_limit_order_without_matching::<DUMMY, BUY>(dt, id, price, size) }
+    }
+
+    #[inline]
+    /// Inserts limit order without matching.
+    ///
+    /// # Safety invariants
+    /// * Should not be inserted into the side of the order book
+    /// if the current best price of the opposite side is better than the `price`.
+    ///
+    /// # Parameters
+    ///
+    /// * `DUMMY` — Whether the order is dummy.
+    /// * `BUY` — Whether the order is bid.
+    ///
+    /// # Arguments
+    ///
+    /// * `dt` — Submission datetime.
+    /// * `id` — ID of the order to insert.
+    /// * `price` — Order price.
+    /// * `size` — Order size.
+    /// * `callback` — Callback.
+    pub unsafe fn insert_limit_order_without_matching<const DUMMY: bool, const BUY: bool>(
+        &mut self,
+        dt: DateTime,
+        id: OrderID,
+        price: Price,
+        size: Size,
+    ) {
         // Insert the remaining size of the new limit order into the order book
         self.id_to_price_and_side.insert(id, (price, BUY));
         let side = if BUY {

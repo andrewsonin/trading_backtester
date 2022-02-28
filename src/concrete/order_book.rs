@@ -566,7 +566,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
             }
         }
 
-        unsafe { self.insert_limit_order_without_matching::<DUMMY, BUY>(dt, id, price, size) }
+        self.insert_limit_order_without_matching::<DUMMY, BUY>(dt, id, price, size)
     }
 
     #[inline]
@@ -588,7 +588,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     /// * `price` — Order price.
     /// * `size` — Order size.
     /// * `callback` — Callback.
-    pub unsafe fn insert_limit_order_without_matching<const DUMMY: bool, const BUY: bool>(
+    pub fn insert_limit_order_without_matching<const DUMMY: bool, const BUY: bool>(
         &mut self,
         dt: DateTime,
         id: OrderID,

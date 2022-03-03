@@ -753,6 +753,56 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     }
 
     #[inline]
+    /// Returns an iterator over the order book volume-weighted pending times.
+    ///
+    /// # Parameters
+    /// * `UPPER` — Whether the side is asks.
+    ///
+    pub fn get_ob_side_vwa_pending_times<const UPPER: bool>(
+        &self,
+        current_dt: DateTime,
+    ) -> impl Iterator<Item=(Tick, f64)> + '_
+    {
+        let (side, price) = if UPPER {
+            (&self.asks, self.best_ask)
+        } else {
+            (&self.bids, self.best_bid)
+        };
+        side.iter()
+            .scan(
+                price,
+                |price, level| {
+                    let result = (*price, level);
+                    if UPPER {
+                        *price += Tick(1)
+                    } else {
+                        *price -= Tick(1)
+                    }
+                    Some(result)
+                },
+            )
+            .filter_map(
+                move |(price, level)| {
+                    let (mut vwpt, mut cum_lots) = (0, Lots(0));
+
+                    let mut update = |order: &LimitOrder| {
+                        cum_lots += order.size;
+                        vwpt += (current_dt - order.dt).num_nanoseconds().unwrap() * order.size.0;
+                    };
+
+                    let mut side = level.into_iter().filter(|order| order.size != Lots(0));
+                    if let Some(first_order) = side.next() {
+                        update(first_order)
+                    } else {
+                        return None;
+                    };
+                    side.for_each(update);
+                    Some((price, vwpt as f64 / cum_lots.0 as f64))
+                }
+            )
+    }
+
+    #[inline]
     /// Gets the current state of the order book side.
     ///
     /// # Parameters

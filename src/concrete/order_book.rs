@@ -760,8 +760,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     ///
     pub fn get_ob_side_vwa_pending_times<const UPPER: bool>(
         &self,
-        current_dt: DateTime,
-    ) -> impl Iterator<Item=(Tick, f64)> + '_
+        current_dt: DateTime) -> impl Iterator<Item=(Tick, f64)> + '_
     {
         let (side, price) = if UPPER {
             (&self.asks, self.best_ask)

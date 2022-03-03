@@ -2,7 +2,7 @@ use {
     crate::{
         concrete::{
             traded_pair::{settlement::GetSettlementLag, TradedPair},
-            types::{Direction, ObState, OrderID, Price, PriceStep, Size},
+            types::{Direction, Lots, ObState, OrderID, Tick, TickSize},
         },
         interface::message::{ExchangeToBroker, ExchangeToReplay},
         types::{
@@ -125,23 +125,23 @@ pub struct OrderPlacementDiscarded<Symbol: Id, Settlement: GetSettlementLag> {
 pub struct OrderPartiallyExecuted<Symbol: Id, Settlement: GetSettlementLag> {
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
-    pub price: Price,
-    pub size: Size,
+    pub price: Tick,
+    pub size: Lots,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct OrderExecuted<Symbol: Id, Settlement: GetSettlementLag> {
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
-    pub price: Price,
-    pub size: Size,
+    pub price: Tick,
+    pub size: Lots,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct MarketOrderNotFullyExecuted<Symbol: Id, Settlement: GetSettlementLag> {
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
-    pub remaining_size: Size,
+    pub remaining_size: Lots,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -163,7 +163,7 @@ pub enum ExchangeEventNotification<Symbol: Id, Settlement: GetSettlementLag>
 {
     ExchangeOpen,
 
-    TradesStarted { traded_pair: TradedPair<Symbol, Settlement>, price_step: PriceStep },
+    TradesStarted { traded_pair: TradedPair<Symbol, Settlement>, price_step: TickSize },
 
     OrderCancelled(LimitOrderEventInfo<Symbol, Settlement>),
 
@@ -262,16 +262,16 @@ pub struct LimitOrderEventInfo<Symbol: Id, Settlement: GetSettlementLag> {
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub order_id: OrderID,
     pub direction: Direction,
-    pub price: Price,
-    pub size: Size,
+    pub price: Tick,
+    pub size: Lots,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct MarketOrderEventInfo<Symbol: Id, Settlement: GetSettlementLag> {
     pub traded_pair: TradedPair<Symbol, Settlement>,
     pub direction: Direction,
-    pub price: Price,
-    pub size: Size,
+    pub price: Tick,
+    pub size: Lots,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]

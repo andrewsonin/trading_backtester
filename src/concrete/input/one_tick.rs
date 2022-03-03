@@ -4,7 +4,7 @@ use {
             message_protocol::replay::request::{BasicReplayRequest, BasicReplayToExchange},
             order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
             traded_pair::{settlement::GetSettlementLag, TradedPair},
-            types::{Direction, OrderID, Price, PriceStep, Size},
+            types::{Direction, Lots, OrderID, Tick, TickSize},
         },
         interface::replay::{ReplayAction, ReplayActionKind},
         types::{DateTime, Id, NeverType, Nothing},
@@ -37,7 +37,7 @@ pub struct OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
     next_trd: Option<HistoryEntry>,
     next_prl: Option<HistoryEntry>,
 
-    active_limit_orders: HashMap<OrderID, (OrderID, Size)>,
+    active_limit_orders: HashMap<OrderID, (OrderID, Lots)>,
     /// Map between submitted limit order IDs and their internal IDs.
     pub limit_submitted_to_internal: HashMap<OrderID, OrderID>,
 
@@ -55,9 +55,9 @@ pub(crate) struct OneTickHistoryReader
 #[derive(Copy, Clone)]
 pub(crate) struct HistoryEntry {
     pub datetime: DateTime,
-    pub size: Size,
+    pub size: Lots,
     pub direction: Direction,
-    pub price: Price,
+    pub price: Tick,
     pub order_id: OrderID,
 }
 
@@ -224,7 +224,7 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         >
     > {
         let entry = self.active_limit_orders.entry(prl.order_id);
-        if prl.size != Size(0) {
+        if prl.size != Lots(0) {
             if let Vacant(entry) = entry {
                 let order_id = *next_order_id;
                 *next_order_id += OrderID(1);
@@ -248,7 +248,7 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
         } else if let Occupied(entry) = entry {
             let (order_id, size) = entry.get();
             let (order_id, size) = (*order_id, *size);
-            if size != Size(0) {
+            if size != Lots(0) {
                 let replay_action = self.create_replay_to_exchange(
                     prl.datetime,
                     BasicReplayRequest::CancelLimitOrder(
@@ -298,9 +298,9 @@ OneTickTradedPairReader<ExchangeID, Symbol, Settlement>
                     )
                 }
                 trd.size = *size;
-                *size = Size(0)
+                *size = Lots(0)
             }
-            let result = if trd.size != Size(0) {
+            let result = if trd.size != Lots(0) {
                 let order_id = *next_order_id;
                 *next_order_id += OrderID(1);
                 let replay_action = self.create_replay_to_exchange(
@@ -411,7 +411,7 @@ impl OneTickHistoryReader
             &self.args,
         );
 
-        let price_step = PriceStep(self.args.price_step);
+        let price_step = TickSize(self.args.price_step);
         let datetime_format = &self.args.datetime_format;
 
         let process_next_entry = |(record, row_n): (Result<StringRecord, csv::Error>, _)| {
@@ -434,7 +434,7 @@ impl OneTickHistoryReader
                         Datetime format used: {datetime_format}. Error: {err}"
                     )
                 ),
-                size: Size::from_str(size).unwrap_or_else(
+                size: Lots::from_str(size).unwrap_or_else(
                     |err| panic!("Cannot parse to Size (i64): {size}. Error: {err}")
                 ),
                 direction: match bs_flag {
@@ -442,7 +442,7 @@ impl OneTickHistoryReader
                     "1" | "S" | "s" | "True" | "true" => Direction::Sell,
                     _ => panic!("Cannot parse buy-sell flag: {bs_flag}")
                 },
-                price: Price::from_decimal_str(price, price_step),
+                price: Tick::from_decimal_str(price, price_step),
                 order_id: OrderID::from_str(order_id).unwrap_or_else(
                     |err| panic!("Cannot parse to OrderID (u64): {order_id}. Error: {err}")
                 ),

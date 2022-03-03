@@ -38,7 +38,7 @@ use {
             order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
             order_book::{OrderBook, OrderBookEvent, OrderBookEventKind},
             traded_pair::{settlement::GetSettlementLag, TradedPair},
-            types::{Direction, OrderID, PriceStep, Size},
+            types::{Direction, Lots, OrderID, TickSize},
         },
         interface::{
             exchange::{Exchange, ExchangeAction, ExchangeActionKind},
@@ -93,7 +93,7 @@ pub struct BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
     internal_to_submitted: HashMap<OrderID, (OrderID, Option<BrokerID>)>,
 
     next_order_id: OrderID,
-    order_books: HashMap<TradedPair<Symbol, Settlement>, (OrderBook<false>, PriceStep)>,
+    order_books: HashMap<TradedPair<Symbol, Settlement>, (OrderBook<false>, TickSize)>,
     is_open: bool,
 }
 
@@ -678,7 +678,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         mut message_receiver: MessageReceiver<KerMsg>,
         mut process_action: impl FnMut(<Self as Agent>::Action) -> KerMsg,
         traded_pair: TradedPair<Symbol, Settlement>,
-        price_step: PriceStep,
+        price_step: TickSize,
     ) {
         if !self.is_open {
             let reply = Self::create_replay_reply(
@@ -755,7 +755,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
             message_receiver.push(process_action(reply));
             return;
         }
-        if order.size == Size(0) {
+        if order.size == Lots(0) {
             let order_discarded = OrderPlacementDiscarded {
                 traded_pair: order.traded_pair,
                 order_id: order.order_id,
@@ -906,7 +906,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
                     )
                 }
             }
-            if remaining_size != Size(0) {
+            if remaining_size != Lots(0) {
                 let not_fully_executed = MarketOrderNotFullyExecuted {
                     traded_pair: order.traded_pair,
                     order_id: order.order_id,
@@ -982,7 +982,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
             message_receiver.push(process_action(reply));
             return;
         }
-        if order.size == Size(0) {
+        if order.size == Lots(0) {
             let order_discarded = OrderPlacementDiscarded {
                 traded_pair: order.traded_pair,
                 order_id: order.order_id,
@@ -1182,7 +1182,7 @@ BasicExchange<ExchangeID, BrokerID, Symbol, Settlement>
         >,
         message_receiver: &mut MessageReceiver<KerMsg>,
         mut process_action: ProcessAction,
-        remaining_size: &mut Size,
+        remaining_size: &mut Lots,
         event: OrderBookEvent,
         traded_pair: TradedPair<Symbol, Settlement>,
         new_order_id: OrderID,

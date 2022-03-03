@@ -8,7 +8,7 @@ use {
                 trader::request::BasicTraderToBroker,
             },
             traded_pair::settlement::GetSettlementLag,
-            types::{ObState, PriceStep, Size},
+            types::{Lots, ObState, TickSize},
         },
         interface::{
             latency::Latent,
@@ -37,7 +37,7 @@ pub struct SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
 {
     name: TraderID,
     current_dt: DateTime,
-    price_step: PriceStep,
+    price_step: TickSize,
     file: File,
     phantom: PhantomData<(BrokerID, ExchangeID, Symbol, Settlement)>,
 }
@@ -57,7 +57,7 @@ SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
     /// * `name` — ID of the `SpreadWriter`.
     /// * `price_step` — Price quotation step.
     /// * `file` — Path to the csv-file to create.
-    pub fn new(name: TraderID, price_step: impl Into<PriceStep>, file: impl AsRef<Path>) -> Self {
+    pub fn new(name: TraderID, price_step: impl Into<TickSize>, file: impl AsRef<Path>) -> Self {
         let file = file.as_ref();
         let file = File::create(file).unwrap_or_else(
             |err| panic!("Cannot create file {file:?}. Error: {err}")
@@ -168,8 +168,8 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
             if let (Some((bid, bids)), Some((ask, asks))) = (bids.first(), asks.first())
             {
                 let get_size = |(size, _dt): &_| *size;
-                let bid_size: Size = bids.iter().map(get_size).sum();
-                let ask_size: Size = asks.iter().map(get_size).sum();
+                let bid_size: Lots = bids.iter().map(get_size).sum();
+                let ask_size: Lots = asks.iter().map(get_size).sum();
                 let bid_price = bid.to_f64(self.price_step);
                 let ask_price = ask.to_f64(self.price_step);
                 if bid_price >= ask_price {

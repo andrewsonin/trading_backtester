@@ -11,18 +11,18 @@ pub struct OrderID(pub u64);
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Clone, Copy)]
 #[derive(derive_more::Display, Add, Sub, AddAssign, SubAssign, From, Into)]
-/// Price newtype. Is equivalent to the [`i64`] due to the fact that
+/// Quotation tick newtype. Is equivalent to the [`i64`] due to the fact that
 /// exchanges quote prices with a certain constant step.
-pub struct Price(pub i64);
+pub struct Tick(pub i64);
 
 #[derive(derive_more::Display, FromStr, Debug, PartialOrd, Clone, Copy, From, Into)]
-/// PriceStep newtype. Price quotation step.
-pub struct PriceStep(pub f64);
+/// Tick size newtype. Price quotation step.
+pub struct TickSize(pub f64);
 
 #[derive(Debug, PartialOrd, PartialEq, Ord, Eq, Hash, Clone, Copy)]
 #[derive(derive_more::Display, FromStr, Add, Sub, AddAssign, SubAssign, Sum, From, Into)]
-/// Size newtype.
-pub struct Size(pub i64);
+/// Order size newtype.
+pub struct Lots(pub i64);
 
 #[derive(derive_more::Display, Debug, PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]
 /// Order Direction.
@@ -36,14 +36,14 @@ pub enum Direction {
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd)]
 /// Order book state.
 pub struct ObState {
-    pub bids: Vec<(Price, Vec<(Size, DateTime)>)>,
-    pub asks: Vec<(Price, Vec<(Size, DateTime)>)>,
+    pub bids: Vec<(Tick, Vec<(Lots, DateTime)>)>,
+    pub asks: Vec<(Tick, Vec<(Lots, DateTime)>)>,
 }
 
 /// Acceptable precision error during conversions between [`f64`] and [`Price`].
 const ACCEPTABLE_PRECISION_ERROR: f64 = 1e-11;
 
-impl Price
+impl Tick
 {
     /// Converts string to [`Price`].
     ///
@@ -51,7 +51,7 @@ impl Price
     ///
     /// * `string` — String to convert.
     /// * `price_step` — Price quotation step.
-    pub fn from_decimal_str(string: impl AsRef<str>, price_step: PriceStep) -> Self
+    pub fn from_decimal_str(string: impl AsRef<str>, price_step: TickSize) -> Self
     {
         let string = string.as_ref();
         let parsed_f64 = f64::from_str(string).unwrap_or_else(
@@ -67,11 +67,11 @@ impl Price
     ///
     /// * `value` — Value to convert.
     /// * `price_step` — Price quotation step.
-    pub fn from_f64(value: f64, price_step: PriceStep) -> Self {
+    pub fn from_f64(value: f64, price_step: TickSize) -> Self {
         let price_steps = value / price_step.0;
         let rounded_price_steps = price_steps.round();
         if (rounded_price_steps - price_steps).abs() < ACCEPTABLE_PRECISION_ERROR {
-            Price(rounded_price_steps as i64)
+            Tick(rounded_price_steps as i64)
         } else {
             panic!(
                 "Cannot convert f64 {value} to Price without loss of precision \
@@ -86,18 +86,18 @@ impl Price
     /// # Arguments
     ///
     /// * `price_step` — Price quotation step.
-    pub fn to_f64(&self, price_step: PriceStep) -> f64 {
+    pub fn to_f64(&self, price_step: TickSize) -> f64 {
         self.0 as f64 * price_step.0
     }
 }
 
-impl From<Price> for isize {
-    fn from(price: Price) -> Self {
+impl From<Tick> for isize {
+    fn from(price: Tick) -> Self {
         price.0 as isize
     }
 }
 
-impl PartialEq for PriceStep {
+impl PartialEq for TickSize {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         let diff = self.0 - other.0;
@@ -105,9 +105,9 @@ impl PartialEq for PriceStep {
     }
 }
 
-impl Eq for PriceStep {}
+impl Eq for TickSize {}
 
-impl Ord for PriceStep {
+impl Ord for TickSize {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         if self < other {

@@ -1,7 +1,7 @@
 use crate::{
     concrete::{
         traded_pair::{settlement::GetSettlementLag, TradedPair},
-        types::{Direction, OrderID, Price, Size},
+        types::{Direction, Lots, OrderID, Tick},
     },
     types::Id,
 };
@@ -25,9 +25,9 @@ pub struct LimitOrderPlacingRequest<Symbol: Id, Settlement: GetSettlementLag> {
     /// Direction of the order to place.
     pub direction: Direction,
     /// Price of the order to place.
-    pub price: Price,
+    pub price: Tick,
     /// Size of the order to place.
-    pub size: Size,
+    pub size: Lots,
     /// Whether the order is dummy.
     pub dummy: bool,
 }
@@ -42,7 +42,7 @@ pub struct MarketOrderPlacingRequest<Symbol: Id, Settlement: GetSettlementLag> {
     /// Direction of the order to place.
     pub direction: Direction,
     /// Size of the order to place.
-    pub size: Size,
+    pub size: Lots,
     /// Whether the order is dummy.
     pub dummy: bool,
 }

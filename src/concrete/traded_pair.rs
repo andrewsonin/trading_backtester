@@ -1,6 +1,6 @@
 use {
     crate::{
-        concrete::types::Price,
+        concrete::types::Tick,
         enum_def,
         types::{DateTime, Id, Named},
     },
@@ -55,7 +55,7 @@ pub struct Futures<Name: Id> {
     /// Maturity datetime.
     pub maturity: DateTime,
     /// Strike price.
-    pub strike: Price,
+    pub strike: Tick,
 }
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Ord, Eq, Hash)]
@@ -70,7 +70,7 @@ pub struct OptionContract<Name: Id> {
     /// Maturity datetime.
     pub maturity: DateTime,
     /// Strike price.
-    pub strike: Price,
+    pub strike: Tick,
     /// Kind of `OptionContract`.
     pub kind: OptionKind,
 }
@@ -110,7 +110,7 @@ impl<Name: Id> Futures<Name> {
         underlying_symbol: Name,
         settlement_symbol: Name,
         maturity: DateTime,
-        strike: Price) -> Self
+        strike: Tick) -> Self
     {
         Self { symbol, underlying_symbol, settlement_symbol, maturity, strike }
     }
@@ -132,7 +132,7 @@ impl<Name: Id> OptionContract<Name> {
         underlying_symbol: Name,
         settlement_symbol: Name,
         maturity: DateTime,
-        strike: Price,
+        strike: Tick,
         kind: OptionKind) -> Self
     {
         Self { symbol, underlying_symbol, settlement_symbol, maturity, strike, kind }

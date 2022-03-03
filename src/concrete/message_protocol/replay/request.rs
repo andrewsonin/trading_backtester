@@ -2,7 +2,7 @@ use crate::{
     concrete::{
         order::{LimitOrderCancelRequest, LimitOrderPlacingRequest, MarketOrderPlacingRequest},
         traded_pair::{settlement::GetSettlementLag, TradedPair},
-        types::PriceStep,
+        types::TickSize,
     },
     interface::message::ReplayToExchange,
     types::Id,
@@ -37,7 +37,7 @@ pub enum BasicReplayRequest<Symbol: Id, Settlement: GetSettlementLag>
 {
     ExchangeOpen,
 
-    StartTrades { traded_pair: TradedPair<Symbol, Settlement>, price_step: PriceStep },
+    StartTrades { traded_pair: TradedPair<Symbol, Settlement>, price_step: TickSize },
 
     CancelLimitOrder(LimitOrderCancelRequest<Symbol, Settlement>),
 

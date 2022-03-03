@@ -12,7 +12,7 @@ use {
             },
             traded_pair::{settlement::GetSettlementLag, TradedPair},
             trader::SpreadWriter,
-            types::PriceStep,
+            types::TickSize,
         },
         types::{DateTime, Id},
     },
@@ -133,7 +133,7 @@ for BasicBroker<BrokerID, TraderID, ExchangeID, Symbol, Settlement>
 /// Initializer-config for [`SpreadWriter`].
 pub struct SpreadWriterConfig<TraderID, PS, F>
     where TraderID: Id,
-          PS: Into<PriceStep> + Copy,
+          PS: Into<TickSize> + Copy,
           F: AsRef<Path>
 {
     /// ID of the `SpreadWriter`.
@@ -147,7 +147,7 @@ pub struct SpreadWriterConfig<TraderID, PS, F>
 impl<TraderID, PS, F>
 SpreadWriterConfig<TraderID, PS, F>
     where TraderID: Id,
-          PS: Into<PriceStep> + Copy,
+          PS: Into<TickSize> + Copy,
           F: AsRef<Path>
 {
     /// Creates a new instance of the [`SpreadWriterConfig`].
@@ -170,7 +170,7 @@ for SpreadWriter<TraderID, BrokerID, ExchangeID, Symbol, Settlement>
           ExchangeID: Id,
           Symbol: Id,
           Settlement: GetSettlementLag,
-          PS: Into<PriceStep> + Copy,
+          PS: Into<TickSize> + Copy,
           F: AsRef<Path>
 {
     fn from(cfg: &SpreadWriterConfig<TraderID, PS, F>) -> Self {

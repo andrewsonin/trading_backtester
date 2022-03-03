@@ -11,7 +11,7 @@ use {
                 replay::request::{BasicReplayRequest, BasicReplayToExchange},
             },
             traded_pair::{settlement::GetSettlementLag, TradedPair},
-            types::{OrderID, PriceStep},
+            types::{OrderID, TickSize},
         },
         interface::{
             message::{
@@ -115,7 +115,7 @@ pub struct TradedPairLifetime<ExchangeID, Symbol, Settlement>
 {
     pub exchange_id: ExchangeID,
     pub traded_pair: TradedPair<Symbol, Settlement>,
-    pub price_step: PriceStep,
+    pub price_step: TickSize,
     pub start_dt: DateTime,
     pub stop_dt: Option<DateTime>,
 }

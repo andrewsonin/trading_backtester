@@ -140,7 +140,7 @@ mod tests {
         broker_examples::BasicBroker,
         crate::prelude::*,
         exchange_example::BasicExchange,
-        misc_types::PriceStep,
+        misc_types::TickSize,
         rand::{Rng, rngs::StdRng},
         replay_examples::{GetNextObSnapshotDelay, OneTickReplay},
         settlement_examples::SpotSettlement,
@@ -330,7 +330,7 @@ mod tests {
         let spread_writer_config = SpreadWriterConfig::new(
             0,
             test_files.join("example_01").join("simulated_spread_par_01.csv"),
-            PriceStep(0.0025),
+            TickSize(0.0025),
         );
         let subscription_config = SubscriptionConfig::new(
             ExchangeName::MOEX,
@@ -354,7 +354,7 @@ mod tests {
         let spread_writer_config = SpreadWriterConfig::new(
             1,
             test_files.join("example_01").join("simulated_spread_par_02.csv"),
-            PriceStep(0.0025),
+            TickSize(0.0025),
         );
         let second_thread_config = ThreadConfig::new(
             4122,

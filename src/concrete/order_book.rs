@@ -1,5 +1,5 @@
 use {
-    crate::{concrete::types::{Direction, ObState, OrderID, Price, Size}, types::DateTime},
+    crate::{concrete::types::{Direction, Lots, ObState, OrderID, Tick}, types::DateTime},
     std::{
         cmp::Ordering,
         collections::{hash_map::Entry::Occupied, HashMap, VecDeque},
@@ -17,7 +17,7 @@ pub struct LimitOrder {
     /// Order unique identifier.
     pub id: OrderID,
     /// Order remaining size.
-    pub size: Size,
+    pub size: Lots,
     /// Indicates whether the order is dummy.
     /// If the order is dummy,
     /// it does not affect the size of the opposite orders with which it is executed.
@@ -38,24 +38,24 @@ pub struct OrderBook<const MATCH_DUMMY_WITH_DUMMY: bool> {
     /// Ask levels.
     asks: VecDeque<VecDeque<LimitOrder>>,
     /// Best bid price.
-    best_bid: Price,
+    best_bid: Tick,
     /// Best ask price.
-    best_ask: Price,
+    best_ask: Tick,
     /// Map [OrderId -> (Price, Whether it is bid)]
-    id_to_price_and_side: HashMap<OrderID, (Price, bool)>,
+    id_to_price_and_side: HashMap<OrderID, (Tick, bool)>,
 }
 
 /// Borrows [`OrderBook`] side and performs cleanup on drop.
 struct SideWrapper<'a, const UPPER: bool, const FROM_BOTH_ENDS: bool> {
     side: &'a mut VecDeque<VecDeque<LimitOrder>>,
-    best_price: &'a mut Price,
+    best_price: &'a mut Tick,
 }
 
 impl<const UPPER: bool, const SHRINK_BOTH_ENDS: bool>
 SideWrapper<'_, UPPER, SHRINK_BOTH_ENDS>
 {
     #[inline]
-    fn get_side_and_price(&mut self) -> (&mut VecDeque<VecDeque<LimitOrder>>, Price) {
+    fn get_side_and_price(&mut self) -> (&mut VecDeque<VecDeque<LimitOrder>>, Tick) {
         (self.side, *self.best_price)
     }
 
@@ -68,9 +68,9 @@ SideWrapper<'_, UPPER, SHRINK_BOTH_ENDS>
             }
             self.side.pop_front();
             if UPPER {
-                *self.best_price += Price(1)
+                *self.best_price += Tick(1)
             } else {
-                *self.best_price -= Price(1)
+                *self.best_price -= Tick(1)
             }
         }
         if SHRINK_BOTH_ENDS {
@@ -107,14 +107,14 @@ impl<const SHRINK_BOTH_ENDS: bool> LevelWrapper<'_, SHRINK_BOTH_ENDS>
     pub fn shrink_level(&mut self)
     {
         while let Some(order) = self.0.front() {
-            if order.size != Size(0) {
+            if order.size != Lots(0) {
                 break;
             }
             self.0.pop_front();
         }
         if SHRINK_BOTH_ENDS {
             while let Some(order) = self.0.back() {
-                if order.size != Size(0) {
+                if order.size != Lots(0) {
                     break;
                 }
                 self.0.pop_back();
@@ -136,9 +136,9 @@ Drop for LevelWrapper<'_, SHRINK_BOTH_ENDS>
 /// Order book execution event.
 pub struct OrderBookEvent {
     /// Size of the diff.
-    pub size: Size,
+    pub size: Lots,
     /// Price of the diff.
-    pub price: Price,
+    pub price: Tick,
     /// Order book event kind.
     pub kind: OrderBookEventKind,
 }
@@ -169,7 +169,7 @@ impl Display for NoSuchID {
 
 enum MatchingStatus {
     FullyExecuted,
-    PartiallyExecuted(Size),
+    PartiallyExecuted(Lots),
 }
 
 impl<const MATCH_DUMMY_WITH_DUMMY: bool> Default for OrderBook<MATCH_DUMMY_WITH_DUMMY> {
@@ -187,8 +187,8 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
         OrderBook {
             bids: Default::default(),
             asks: Default::default(),
-            best_bid: Price(0),
-            best_ask: Price(0),
+            best_bid: Tick(0),
+            best_ask: Tick(0),
             id_to_price_and_side: Default::default(),
         }
     }
@@ -196,8 +196,8 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     #[inline]
     /// Clears the `OrderBook`.
     pub fn clear(&mut self) {
-        self.best_bid = Price(0);
-        self.best_ask = Price(0);
+        self.best_bid = Tick(0);
+        self.best_ask = Tick(0);
         self.bids.clear();
         self.asks.clear();
         self.id_to_price_and_side.clear();
@@ -207,7 +207,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     /// Yields all IDs of the active limit orders.
     pub fn get_all_ids(&self) -> impl Iterator<Item=OrderID> + '_ {
         let get_order_ids = |order: &LimitOrder| {
-            if order.size != Size(0) { Some(order.id) } else { None }
+            if order.size != Lots(0) { Some(order.id) } else { None }
         };
         self.asks.iter()
             .map(move |level| level.iter().filter_map(get_order_ids))
@@ -221,9 +221,9 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
 
     #[inline]
     /// Yields all IDs and remaining sizes of the active limit orders.
-    pub fn get_all_ids_and_sizes(&self) -> impl Iterator<Item=(OrderID, Size)> + '_ {
+    pub fn get_all_ids_and_sizes(&self) -> impl Iterator<Item=(OrderID, Lots)> + '_ {
         let get_order_ids = |order: &LimitOrder| {
-            if order.size != Size(0) { Some((order.id, order.size)) } else { None }
+            if order.size != Lots(0) { Some((order.id, order.size)) } else { None }
         };
         self.asks.iter()
             .map(move |level| level.iter().filter_map(get_order_ids))
@@ -243,7 +243,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     /// * `id` — Order ID to cancel.
     pub fn cancel_limit_order(
         &mut self,
-        id: OrderID) -> Result<(LimitOrder, Direction, Price), NoSuchID>
+        id: OrderID) -> Result<(LimitOrder, Direction, Tick), NoSuchID>
     {
         let (price, buy) = if let Occupied(e) = self.id_to_price_and_side.entry(id) {
             e.remove()
@@ -262,7 +262,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     fn cancel_limit_order_<const UPPER: bool>(
         &mut self,
         id: OrderID,
-        price: Price) -> (LimitOrder, Direction, Price)
+        price: Tick) -> (LimitOrder, Direction, Tick)
     {
         let mut opposite_side = if UPPER {
             SideWrapper::<UPPER, true> { side: &mut self.asks, best_price: &mut self.best_ask }
@@ -278,11 +278,11 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
         if offset >= 0 {
             if let Some(level) = side.get_mut(offset as usize) {
                 if let Some(order) = level.iter_mut()
-                    .filter(|order| order.id == id && order.size != Size(0))
+                    .filter(|order| order.id == id && order.size != Lots(0))
                     .next()
                 {
                     let cancelled_order = *order;
-                    order.size = Size(0);
+                    order.size = Lots(0);
                     let direction = if UPPER {
                         Direction::Sell
                     } else {
@@ -315,9 +315,9 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     pub fn update_limit_order_moving_to_end(
         &mut self,
         id: OrderID,
-        new_size: Size) -> Result<(), NoSuchID>
+        new_size: Lots) -> Result<(), NoSuchID>
     {
-        if new_size == Size(0) {
+        if new_size == Lots(0) {
             self.cancel_limit_order(id)?;
             return Ok(());
         }
@@ -334,10 +334,10 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
         if offset >= 0 {
             if let Some(level) = side.get_mut(offset as usize) {
                 if let Some(order) = level.iter_mut()
-                    .filter(|order| order.id == id && order.size != Size(0))
+                    .filter(|order| order.id == id && order.size != Lots(0))
                     .next()
                 {
-                    order.size = Size(0);
+                    order.size = Lots(0);
                     let LimitOrder { is_dummy, dt, .. } = *order;
                     LevelWrapper::<true>(level);
                     level.push_back(LimitOrder { id, size: new_size, is_dummy, dt })
@@ -364,9 +364,9 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     ///
     /// * `id` — Order ID to update.
     /// * `new_size` — New size of the limit order.
-    pub fn update_limit_order(&mut self, id: OrderID, new_size: Size) -> Result<(), NoSuchID>
+    pub fn update_limit_order(&mut self, id: OrderID, new_size: Lots) -> Result<(), NoSuchID>
     {
-        if new_size == Size(0) {
+        if new_size == Lots(0) {
             self.cancel_limit_order(id)?;
             return Ok(());
         }
@@ -383,7 +383,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
         if offset >= 0 {
             if let Some(level) = side.get_mut(offset as usize) {
                 if let Some(order) = level.iter_mut()
-                    .filter(|order| order.id == id && order.size != Size(0))
+                    .filter(|order| order.id == id && order.size != Lots(0))
                     .next()
                 {
                     order.size = new_size
@@ -423,8 +423,8 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
         const BUY: bool
     >(
         &mut self,
-        mut price: Price,
-        mut size: Size,
+        mut price: Tick,
+        mut size: Lots,
         mut callback: CallBack,
     ) {
         let mut opposite_side = if BUY {
@@ -463,7 +463,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                             return;
                         }
                         MatchingStatus::PartiallyExecuted(exec_size) => {
-                            if exec_size != Size(0) {
+                            if exec_size != Lots(0) {
                                 size -= exec_size;
                                 callback(
                                     OrderBookEvent {
@@ -476,9 +476,9 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                         }
                     }
                     if BUY {
-                        price += Price(1)
+                        price += Tick(1)
                     } else {
-                        price -= Price(1)
+                        price -= Tick(1)
                     }
                 }
             }
@@ -503,8 +503,8 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
         &mut self,
         dt: DateTime,
         id: OrderID,
-        price: Price,
-        mut size: Size,
+        price: Tick,
+        mut size: Lots,
         mut callback: CallBack,
     ) {
         {
@@ -544,7 +544,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                                 return;
                             }
                             MatchingStatus::PartiallyExecuted(exec_size) => {
-                                if exec_size != Size(0) {
+                                if exec_size != Lots(0) {
                                     size -= exec_size;
                                     callback(
                                         OrderBookEvent {
@@ -557,9 +557,9 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                             }
                         }
                         if BUY {
-                            price += Price(1)
+                            price += Tick(1)
                         } else {
-                            price -= Price(1)
+                            price -= Tick(1)
                         }
                     }
                 }
@@ -592,8 +592,8 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
         &mut self,
         dt: DateTime,
         id: OrderID,
-        price: Price,
-        size: Size,
+        price: Tick,
+        size: Lots,
     ) {
         // Insert the remaining size of the new limit order into the order book
         self.id_to_price_and_side.insert(id, (price, BUY));
@@ -656,7 +656,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     /// * `callback` — Callback.
     pub fn insert_market_order<CallBack: FnMut(OrderBookEvent), const DUMMY: bool, const BUY: bool>(
         &mut self,
-        mut size: Size,
+        mut size: Lots,
         mut callback: CallBack,
     ) {
         let mut opposite_side = if BUY {
@@ -682,7 +682,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                     return;
                 }
                 MatchingStatus::PartiallyExecuted(exec_size) => {
-                    if exec_size != Size(0) {
+                    if exec_size != Lots(0) {
                         size -= exec_size;
                         callback(
                             OrderBookEvent {
@@ -695,9 +695,9 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                 }
             }
             if BUY {
-                price += Price(1)
+                price += Tick(1)
             } else {
-                price -= Price(1)
+                price -= Tick(1)
             }
         }
     }
@@ -710,7 +710,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     ///
     pub fn get_ob_side_iter<const UPPER: bool>(
         &self
-    ) -> impl Iterator<Item=(Price, impl Iterator<Item=(OrderID, Size, DateTime)> + '_)> + '_
+    ) -> impl Iterator<Item=(Tick, impl Iterator<Item=(OrderID, Lots, DateTime)> + '_)> + '_
     {
         let (side, price) = if UPPER {
             (&self.asks, self.best_ask)
@@ -722,7 +722,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                 |level| level
                     .iter()
                     .filter_map(
-                        |order| if order.size != Size(0) && !order.is_dummy {
+                        |order| if order.size != Lots(0) && !order.is_dummy {
                             Some((order.id, order.size, order.dt))
                         } else {
                             None
@@ -734,9 +734,9 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                 |price, level| {
                     let result = (*price, level);
                     if UPPER {
-                        *price += Price(1)
+                        *price += Tick(1)
                     } else {
-                        *price -= Price(1)
+                        *price -= Tick(1)
                     }
                     Some(result)
                 },
@@ -764,7 +764,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     ///                  If zero, the number of levels is considered unlimited.
     pub fn get_ob_side<const UPPER: bool>(
         &self,
-        max_levels: usize) -> Vec<(Price, Vec<(OrderID, Size, DateTime)>)>
+        max_levels: usize) -> Vec<(Tick, Vec<(OrderID, Lots, DateTime)>)>
     {
         let it = self.get_ob_side_iter::<UPPER>()
             .map(|(price, level)| (price, level.collect()));
@@ -787,7 +787,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
     ///                  If zero, the number of levels is considered unlimited.
     pub fn get_ob_side_with_no_id<const UPPER: bool>(
         &self,
-        max_levels: usize) -> Vec<(Price, Vec<(Size, DateTime)>)>
+        max_levels: usize) -> Vec<(Tick, Vec<(Lots, DateTime)>)>
     {
         let it = self.get_ob_side_iter::<UPPER>()
             .map(|(price, level)| (price, level.map(|(_, size, dt)| (size, dt)).collect()));
@@ -814,10 +814,10 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
 
     fn match_with_level<Callback: FnMut(OrderBookEvent), const DUMMY: bool>(
         level: &mut VecDeque<LimitOrder>,
-        price: Price,
-        size: Size,
+        price: Tick,
+        size: Lots,
         callback: &mut Callback,
-        id_to_price_and_side: &mut HashMap<OrderID, (Price, bool)>) -> MatchingStatus
+        id_to_price_and_side: &mut HashMap<OrderID, (Tick, bool)>) -> MatchingStatus
     {
         if DUMMY {
             Self::match_dummy_with_level(level, price, size, callback, id_to_price_and_side)
@@ -828,13 +828,13 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
 
     fn match_dummy_with_level(
         level: &mut VecDeque<LimitOrder>,
-        price: Price,
-        mut size: Size,
+        price: Tick,
+        mut size: Lots,
         callback: &mut impl FnMut(OrderBookEvent),
-        id_to_price_and_side: &mut HashMap<OrderID, (Price, bool)>) -> MatchingStatus
+        id_to_price_and_side: &mut HashMap<OrderID, (Tick, bool)>) -> MatchingStatus
     {
         let size_before_matching = size;
-        for order in level.iter_mut().filter(|order| order.size != Size(0)) {
+        for order in level.iter_mut().filter(|order| order.size != Lots(0)) {
             if order.is_dummy {
                 if MATCH_DUMMY_WITH_DUMMY {
                     match size.cmp(&order.size) {
@@ -865,7 +865,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                                     kind: OrderBookEventKind::OldOrderExecuted(order.id),
                                 }
                             );
-                            order.size = Size(0);
+                            order.size = Lots(0);
                             return MatchingStatus::FullyExecuted;
                         }
                         Ordering::Greater => {
@@ -884,7 +884,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                                 }
                             );
                             size -= order.size;
-                            order.size = Size(0);
+                            order.size = Lots(0);
                         }
                     }
                 }
@@ -899,13 +899,13 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
 
     fn match_real_with_level(
         level: &mut VecDeque<LimitOrder>,
-        price: Price,
-        mut size: Size,
+        price: Tick,
+        mut size: Lots,
         callback: &mut impl FnMut(OrderBookEvent),
-        id_to_price_and_side: &mut HashMap<OrderID, (Price, bool)>) -> MatchingStatus
+        id_to_price_and_side: &mut HashMap<OrderID, (Tick, bool)>) -> MatchingStatus
     {
         let size_before_matching = size;
-        for order in level.iter_mut().filter(|order| order.size != Size(0)) {
+        for order in level.iter_mut().filter(|order| order.size != Lots(0)) {
             if !order.is_dummy {
                 match size.cmp(&order.size) {
                     Ordering::Less => {
@@ -935,7 +935,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                                 kind: OrderBookEventKind::OldOrderExecuted(order.id),
                             }
                         );
-                        order.size = Size(0);
+                        order.size = Lots(0);
                         return MatchingStatus::FullyExecuted;
                     }
                     Ordering::Greater => {
@@ -954,7 +954,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                             }
                         );
                         size -= order.size;
-                        order.size = Size(0);
+                        order.size = Lots(0);
                     }
                 }
             } else if order.size > size {
@@ -980,7 +980,7 @@ impl<const MATCH_DUMMY_WITH_DUMMY: bool> OrderBook<MATCH_DUMMY_WITH_DUMMY>
                         kind: OrderBookEventKind::OldOrderExecuted(order.id),
                     }
                 );
-                order.size = Size(0);
+                order.size = Lots(0);
             }
         }
         MatchingStatus::PartiallyExecuted(size_before_matching - size)

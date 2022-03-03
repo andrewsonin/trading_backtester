@@ -14,7 +14,7 @@ use {
                 TradedPairLifetime,
             },
             traded_pair::{parser::TradedPairParser, settlement::GetSettlementLag, TradedPair},
-            types::PriceStep,
+            types::TickSize,
         },
         types::{
             DateTime,
@@ -788,7 +788,7 @@ fn parse_traded_pairs_section<
             let full_section_path = || format!("{SECTION} :: {i} :: {field}");
             let price_step = read_yaml_hashmap_field(map, field, path, full_section_path);
             let price_step = expect_yaml_real(price_step, path, full_section_path);
-            let price_step: PriceStep = f64::from_str(price_step).unwrap_or_else(
+            let price_step: TickSize = f64::from_str(price_step).unwrap_or_else(
                 |err| panic!("Section \"{}\". Cannot parse to f64: {}. Error: {err}",
                              full_section_path(), price_step)
             ).into();
@@ -841,7 +841,7 @@ fn parse_trade_start_stops<
 >(
     map: &Hash,
     traded_pair: TradedPair<Symbol, Settlement>,
-    price_step: PriceStep,
+    price_step: TickSize,
     exchange_id: ExchangeID,
     mut env: HashMap<String, YamlValue>,
     path: &Path,
@@ -1071,7 +1071,7 @@ fn gen_traded_pair_reader<
 >(
     map: &Hash,
     traded_pair: TradedPair<Symbol, Settlement>,
-    price_step: PriceStep,
+    price_step: TickSize,
     exchange_id: ExchangeID,
     env: HashMap<String, YamlValue>,
     path: &Path,
@@ -1118,7 +1118,7 @@ const fn get_order_id_colname<const IS_TRD: bool>() -> &'static str {
 fn gen_trd_prl_config<F: Fn() -> String, const IS_TRD: bool>(
     map: &Hash,
     mut env: HashMap<String, YamlValue>,
-    price_step: PriceStep,
+    price_step: TickSize,
     path: &Path,
     full_section_path: F) -> (PathBuf, OneTickTrdPrlConfig)
 {
